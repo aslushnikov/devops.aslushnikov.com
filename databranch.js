@@ -49,11 +49,14 @@ class DataBranch {
   async upload(message = 'update data') {
     // Check if there's anything to update.
     const {stdout} = await spawnAsyncOrDie('git', 'status', '-s', '--untracked-files=all', {cwd: this._checkoutPath});
-    if (!stdout.trim())
+    if (!stdout.trim()) {
+      console.log('Nothing to upload');
       return;
+    }
     await spawnAsyncOrDie('git', 'add', '.', {cwd: this._checkoutPath});
     await spawnAsyncOrDie('git', 'commit', '-m', message, '--author', '"github-actions <github-actions@github.com>"', {cwd: this._checkoutPath});
     await spawnAsyncOrDie('git', 'push', 'origin', this._branch, {cwd: this._checkoutPath});
+    console.log('Uploaded new data!');
   }
 }
 

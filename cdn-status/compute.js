@@ -1,5 +1,5 @@
-const {URL} = require('url');
 const {DataBranch} = require('../databranch.js');
+const {Playwright} = require('../playwright.js');
 const misc = require('../misc.js');
 
 const BRANCH_NAME = 'cdn-status-data';
@@ -74,12 +74,10 @@ async function updateCDNStatus(dataBranch, browserName, buildNumber, dataPath) {
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
   const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
-  const pwPath = await misc.clonePlaywrightRepo(cleanupHooks);
-  const wkBuildNumber = await misc.webkitBuildNumber(pwPath);
-  const ffBuildNumber = await misc.firefoxBuildNumber(pwPath);
+  const pw = await Playwright.clone(cleanupHooks);
 
-  await updateCDNStatus(dataBranch, 'webkit', wkBuildNumber, 'webkit.json');
-  await updateCDNStatus(dataBranch, 'firefox', ffBuildNumber, 'firefox.json');
+  await updateCDNStatus(dataBranch, 'webkit', await pw.wkBuildNumber(), 'webkit.json');
+  await updateCDNStatus(dataBranch, 'firefox', await pw.ffBuildNumber(), 'firefox.json');
 
   await dataBranch.upload('update cdn-status');
 })();

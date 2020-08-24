@@ -36,22 +36,6 @@ async function spawnAsyncOrDie(command, ...args) {
   return {stdout, stderr};
 }
 
-async function clonePlaywrightRepo(cleanupHooks = []) {
-  const tmpFolder = path.join(os.tmpdir(), 'playwright-tmp-folder-');
-  const checkoutPath = await fs.promises.mkdtemp(tmpFolder);
-  await spawnAsyncOrDie('git', 'clone', '--single-branch', '--branch', `master`, '--depth=1', 'https://github.com/microsoft/playwright.git', checkoutPath);
-  cleanupHooks.push(() => fs.rmdirSync(checkoutPath, {recursive: true}));
-  return checkoutPath;
-}
-
-async function webkitBuildNumber(playwrightPath) {
-  return parseInt((await fs.promises.readFile(path.join(playwrightPath, 'browser_patches', 'webkit', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
-}
-
-async function firefoxBuildNumber(playwrightPath) {
-  return parseInt((await fs.promises.readFile(path.join(playwrightPath, 'browser_patches', 'firefox', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
-}
-
 async function headRequest(url) {
   return new Promise(resolve => {
     let options = new URL(url);
@@ -89,4 +73,4 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, clonePlaywrightRepo, headRequest, webkitBuildNumber, firefoxBuildNumber };
+module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest };

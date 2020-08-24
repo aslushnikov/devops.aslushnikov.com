@@ -46,12 +46,14 @@ class DataBranch {
     return await fs.promises.writeFile(path.join(this._checkoutPath, filepath), content, 'utf8');
   }
 
-  async upload(message) {
-    console.log(this._checkoutPath);
+  async upload(message = 'update data') {
+    // Check if there's anything to update.
+    const {stdout} = await spawnAsyncOrDie('git', 'status', '-s', '--untracked-files=all', {cwd: this._checkoutPath});
+    if (!stdout.trim())
+      return;
     await spawnAsyncOrDie('git', 'add', '.', {cwd: this._checkoutPath});
     await spawnAsyncOrDie('git', 'commit', '-m', message, '--author', '"github-actions <github-actions@github.com>"', {cwd: this._checkoutPath});
-    const {code} = await spawnAsync('git', 'push', 'origin', this._branch, {cwd: this._checkoutPath});
-    return code === 0;
+    await spawnAsyncOrDie('git', 'push', 'origin', this._branch, {cwd: this._checkoutPath});
   }
 }
 

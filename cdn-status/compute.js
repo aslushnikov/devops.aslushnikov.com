@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const {URL} = require('url');
 const {DataBranch} = require('../databranch.js');
-const {clonePlaywrightRepo, spawnAsyncOrDie, headRequest} = require('../misc.js');
+const misc = require('../misc.js');
 
 const DATA_DIR = path.join(__dirname, 'data');
 
@@ -30,7 +30,7 @@ const BLOB_NAMES = {
 };
 
 async function collectRevisionInfo(rev, urls) {
-  const statuses = await Promise.all(urls.map(url => headRequest(url)));
+  const statuses = await Promise.all(urls.map(url => misc.headRequest(url)));
   return {
     rev,
     urls: urls.filter((url, index) => statuses[index]),
@@ -76,11 +76,13 @@ async function updateCDNStatus(browserName, buildNumber, dataPath) {
 }
 
 (async () => {
+  const cleanupHooks = misc.setupProcessHooks();
   const dataBranch = await DataBranch.initialize(BRANCH_NAME, DATA_DIR);
-  const pwPath = await clonePlaywrightRepo();
-  const wkBuildNumber = parseInt((await fs.promises.readFile(path.join(pwPath, 'browser_patches', 'webkit', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
-  const ffBuildNumber = parseInt((await fs.promises.readFile(path.join(pwPath, 'browser_patches', 'firefox', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
-  await fs.promises.rmdir(pwPath, {recursive: true});
+  const pwPath = await misc.clonePlaywrightRepo();
+  console.log(pwPath);
+  cleanupHooks.push(() => fs.rmdirSync(pwPath, {recursive: true}));
+  const wkBuildNumber = await misc.webkitBuildNumber(pwPath);
+  const ffBuildNumber = await misc.firefoxBuildNumber(pwPath);
 
   await updateCDNStatus('webkit', wkBuildNumber, path.join(DATA_DIR, 'webkit.json'));
   await updateCDNStatus('firefox', ffBuildNumber, path.join(DATA_DIR, 'firefox.json'));

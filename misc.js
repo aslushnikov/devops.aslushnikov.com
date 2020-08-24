@@ -44,6 +44,14 @@ async function clonePlaywrightRepo() {
   return checkoutPath;
 }
 
+async function webkitBuildNumber(playwrightPath) {
+  return parseInt((await fs.promises.readFile(path.join(playwrightPath, 'browser_patches', 'webkit', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
+}
+
+async function firefoxBuildNumber(playwrightPath) {
+  return parseInt((await fs.promises.readFile(path.join(playwrightPath, 'browser_patches', 'firefox', 'BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
+}
+
 async function headRequest(url) {
   return new Promise(resolve => {
     let options = new URL(url);
@@ -54,4 +62,31 @@ async function headRequest(url) {
   });
 }
 
-module.exports = { spawnAsync, spawnAsyncOrDie, clonePlaywrightRepo, headRequest };
+// Process hooks are important so that github workflow actually crashes
+// if there's an error in node.js process.
+function setupProcessHooks() {
+  const cleanupHooks = [];
+  process.on('exit', () => {
+    for (const cleanup of cleanupHooks) {
+      try {
+        cleanup();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  });
+  process.on('SIGINT', () => process.exit(2));
+  process.on('SIGHUP', () => process.exit(3));
+  process.on('SIGTERM', () => process.exit(4));
+  process.on('uncaughtException', error => {
+    console.error(error);
+    process.exit(5);
+  });
+  process.on('unhandledRejection', error => {
+    console.error(error);
+    process.exit(6);
+  });
+  return cleanupHooks;
+}
+
+module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, clonePlaywrightRepo, headRequest, webkitBuildNumber, firefoxBuildNumber };

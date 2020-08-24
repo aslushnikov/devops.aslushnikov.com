@@ -2,7 +2,7 @@ const fs = require('fs');
 
 const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
 
-const GITHUB_REPOSITORY = 'aslushnikov/devops.asluhnikov.com';
+const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
 
 class DataBranch {
   static async initialize(branch, checkoutPath) {

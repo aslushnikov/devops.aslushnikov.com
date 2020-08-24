@@ -35,7 +35,7 @@ async function collectRevisionInfo(rev, urls) {
 
 async function updateCDNStatus(dataBranch, browserName, buildNumber, dataPath) {
   // Try to read last saved status and default to 'no status'
-  const cdnData = await dataBranch.readFile(dataPath, 'utf8').catch(e => []);
+  const cdnData = JSON.parse(await dataBranch.readFile(dataPath, 'utf8').catch(e => '[]'));
 
   // Build a list of all missing status data.
   const revisionToInfo = new Map();

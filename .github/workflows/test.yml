@@ -7,5 +7,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: |
-          node git.js
+      - run: node git.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

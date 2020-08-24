@@ -2,13 +2,15 @@ const fs = require('fs');
 
 const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
 
+const GITHUB_REPOSITORY = 'aslushnikov/devops.asluhnikov.com';
+
 class DataBranch {
-  static async initialize(githubRepository, branch, checkoutPath) {
+  static async initialize(branch, checkoutPath) {
     await fs.promises.rmdir(checkoutPath, {recursive: true});
-    let url = `https://github.com/${githubRepository}.git`;
+    let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
-      url = `https://${process.env.GITHUB_ACTOR}:${process.env.GITHUB_TOKEN}@github.com/${githubRepository}.git`;
+      url = `https://${process.env.GITHUB_ACTOR}:${process.env.GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git`;
 
     await fs.promises.mkdir(checkoutPath, {recursive: true}); 
     // Check existance of a remote branch for this bot.

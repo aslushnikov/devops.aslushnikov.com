@@ -2,6 +2,7 @@ const spawn = require('child_process').spawn;
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 const RED_COLOR = '\x1b[31m';
 const GREEN_COLOR = '\x1b[32m';
@@ -43,4 +44,14 @@ async function clonePlaywrightRepo() {
   return checkoutPath;
 }
 
-module.exports = { spawnAsync, spawnAsyncOrDie, clonePlaywrightRepo };
+async function headRequest(url) {
+  return new Promise(resolve => {
+    let options = new URL(url);
+    options.method = 'HEAD';
+    const request = https.request(options, res => resolve(res.statusCode === 200));
+    request.on('error', error => resolve(false));
+    request.end();
+  });
+}
+
+module.exports = { spawnAsync, spawnAsyncOrDie, clonePlaywrightRepo, headRequest };

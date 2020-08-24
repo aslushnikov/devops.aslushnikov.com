@@ -33,10 +33,7 @@ async function collectRevisionInfo(rev, urls) {
   };
 }
 
-async function updateCDNStatus(dataBranch, browserName, buildNumber, dataPath) {
-  // Try to read last saved status and default to 'no status'
-  const cdnData = await dataBranch.readJSON(dataPath).catch(e => []);
-
+async function updateCDNStatus(browserName, buildNumber, cdnData) {
   // Build a list of all missing status data.
   const revisionToInfo = new Map();
   for (const entry of cdnData)
@@ -67,18 +64,33 @@ async function updateCDNStatus(dataBranch, browserName, buildNumber, dataPath) {
     revisionToInfo.set(rev, await collectRevisionInfo(rev, urls));
     console.timeEnd(label);
   }
-
-  await dataBranch.writeJSON(dataPath, [...revisionToInfo.values()]);
+  const result = [...revisionToInfo.values()];
+  result.sort((a, b) => a.rev - b.rev);
+  return result;
 }
+
+const FORMAT_VERSION = 2;
 
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
   const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
   const pw = await Playwright.clone(cleanupHooks);
+  // Try to read last saved status and default to 'no status'
+  const defaultData = {
+    version: FORMAT_VERSION,
+    timestamp: Date.now(),
+    webkit: [],
+    firefox: [],
+  };
+  let status = await dataBranch.readJSON('./status.json').catch(e => defaultData);
+  if (status.version !== FORMAT_VERSION)
+    status = defaultData;
 
-  await updateCDNStatus(dataBranch, 'webkit', await pw.wkBuildNumber(), 'webkit.json');
-  await updateCDNStatus(dataBranch, 'firefox', await pw.ffBuildNumber(), 'firefox.json');
+  status.webkit = await updateCDNStatus('webkit', await pw.wkBuildNumber(), status.webkit);
+  status.firefox = await updateCDNStatus('firefox', await pw.ffBuildNumber(), status.firefox);
+  status.timestamp = Date.now();
 
+  await dataBranch.writeJSON('./status.json', status);
   await dataBranch.upload('update cdn-status');
 })();
 

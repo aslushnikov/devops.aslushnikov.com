@@ -1,14 +1,15 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
+const TMP_FOLDER = path.join(os.tmpdir(), 'devops-data-dir-tmp-folder-');
 
 class DataBranch {
   static async initialize(branch, cleanupHooks = []) {
-    const checkoutPath = await fs.promises.mkdtemp('devops-data-dir-tmp-folder-');
-    await fs.promises.rmdir(checkoutPath, {recursive: true});
+    const checkoutPath = await fs.promises.mkdtemp(TMP_FOLDER);
     let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
@@ -46,8 +47,9 @@ class DataBranch {
   }
 
   async upload(message) {
+    console.log(this._checkoutPath);
     await spawnAsyncOrDie('git', 'add', '.', {cwd: this._checkoutPath});
-    await spawnAsyncOrDie('git', 'commit', '-m', `${message}`, '--author', '"github-actions <github-actions@github.com>"', {cwd: this._checkoutPath});
+    await spawnAsyncOrDie('git', 'commit', '-m', message, '--author', '"github-actions <github-actions@github.com>"', {cwd: this._checkoutPath});
     const {code} = await spawnAsync('git', 'push', 'origin', this._branch, {cwd: this._checkoutPath});
     return code === 0;
   }

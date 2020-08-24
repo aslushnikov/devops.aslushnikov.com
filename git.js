@@ -63,6 +63,11 @@ async function spawnAsync(command, ...args) {
   cmd.stdout.on('data', data => stdout += data);
   cmd.stderr.on('data', data => stderr += data);
   const code = await new Promise(x => cmd.once('close', x));
+  console.log(command, ...args);
+  console.log('------ stdout --------');
+  console.log(stdout);
+  console.log('------ stderr --------');
+  console.log(stderr);
   return {code, stdout, stderr};
 }
 

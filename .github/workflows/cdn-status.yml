@@ -1,4 +1,7 @@
-on: push
+on:
+  push:
+    branches:
+      - master
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -7,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: node git.js
+      - run: node cdn-status/cdn-status.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

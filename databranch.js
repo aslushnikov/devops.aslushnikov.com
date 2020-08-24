@@ -1,13 +1,6 @@
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const spawn = require('child_process').spawn;
-const util = require('util');
 
-const RED_COLOR = '\x1b[31m';
-const GREEN_COLOR = '\x1b[32m';
-const YELLOW_COLOR = '\x1b[33m';
-const RESET_COLOR = '\x1b[0m';
+const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
 
 class DataBranch {
   static async initialize(githubRepository, branch, checkoutPath) {
@@ -47,33 +40,4 @@ class DataBranch {
   }
 }
 
-(async () => {
-  const dataBranch = await DataBranch.initialize('aslushnikov/devops.aslushnikov.com', 'test-data-branch', './data');
-  await fs.promises.writeFile(path.join(__dirname, 'data', 'test.txt'), '' + Date.now());
-  console.log(await dataBranch.upload('update data!'));
-})();
-
-async function spawnAsync(command, ...args) {
-  let options = {};
-  if (args.length && args[args.length - 1].constructor.name !== 'String')
-    options = args.pop();
-  const cmd = spawn(command, args, options);
-  let stdout = '';
-  let stderr = '';
-  cmd.stdout.on('data', data => stdout += data);
-  cmd.stderr.on('data', data => stderr += data);
-  const code = await new Promise(x => cmd.once('close', x));
-  console.log(command, ...args);
-  console.log('------ stdout --------');
-  console.log(stdout);
-  console.log('------ stderr --------');
-  console.log(stderr);
-  return {code, stdout, stderr};
-}
-
-async function spawnAsyncOrDie(command, ...args) {
-  const {code, stdout, stderr} = await spawnAsync(command, ...args);
-  if (code !== 0)
-    throw new Error(`Failed to executed: "${command} ${args.join(' ')}".\n\n=== STDOUT ===\n${stdout}\n\n\n=== STDERR ===\n${stderr}`);
-  return {stdout, stderr};
-}
+module.exports = {DataBranch};

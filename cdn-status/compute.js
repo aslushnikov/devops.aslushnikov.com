@@ -1,10 +1,6 @@
-const path = require('path');
-const fs = require('fs');
 const {URL} = require('url');
 const {DataBranch} = require('../databranch.js');
 const misc = require('../misc.js');
-
-const DATA_DIR = path.join(__dirname, 'data');
 
 const BRANCH_NAME = 'cdn-status-data';
 const HOST = 'https://playwright.azureedge.net';
@@ -37,9 +33,9 @@ async function collectRevisionInfo(rev, urls) {
   };
 }
 
-async function updateCDNStatus(browserName, buildNumber, dataPath) {
+async function updateCDNStatus(dataBranch, browserName, buildNumber, dataPath) {
   // Try to read last saved status and default to 'no status'
-  const cdnData = await fs.promises.readFile(dataPath, 'utf8').catch(e => []);
+  const cdnData = await dataBranch.readFile(dataPath, 'utf8').catch(e => []);
 
   // Build a list of all missing status data.
   const revisionToInfo = new Map();
@@ -72,21 +68,19 @@ async function updateCDNStatus(browserName, buildNumber, dataPath) {
     console.timeEnd(label);
   }
 
-  await fs.promises.writeFile(dataPath, JSON.stringify([...revisionToInfo.values()]));
+  await dataBranch.writeFile(dataPath, JSON.stringify([...revisionToInfo.values()]));
 }
 
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
-  const dataBranch = await DataBranch.initialize(BRANCH_NAME, DATA_DIR);
-  const pwPath = await misc.clonePlaywrightRepo();
-  console.log(pwPath);
-  cleanupHooks.push(() => fs.rmdirSync(pwPath, {recursive: true}));
+  const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
+  const pwPath = await misc.clonePlaywrightRepo(cleanupHooks);
   const wkBuildNumber = await misc.webkitBuildNumber(pwPath);
   const ffBuildNumber = await misc.firefoxBuildNumber(pwPath);
 
-  await updateCDNStatus('webkit', wkBuildNumber, path.join(DATA_DIR, 'webkit.json'));
-  await updateCDNStatus('firefox', ffBuildNumber, path.join(DATA_DIR, 'firefox.json'));
+  await updateCDNStatus(dataBranch, 'webkit', wkBuildNumber, 'webkit.json');
+  await updateCDNStatus(dataBranch, 'firefox', ffBuildNumber, 'firefox.json');
 
-  console.log(await dataBranch.upload('update cdn-status'));
+  await dataBranch.upload('update cdn-status');
 })();
 

@@ -36,11 +36,10 @@ async function spawnAsyncOrDie(command, ...args) {
   return {stdout, stderr};
 }
 
-const TMP_FOLDER = path.join(os.tmpdir(), 'tmp_folder-');
-
-async function clonePlaywrightRepo() {
-  const checkoutPath = await fs.promises.mkdtemp(TMP_FOLDER);
+async function clonePlaywrightRepo(cleanupHooks = []) {
+  const checkoutPath = await fs.promises.mkdtemp('playwright-tmp-folder-');
   await spawnAsyncOrDie('git', 'clone', '--single-branch', '--branch', `master`, '--depth=1', 'https://github.com/microsoft/playwright.git', checkoutPath);
+  cleanupHooks.push(() => fs.rmdirSync(checkoutPath, {recursive: true}));
   return checkoutPath;
 }
 

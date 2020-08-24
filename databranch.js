@@ -5,7 +5,8 @@ const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
 const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
 
 class DataBranch {
-  static async initialize(branch, checkoutPath) {
+  static async initialize(branch, cleanupHooks = []) {
+    const checkoutPath = await fs.promises.mkdtemp('devops-data-dir-tmp-folder-');
     await fs.promises.rmdir(checkoutPath, {recursive: true});
     let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
@@ -26,12 +27,21 @@ class DataBranch {
     }
     await spawnAsyncOrDie('git', 'config', 'user.email', `"github-actions@github.com"`, {cwd: checkoutPath});
     await spawnAsyncOrDie('git', 'config', 'user.name', `"github-actions"`, {cwd: checkoutPath});
-    return new DataBranch(checkoutPath, branch);
+    return new DataBranch(checkoutPath, branch, cleanupHooks);
   }
 
-  constructor(checkoutPath, branch) {
+  constructor(checkoutPath, branch, cleanupHooks) {
     this._checkoutPath = checkoutPath;
     this._branch = branch;
+    cleanupHooks.push(() => fs.rmdirSync(this._checkoutPath, {recursive: true}));
+  }
+
+  async readFile(filepath) {
+    return await fs.promises.readFile(path.join(this._checkoutPath, filepath), 'utf8');
+  }
+
+  async writeFile(filepath, content) {
+    return await fs.promises.writeFile(path.join(this._checkoutPath, filepath), content, 'utf8');
   }
 
   async upload(message) {

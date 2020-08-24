@@ -23,6 +23,19 @@ class Playwright {
     return path.join(this._checkoutPath, gitpath);
   }
 
+  async prepareBrowserCheckout(browserName) {
+    await misc.spawnAsyncOrDie(this.filepath('browser_patches/prepare_checkout.sh'), browserName, {cwd: this._checkoutPath});
+  }
+
+  async webkitProtocol() {
+    const {stdout} = await spawnAsyncOrDie('node', this.filepath('browser_patches/webkit/concat_protocol.js'), {cwd: this._checkoutPath});
+    return stdout;
+  }
+
+  async firefoxProtocol() {
+    return await fs.promises.readFile(this.filepath('browser_patches/firefox/juggler/protocol/Protocol.js'), 'utf8');
+  }
+
   async wkBuildNumber() {
     return parseInt((await fs.promises.readFile(this.filepath('browser_patches/webkit/BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
   }

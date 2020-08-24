@@ -38,12 +38,20 @@ class DataBranch {
     cleanupHooks.push(() => fs.rmdirSync(this._checkoutPath, {recursive: true}));
   }
 
+  async readJSON(filepath) {
+    return JSON.parse(await this.readFile(filepath));
+  }
+
   async readFile(filepath) {
     return await fs.promises.readFile(path.join(this._checkoutPath, filepath), 'utf8');
   }
 
   async writeFile(filepath, content) {
     return await fs.promises.writeFile(path.join(this._checkoutPath, filepath), content, 'utf8');
+  }
+
+  async writeJSON(filepath, content) {
+    return await this.writeFile(filepath, JSON.stringify(content));
   }
 
   async upload(message = 'update data') {

@@ -15,7 +15,7 @@ class DataBranch {
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
       url = `https://${process.env.GITHUB_ACTOR}:${process.env.GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git`;
 
-    await fs.promises.mkdir(checkoutPath, {recursive: true}); 
+    await fs.promises.mkdir(checkoutPath, {recursive: true});
     // Check existance of a remote branch for this bot.
     const {stdout} = await spawnAsync('git', 'ls-remote', '--heads', url, branch);
     // If there is no remote branch for this bot - create one.

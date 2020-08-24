@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: node browser-patches/compute.js
+      - run: node browser-protocols/compute.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

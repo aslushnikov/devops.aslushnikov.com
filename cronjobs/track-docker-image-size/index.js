@@ -1,6 +1,7 @@
 const {DataBranch} = require('../databranch.js');
 const {Playwright} = require('../playwright.js');
 const misc = require('../misc.js');
+const fs = require('fs');
 
 const BRANCH_NAME = 'docker-image-size-data';
 
@@ -45,7 +46,7 @@ const FORMAT_VERSION = 1;
       });
     }
 
-    console.log(`* extracting imager`);
+    console.log(`* extracting image`);
     // This command is expected to produce `dockerimage.tar` and `dockerimage.tar.gz`
     await misc.spawnAsyncOrDie('bash', 'export-docker-image.sh', workdir, {cwd: __dirname});
     // The only output in stdout is the compressed image.

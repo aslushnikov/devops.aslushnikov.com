@@ -28,7 +28,7 @@ class Playwright {
   }
 
   async webkitProtocol() {
-    const {stdout} = await spawnAsyncOrDie('node', this.filepath('browser_patches/webkit/concat_protocol.js'), {cwd: this._checkoutPath});
+    const {stdout} = await misc.spawnAsyncOrDie('node', this.filepath('browser_patches/webkit/concat_protocol.js'), {cwd: this._checkoutPath});
     return stdout;
   }
 
@@ -42,6 +42,17 @@ class Playwright {
 
   async ffBuildNumber() {
     return parseInt((await fs.promises.readFile(this.filepath('browser_patches/firefox/BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
+  }
+
+  async commitHistory(gitpath) {
+    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format=oneline', gitpath);
+    return stdout.trim().split('\n').map(line => {
+      line = line.trim();
+      const spaceIndex = line.indexOf(' ');
+      const sha = line.substring(0, spaceIndex);
+      const message = line.substring(spaceIndex + 1);
+      return {sha, message};
+    });
   }
 }
 

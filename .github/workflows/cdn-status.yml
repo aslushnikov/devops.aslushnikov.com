@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: node cronjobs/update-cdn-status.js
+      - run: node cronjobs/cdn-status/index.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

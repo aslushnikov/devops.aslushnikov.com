@@ -1,6 +1,6 @@
-const {DataBranch} = require('./common/databranch.js');
-const {Playwright} = require('./common/playwright.js');
-const misc = require('./common/misc.js');
+const {DataBranch} = require('../databranch.js');
+const {Playwright} = require('../playwright.js');
+const misc = require('../misc.js');
 
 const BRANCH_NAME = 'browser-protocols-data';
 

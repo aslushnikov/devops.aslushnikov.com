@@ -25,7 +25,8 @@ const FORMAT_VERSION = 1;
   for (const info of data.infos)
     shaToInfo.set(info.sha, info);
 
-  const pw = await Playwright.clone(cleanupHooks);
+  // Clone Playwright with history so that we can use commitHistory command.
+  const pw = await Playwright.clone(cleanupHooks, { fullHistory: true });
   await pw.installDependencies();
   await pw.buildProject();
   const commits = await pw.commitHistory('docs/docker/Dockerfile.bionic');

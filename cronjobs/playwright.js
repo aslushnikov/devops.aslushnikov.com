@@ -6,10 +6,19 @@ const misc = require('./misc.js');
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
 class Playwright {
-  static async clone(cleanupHooks = []) {
+  static async clone(cleanupHooks, options = {}) {
+    const {
+      fullHistory = false,
+    } = options;
     const checkoutPath = await misc.makeTempDir('devops-playwright-checkout-', cleanupHooks);
     console.log(`[playwright] cloning Playwright at ${checkoutPath}`);
-    await misc.spawnAsyncOrDie('git', 'clone', '--single-branch', '--branch', `master`, '--depth=1', 'https://github.com/microsoft/playwright.git', checkoutPath);
+    const cloneOptions = [
+      '--single-branch',
+      '--branch', 'master',
+    ];
+    if (!fullHistory)
+      cloneOptions.push('--depth=1');
+    await misc.spawnAsyncOrDie('git', 'clone', ...cloneOptions, 'https://github.com/microsoft/playwright.git', checkoutPath);
     return new Playwright(checkoutPath);
   }
 

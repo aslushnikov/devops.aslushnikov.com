@@ -9,6 +9,9 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
+      - run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
       - run: node browser-protocols/compute.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

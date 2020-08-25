@@ -2,6 +2,7 @@ const {DataBranch} = require('../databranch.js');
 const {Playwright} = require('../playwright.js');
 const misc = require('../misc.js');
 const fs = require('fs');
+const path = require('path');
 
 const BRANCH_NAME = 'docker-image-size-data';
 

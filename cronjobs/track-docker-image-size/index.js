@@ -49,9 +49,10 @@ const FORMAT_VERSION = 1;
 
     console.log(`* extracting image`);
     // This command is expected to produce `dockerimage.tar` and `dockerimage.tar.gz`
-    await misc.spawnAsyncOrDie('bash', 'export-docker-image.sh', workdir, {cwd: __dirname});
+    await misc.spawnAsyncOrDie('bash', path.join(__dirname, 'export-docker-image.sh'), {cwd: workdir});
     // The only output in stdout is the compressed image.
     const rawStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar'));
+    await misc.spawnAsyncOrDie('gzip', 'dockerimage.tar', {cwd: workdir});
     const zipStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar.gz'));
     shaToInfo.set(commit.sha, {
       ...commit,

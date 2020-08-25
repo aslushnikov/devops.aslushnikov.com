@@ -7,6 +7,8 @@ const HOST = 'https://playwright.azureedge.net';
 
 const BLOB_NAMES = {
   webkit: [
+    'webkit-ubuntu-18.04',
+    'webkit-ubuntu-20.04',
     'webkit-mac-10.14',
     'webkit-mac-10.15',
     'webkit-win64',

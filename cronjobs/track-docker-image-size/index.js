@@ -47,7 +47,7 @@ const FORMAT_VERSION = 1;
 
     console.log(`* extracting imager`);
     // This command is expected to produce `dockerimage.tar` and `dockerimage.tar.gz`
-    await misc.spawnAsyncOrDie('bash', 'docker-image-size.sh', workdir, {cwd: __dirname});
+    await misc.spawnAsyncOrDie('bash', 'export-docker-image.sh', workdir, {cwd: __dirname});
     // The only output in stdout is the compressed image.
     const rawStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar'));
     const zipStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar.gz'));

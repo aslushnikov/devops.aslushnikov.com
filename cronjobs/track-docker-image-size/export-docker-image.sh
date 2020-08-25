@@ -10,7 +10,7 @@ if [[ $# != 1 ]]; then
   exit 1
 fi
 
-trap "cleanup; cd $(pwd -P)" EXIT
+trap "cd $(pwd -P)" EXIT
 cd $1
 
 docker save "playwright:localbuild" > "dockerimage.tar"

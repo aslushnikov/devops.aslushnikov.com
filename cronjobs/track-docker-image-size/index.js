@@ -43,7 +43,7 @@ const FORMAT_VERSION = 1;
         cwd: pw.filepath('./docs/docker'),
       });
     } else {
-      await misc.spawnAsyncOrDie('docker', 'build', '-it', 'playwright:localbuild', '-f', 'Dockerfile.bionic', '.', {
+      await misc.spawnAsyncOrDie('docker', 'build', '-t', 'playwright:localbuild', '-f', 'Dockerfile.bionic', '.', {
         cwd: pw.filepath('./docs/docker'),
       });
     }

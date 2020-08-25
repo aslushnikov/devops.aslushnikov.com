@@ -24,6 +24,8 @@ const FORMAT_VERSION = 1;
     shaToInfo.set(info.sha, info);
 
   const pw = await Playwright.clone(cleanupHooks);
+  await pw.installDependencies();
+  await pw.buildProject();
   const commits = await pw.commitHistory('docs/docker/Dockerfile.bionic');
   const missingCommits = commits.filter(commit => !shaToInfo.has(commit.sha));
 
@@ -31,6 +33,7 @@ const FORMAT_VERSION = 1;
   for (const commit of missingCommits) {
     await pw.checkoutRevision(commit.sha);
     // build.sh may and may not exist.
+    console.log(`* building docker file`);
     if (await pw.exists('./docs/docker/build.sh')) {
       const buildFilePath = pw.filepath('./docs/docker/build.sh');
       await misc.spawnAsyncOrDie('bash', buildFilePath, {
@@ -42,6 +45,7 @@ const FORMAT_VERSION = 1;
       });
     }
 
+    console.log(`* extracting imager`);
     // This command is expected to produce `dockerimage.tar` and `dockerimage.tar.gz`
     await misc.spawnAsyncOrDie('bash', 'docker-image-size.sh', workdir, {cwd: __dirname});
     // The only output in stdout is the compressed image.

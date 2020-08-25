@@ -8,6 +8,7 @@ const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
 class DataBranch {
   static async initialize(branch, cleanupHooks = []) {
     const checkoutPath = await makeTempDir('devops-data-dir-tmp-folder-', cleanupHooks);
+    console.log(`[databranch] initializing at ${checkoutPath}`);
     let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
@@ -55,13 +56,13 @@ class DataBranch {
     // Check if there's anything to update.
     const {stdout} = await spawnAsyncOrDie('git', 'status', '-s', '--untracked-files=all', {cwd: this._checkoutPath});
     if (!stdout.trim()) {
-      console.log('Nothing to upload');
+      console.log('[databranch] FYI: no changes, nothing to upload');
       return;
     }
+    console.log(`[databranch] Uploading data with message "${message}"`);
     await spawnAsyncOrDie('git', 'add', '.', {cwd: this._checkoutPath});
     await spawnAsyncOrDie('git', 'commit', '-m', message, '--author', '"github-actions <github-actions@github.com>"', {cwd: this._checkoutPath});
     await spawnAsyncOrDie('git', 'push', 'origin', this._branch, {cwd: this._checkoutPath});
-    console.log('Uploaded new data!');
   }
 }
 

@@ -8,6 +8,7 @@ const GITHUB_REPOSITORY = 'microsoft/playwright';
 class Playwright {
   static async clone(cleanupHooks = []) {
     const checkoutPath = await misc.makeTempDir('devops-playwright-checkout-', cleanupHooks);
+    console.log(`[playwright] cloning Playwright at ${checkoutPath}`);
     await misc.spawnAsyncOrDie('git', 'clone', '--single-branch', '--branch', `master`, '--depth=1', 'https://github.com/microsoft/playwright.git', checkoutPath);
     return new Playwright(checkoutPath);
   }
@@ -21,6 +22,7 @@ class Playwright {
   }
 
   async prepareBrowserCheckout(browserName) {
+    console.log(`[playwright] preparing ${browserName} checkout`);
     await misc.spawnAsyncOrDie(this.filepath('browser_patches/prepare_checkout.sh'), browserName, {cwd: this._checkoutPath});
   }
 
@@ -41,8 +43,22 @@ class Playwright {
     return parseInt((await fs.promises.readFile(this.filepath('browser_patches/firefox/BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
   }
 
+  async installDependencies() {
+    console.log(`[playwright] installing dependencies`);
+    await misc.spawnAsyncOrDie('npm', 'install', {
+      cwd: this._checkoutPath,
+    });
+  }
+
+  async buildProject() {
+    console.log(`[playwright] building project`);
+    await misc.spawnAsyncOrDie('npm', 'run', 'build', {
+      cwd: this._checkoutPath,
+    });
+  }
+
   async commitHistory(gitpath) {
-    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format="%H %ct %s"', gitpath, {cwd: this._checkoutPath});
+    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
     return stdout.trim().split('\n').map(line => {
       line = line.trim();
       const tokens = line.split(' ');
@@ -58,6 +74,7 @@ class Playwright {
   }
 
   async checkoutRevision(sha) {
+    console.log(`[playwright] checking out revision ${sha}`);
     await misc.spawnAsyncOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
   }
 }

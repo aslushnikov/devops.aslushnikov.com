@@ -19,14 +19,14 @@ async function spawnAsync(command, ...args) {
   cmd.stdout.on('data', data => stdout += data);
   cmd.stderr.on('data', data => stderr += data);
   const code = await new Promise(x => cmd.once('close', x));
-  /*
-  console.log(command, ...args);
-  console.log('------ stdout --------');
-  console.log(stdout);
-  console.log('------ stderr --------');
-  console.log(stderr);
-  */
   return {code, stdout, stderr};
+}
+
+async function makeTempDir(prefix, cleanupHooks = []) {
+  const TMP_FOLDER = path.join(os.tmpdir(), prefix);
+  const tmp = await fs.promises.mkdtemp(TMP_FOLDER);
+  cleanupHooks.push(() => fs.rmdirSync(tmp, {recursive: true}));
+  return tmp;
 }
 
 async function spawnAsyncOrDie(command, ...args) {
@@ -73,4 +73,4 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest };
+module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest, makeTempDir };

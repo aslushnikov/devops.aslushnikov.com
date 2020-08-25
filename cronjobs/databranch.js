@@ -1,15 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
-const {spawnAsync, spawnAsyncOrDie} = require('./misc.js');
+const {spawnAsync, spawnAsyncOrDie, makeTempDir} = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
-const TMP_FOLDER = path.join(os.tmpdir(), 'devops-data-dir-tmp-folder-');
 
 class DataBranch {
   static async initialize(branch, cleanupHooks = []) {
-    const checkoutPath = await fs.promises.mkdtemp(TMP_FOLDER);
+    const checkoutPath = await makeTempDir('devops-data-dir-tmp-folder-', cleanupHooks);
     let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
@@ -29,13 +27,12 @@ class DataBranch {
     }
     await spawnAsyncOrDie('git', 'config', 'user.email', `"github-actions@github.com"`, {cwd: checkoutPath});
     await spawnAsyncOrDie('git', 'config', 'user.name', `"github-actions"`, {cwd: checkoutPath});
-    return new DataBranch(checkoutPath, branch, cleanupHooks);
+    return new DataBranch(checkoutPath, branch);
   }
 
-  constructor(checkoutPath, branch, cleanupHooks) {
+  constructor(checkoutPath, branch) {
     this._checkoutPath = checkoutPath;
     this._branch = branch;
-    cleanupHooks.push(() => fs.rmdirSync(this._checkoutPath, {recursive: true}));
   }
 
   async readJSON(filepath) {

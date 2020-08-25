@@ -1,17 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
 const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'microsoft/playwright';
-const TMP_FOLDER = path.join(os.tmpdir(), 'devops-playwright-checkout-');
 
 class Playwright {
   static async clone(cleanupHooks = []) {
-    const checkoutPath = await fs.promises.mkdtemp(TMP_FOLDER);
+    const checkoutPath = await misc.makeTempDir('devops-playwright-checkout-', cleanupHooks);
     await misc.spawnAsyncOrDie('git', 'clone', '--single-branch', '--branch', `master`, '--depth=1', 'https://github.com/microsoft/playwright.git', checkoutPath);
-    cleanupHooks.push(() => fs.rmdirSync(checkoutPath, {recursive: true}));
     return new Playwright(checkoutPath);
   }
 
@@ -45,14 +42,23 @@ class Playwright {
   }
 
   async commitHistory(gitpath) {
-    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format=oneline', gitpath);
+    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format="%H %ct %s"', gitpath, {cwd: this._checkoutPath});
     return stdout.trim().split('\n').map(line => {
       line = line.trim();
-      const spaceIndex = line.indexOf(' ');
-      const sha = line.substring(0, spaceIndex);
-      const message = line.substring(spaceIndex + 1);
-      return {sha, message};
+      const tokens = line.split(' ');
+      const sha = tokens.shift();
+      const timestamp = tokens.shift();
+      const message = tokens.join(' ');
+      return {sha, timestamp, message};
     });
+  }
+
+  async exists(gitpath) {
+    return await fs.promises.stat(this.filepath(gitpath)).then(() => true).catch(e => false);
+  }
+
+  async checkoutRevision(sha) {
+    await misc.spawnAsyncOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
   }
 }
 

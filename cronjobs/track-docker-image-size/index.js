@@ -55,6 +55,7 @@ const FORMAT_VERSION = 1;
     const rawStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar'));
     await misc.spawnAsyncOrDie('gzip', 'dockerimage.tar', {cwd: workdir});
     const zipStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar.gz'));
+    await fs.promises.unlink(path.join(workdir, 'dockerimage.tar.gz'));
     shaToInfo.set(commit.sha, {
       ...commit,
       rawSize: rawStat.size,

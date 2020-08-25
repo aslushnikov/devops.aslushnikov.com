@@ -1,3 +1,4 @@
+name: update CDN status
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -9,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: node cdn-status/compute.js
+      - run: node cronjobs/update-cdn-status.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

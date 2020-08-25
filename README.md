@@ -1,9 +1,9 @@
 # Playwright devops landing site
 
 This automation to collect the following information:
-- [x] CDN browser links for binaries & logs ![.github/workflows/cdn-status.yml](https://github.com/aslushnikov/devops.aslushnikov.com/workflows/.github/workflows/cdn-status.yml/badge.svg)
+- [x] CDN browser links for binaries & logs ![update CDN status](https://github.com/aslushnikov/devops.aslushnikov.com/workflows/update%20CDN%20status/badge.svg)
 - [ ] Playwright docker image size over time (in a form of a chart)
-- [x] Browser protocols per version ![.github/workflows/browser-protocols.yml](https://github.com/aslushnikov/devops.aslushnikov.com/workflows/.github/workflows/browser-protocols.yml/badge.svg)
+- [x] Browser protocols per version ![publish browser protocols](https://github.com/aslushnikov/devops.aslushnikov.com/workflows/publish%20browser%20protocols/badge.svg)
 - [ ] test status (skips & fails)
 - [ ] autoroll info
 

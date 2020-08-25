@@ -13,10 +13,6 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14
-      - run: |
-          which docker
-          sudo apt-get update
-          sudo apt-get install -y docker
       - run: node cronjobs/track-docker-image-size/index.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

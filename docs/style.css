@@ -1,0 +1,127 @@
+:root {
+  --page-width: 1280px;
+  --monospace: Consolas, Menlo, monospace;
+  --text-color: #24292e;
+  --background-color: #fff;
+  --link-color: #0366d6;
+  --border-color: #e0e0e0;
+}
+
+a {
+  color: var(--link-color);
+}
+
+body {
+  /*font-family: var(--non-monospace); */
+  font-size: 12px;
+  color: var(--text-color);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.gallery {
+  display: grid;
+  grid-gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+/*   grid-template-columns: repeat(auto-fill, 200px); */
+/*   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr) 150px); */
+  /* grid-auto-rows: 200px; */
+  grid-auto-flow: dense;
+}
+
+tile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.tile {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 2px 2px 5px 0px #EEEEEE;
+}
+
+docker-size {
+  display: flex;
+  flex-direction: column;
+}
+    docker-size h2 {
+      argin-bottom: 0;
+    }
+
+    docker-size .row {
+      display: flex;
+      padding: 0 10px;
+    }
+        docker-size .row > * {
+          flex: none;
+        }
+
+        docker-size .row .hash {
+        }
+
+        docker-size .row .message {
+          flex-shrink: 1;
+          flex-grow: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          margin: 0 2px;
+        }
+
+    docker-size .size-delta {
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 80%;
+      font-family: var(--monospace);
+      margin: 2px 2px;
+      white-space: nowrap;
+    }
+
+    docker-size .size-decrease {
+      background-color: #DCEDC8;
+    }
+
+    docker-size .size-increase {
+      background-color: #FFEBEE;
+    }
+
+cdn-status {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+    cdn-status h2 {
+      margin-bottom: 0;
+    }
+
+    cdn-status .title {
+      font-weight: bold;
+      font-size: 120%;
+      margin: 5px 0;
+    }
+
+    cdn-status section.grid {
+      display: grid;
+      grid-template-columns: auto auto auto auto;
+    }
+
+        cdn-status section.grid .header {
+          text-align: center;
+        }
+
+        cdn-status section.grid .revision {
+          display: flex;
+          justify-content: center;
+          flex-direction: column;
+          font-weight: bold;
+          border-right: 1px solid var(--border-color);
+        }
+
+        cdn-status section.grid .cell {
+          padding: 5px 10px;
+          border-top: 1px solid var(--border-color);
+        }
+

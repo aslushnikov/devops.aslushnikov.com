@@ -42,7 +42,7 @@ const BRANCH_NAME = `autoroll-${BROWSER_NAME}-data`;
   });
 
   const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
-  const rolls = await dataBranch.readJSON('./rolls.json').catch(e => ([]));
+  let rolls = await dataBranch.readJSON('./rolls.json').catch(e => ([]));
   rolls.push({
     timestamp: Date.now(),
     playwrightCommit,

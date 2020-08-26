@@ -22,7 +22,7 @@ const BRANCH_NAME = `autoroll-${BROWSER_NAME}-data`;
   const browserCheckout = await pw.prepareBrowserCheckout(BROWSER_NAME);
 
   const playwrightCommit = await pw.getCommit('HEAD');
-  const upstreamCommit = await ff.getCommit(ff.browserUpstreamRef());
+  const upstreamCommit = await browserCheckout.getCommit(browserCheckout.browserUpstreamRef());
   const timestamp = Date.now();
   const runURL = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 

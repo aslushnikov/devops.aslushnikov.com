@@ -88,9 +88,17 @@ const FORMAT_VERSION = 2;
   if (status.version !== FORMAT_VERSION)
     status = defaultData;
 
-  status.webkit = await updateCDNStatus('webkit', await pw.wkBuildNumber(), status.webkit);
-  status.firefox = await updateCDNStatus('firefox', await pw.ffBuildNumber(), status.firefox);
-  status.timestamp = Date.now();
+  const newWebKit = await updateCDNStatus('webkit', await pw.wkBuildNumber(), status.webkit);
+  const newFirefox = await updateCDNStatus('firefox', await pw.ffBuildNumber(), status.firefox);
+
+  if (JSON.stringify(newWebKit) === JSON.stringify(status.webkit) &&
+      JSON.stringify(newFirefox) === JSON.stringify(status.firefox)) {
+    console.log('FYI: CDN status did not change - do nothing.');
+    return;
+  }
+
+  status.webkit = newWebKit;
+  status.firefox = newFirefox;
 
   await dataBranch.writeJSON('./status.json', status);
   await dataBranch.upload('update cdn-status');

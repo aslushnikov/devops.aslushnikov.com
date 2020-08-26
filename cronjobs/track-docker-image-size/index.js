@@ -39,21 +39,21 @@ const FORMAT_VERSION = 1;
     console.log(`* building docker file`);
     if (await pw.exists('./docs/docker/build.sh')) {
       const buildFilePath = pw.filepath('./docs/docker/build.sh');
-      await misc.spawnAsyncOrDie('bash', buildFilePath, {
+      await misc.spawnWithLogOrDie('bash', buildFilePath, {
         cwd: pw.filepath('./docs/docker'),
       });
     } else {
-      await misc.spawnAsyncOrDie('docker', 'build', '-t', 'playwright:localbuild', '-f', 'Dockerfile.bionic', '.', {
+      await misc.spawnWithLogOrDie('docker', 'build', '-t', 'playwright:localbuild', '-f', 'Dockerfile.bionic', '.', {
         cwd: pw.filepath('./docs/docker'),
       });
     }
 
     console.log(`* extracting image`);
     // This command is expected to produce `dockerimage.tar` and `dockerimage.tar.gz`
-    await misc.spawnAsyncOrDie('bash', path.join(__dirname, 'export-docker-image.sh'), {cwd: workdir});
+    await misc.spawnOrDie('bash', path.join(__dirname, 'export-docker-image.sh'), {cwd: workdir});
     // The only output in stdout is the compressed image.
     const rawStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar'));
-    await misc.spawnAsyncOrDie('gzip', 'dockerimage.tar', {cwd: workdir});
+    await misc.spawnOrDie('gzip', 'dockerimage.tar', {cwd: workdir});
     const zipStat = await fs.promises.stat(path.join(workdir, 'dockerimage.tar.gz'));
     await fs.promises.unlink(path.join(workdir, 'dockerimage.tar.gz'));
     shaToInfo.set(commit.sha, {

@@ -1,4 +1,4 @@
-const spawn = require('child_process').spawn;
+const child_process = require('child_process');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
@@ -9,15 +9,22 @@ const GREEN_COLOR = '\x1b[32m';
 const YELLOW_COLOR = '\x1b[33m';
 const RESET_COLOR = '\x1b[0m';
 
-async function spawnAsync(command, ...args) {
+function extractSpawnOptions(args) {
   let options = {};
   if (args.length && args[args.length - 1].constructor.name !== 'String')
     options = args.pop();
-  const cmd = spawn(command, args, options);
+  return options;
+}
+
+async function spawn(command, ...args) {
+  const options = extractSpawnOptions(args);
+  const cmd = child_process.spawn(command, args, options);
   let stdout = '';
   let stderr = '';
-  cmd.stdout.on('data', data => stdout += data);
-  cmd.stderr.on('data', data => stderr += data);
+  if (cmd.stdout)
+    cmd.stdout.on('data', data => stdout += data);
+  if (cmd.stderr)
+    cmd.stderr.on('data', data => stderr += data);
   const code = await new Promise(x => cmd.once('close', x));
   return {code, stdout, stderr};
 }
@@ -29,11 +36,17 @@ async function makeTempDir(prefix, cleanupHooks = []) {
   return tmp;
 }
 
-async function spawnAsyncOrDie(command, ...args) {
-  const {code, stdout, stderr} = await spawnAsync(command, ...args);
+async function spawnOrDie(command, ...args) {
+  const {code, stdout, stderr} = await spawn(command, ...args);
   if (code !== 0)
     throw new Error(`Failed to executed: "${command} ${args.join(' ')}".\n\n=== STDOUT ===\n${stdout}\n\n\n=== STDERR ===\n${stderr}`);
   return {stdout, stderr};
+}
+
+async function spawnWithLogOrDie(command, ...args) {
+  const options = extractSpawnOptions(args);
+  options.stdio = 'inherit';
+  await spawnOrDie(command, ...args, options);
 }
 
 async function headRequest(url) {
@@ -73,4 +86,4 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest, makeTempDir};
+module.exports = { setupProcessHooks, spawn, spawnOrDie, spawnWithLogOrDie, headRequest, makeTempDir};

@@ -111,7 +111,7 @@ cdn-status {
 
     cdn-status section.grid {
       display: grid;
-      grid-template-columns: auto auto auto auto;
+      grid-template-columns: fit-content(100%) auto auto auto;
     }
 
         cdn-status section.grid .header {

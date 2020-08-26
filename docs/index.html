@@ -4,16 +4,12 @@
 <link rel=stylesheet href=./typography.css>
 <link rel=stylesheet href=./docker-size.css>
 <link rel=stylesheet href=./cdn-status.css>
-<a style="position: absolute; right: 0; top: 0;" href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img src='/github.svg'></a>
 
 <style>
-  body {
-    max-width: 1200px;
+  .gallery {
     margin: 0 auto;
     padding: 20px;
-  }
-
-  .gallery {
+    max-width: 1200px;
     display: grid;
     grid-gap: 15px;
     grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
@@ -25,12 +21,33 @@
     border-radius: 10px;
     box-shadow: 2px 2px 5px 0px #EEEEEE;
   }
+
+  .cronjobs-status {
+    background-color: #434449;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-wrap: wrap;
+  }
+      .cronjobs-status a:not(.ghlogo) {
+        margin: 2 5px;
+      }
+
+      .cronjobs-status .ghlogo {
+        position: absolute;
+        width: 22px;
+        margin-right: 5px;
+        right: 0;
+      }
 </style>
 
 <script type=module>
   import {html} from './zhtml.js';
   import {fetchCDNStatus, renderWebkitCDNStatus, renderFirefoxCDNStatus} from './cdn-status.js';
   import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
+  import {cronjobBadges} from './cronjobs.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
     const [cdnData, dockerData] = await Promise.all([
@@ -39,6 +56,10 @@
     ]);
 
     document.body.append(html`
+      <div class=cronjobs-status>
+        ${cronjobBadges()}
+        <a class=ghlogo href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img width=22px src='/github.png'></a>
+      </div>
       <div class="gallery">
         <div class=tile>${renderWebkitCDNStatus(cdnData, true /* preview */)}</div>
         <div class=tile>${renderFirefoxCDNStatus(cdnData, true /* preview */)}</div>

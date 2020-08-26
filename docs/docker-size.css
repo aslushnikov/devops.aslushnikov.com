@@ -7,9 +7,7 @@ docker-size {
     }
 
     docker-size footer {
-      display: flex;
       padding: 10px;
-      justify-content: space-between;
       border-top: 1px double var(--border-color);
     }
 

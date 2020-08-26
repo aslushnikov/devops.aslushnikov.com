@@ -20,14 +20,6 @@ export function renderFirefoxCDNStatus(cdnData, preview = false) {
   return renderBrowserStatus('Firefox', '/ff.svg', cdnData.firefox, cdnData.timestamp, preview);
 }
 
-function badge() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/cdn-status.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/update%20CDN%20status/badge.svg'>
-    </a>
-  `;
-}
-
 function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, preview) {
   let footer, header;
 
@@ -36,10 +28,7 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, previ
     infos = infos.slice(0, RECENT_RUNS);
     footer = html`
       <footer>
-        <div>
-          Showing ${RECENT_RUNS} most recent builds. <a href="/full-${browserName.toLowerCase()}-cdn-status.html">See all</a>
-        </div>
-        ${badge()}
+        Showing ${RECENT_RUNS} most recent builds. <a href="/full-${browserName.toLowerCase()}-cdn-status.html">See all</a>
       </footer>
     `;
     header = html`
@@ -53,18 +42,12 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, previ
     `;
 
   } else {
-    footer = html`
-      <footer>
-        ${badge()}
-      </footer>
-    `;
     header = html`
       <header>
         <div>
           <h2>${browserName} CDN status</h2>
           <div>(updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</div>
         </div>
-        ${badge()}
       </header>
     `;
   }

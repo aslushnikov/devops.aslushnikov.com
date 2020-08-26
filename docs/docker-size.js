@@ -8,14 +8,6 @@ export function fetchDockerStats() {
   });
 }
 
-function badge() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/track-docker-size.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/track%20docker%20size/badge.svg'>
-    </a>
-  `;
-}
-
 export function dockerSizeStats(dockerData, preview = false) {
   const originalData = dockerData.infos;
   let data = dockerData.infos;
@@ -25,10 +17,7 @@ export function dockerSizeStats(dockerData, preview = false) {
     data = data.slice(0, RECENT_RUNS);
     footer = html`
       <footer>
-        <div>
-          Showing ${RECENT_RUNS} most recent commits. <a href="/full-docker-stats.html">See all</a>
-        </div>
-        ${badge()}
+        Showing ${RECENT_RUNS} most recent commits. <a href="/full-docker-stats.html">See all</a>
       </footer>
     `;
   }

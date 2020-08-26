@@ -93,4 +93,50 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawn, spawnOrDie, spawnWithLog, spawnWithLogOrDie, headRequest, makeTempDir};
+class GitRepo {
+  constructor(checkoutPath) {
+    this._checkoutPath = checkoutPath;
+  }
+
+  filepath(gitpath) {
+    return path.join(this._checkoutPath, gitpath);
+  }
+
+  async commitHistory(gitpath) {
+    const {stdout} = await spawnOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
+    return stdout.trim().split('\n').map(parseCommitString);
+  }
+
+  async exists(gitpath) {
+    return await fs.promises.stat(this.filepath(gitpath)).then(() => true).catch(e => false);
+  }
+
+  async checkoutRevision(sha) {
+    await spawnOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
+  }
+
+  async rebase(sha) {
+    await spawnOrDie('git', 'rebase', sha, {cwd: this._checkoutPath});
+  }
+
+  async getCommit(ref) {
+    const {stdout} = await spawnOrDie('git', 'show', '-s', '--format=%H %ct %s', ref, {cwd: this._checkoutPath});
+    return parseCommitString(stdout.trim());
+  }
+
+  async isDirty() {
+    const {stdout} = await spawnOrDie('git', 'status', '-s', '--untracked-files=all', {cwd: this._checkoutPath});
+    return !!stdout.trim();
+  }
+}
+
+function parseCommitString(line) {
+  line = line.trim();
+  const tokens = line.split(' ');
+  const sha = tokens.shift();
+  const timestamp = tokens.shift();
+  const message = tokens.join(' ');
+  return {sha, timestamp, message};
+}
+
+module.exports = { GitRepo, setupProcessHooks, spawn, spawnOrDie, spawnWithLog, spawnWithLogOrDie, headRequest, makeTempDir};

@@ -5,48 +5,7 @@ const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
-class GitRepo {
-  constructor(checkoutPath) {
-    this._checkoutPath = checkoutPath;
-  }
-
-  filepath(gitpath) {
-    return path.join(this._checkoutPath, gitpath);
-  }
-
-  async commitHistory(gitpath) {
-    const {stdout} = await misc.spawnOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
-    return stdout.trim().split('\n').map(parseCommitString);
-  }
-
-  async exists(gitpath) {
-    return await fs.promises.stat(this.filepath(gitpath)).then(() => true).catch(e => false);
-  }
-
-  async checkoutRevision(sha) {
-    await misc.spawnOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
-  }
-
-  async rebase(sha) {
-    await misc.spawnOrDie('git', 'rebase', sha, {cwd: this._checkoutPath});
-  }
-
-  async getCommit(ref) {
-    const {stdout} = await misc.spawnOrDie('git', 'show', '-s', '--format=%H %ct %s', ref, {cwd: this._checkoutPath});
-    return parseCommitString(stdout.trim());
-  }
-}
-
-function parseCommitString(line) {
-  line = line.trim();
-  const tokens = line.split(' ');
-  const sha = tokens.shift();
-  const timestamp = tokens.shift();
-  const message = tokens.join(' ');
-  return {sha, timestamp, message};
-}
-
-class Playwright extends GitRepo {
+class Playwright extends misc.GitRepo {
   static async clone(cleanupHooks, options = {}) {
     const {
       fullHistory = false,
@@ -125,7 +84,7 @@ class Playwright extends GitRepo {
   }
 }
 
-class BrowserCheckout extends GitRepo {
+class BrowserCheckout extends misc.GitRepo {
   constructor(browserName, checkoutPath) {
     super(checkoutPath);
     this._browserName = browserName;

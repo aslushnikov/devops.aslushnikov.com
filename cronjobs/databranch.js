@@ -33,6 +33,9 @@ class DataBranch {
 
   constructor(checkoutPath, branch) {
     this._checkoutPath = checkoutPath;
+    // We don't want to expose that our data store is backed with git,
+    // so aggregate here instead of inheriting.
+    this._git = new misc.GitRepo(checkoutPath);
     this._branch = branch;
   }
 
@@ -54,8 +57,7 @@ class DataBranch {
 
   async upload(message = 'update data') {
     // Check if there's anything to update.
-    const {stdout} = await misc.spawnOrDie('git', 'status', '-s', '--untracked-files=all', {cwd: this._checkoutPath});
-    if (!stdout.trim()) {
+    if (!(await this.isDirty())) {
       console.log('[databranch] FYI: no changes, nothing to upload');
       return;
     }

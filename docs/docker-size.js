@@ -22,7 +22,7 @@ export function dockerSizeStats(dockerData, preview = false) {
     `;
   }
   return html`
-    <docker-size class=tile>
+    <docker-size>
       <header>
         <h2>
           <span>Dockerfile.bionic image size</span>

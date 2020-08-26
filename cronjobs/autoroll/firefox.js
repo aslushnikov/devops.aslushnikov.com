@@ -11,7 +11,7 @@ const BRANCH_NAME = 'autoroll-firefox-data';
   const ff = await pw.prepareBrowserCheckout('firefox');
 
   const upstreamCommit = await ff.getCommit(ff.browserUpstreamRef());
-  console.log(JSON.sringify(upstreamCommit, null, 2));
+  console.log(JSON.stringify(upstreamCommit, null, 2));
 
   await ff.rebase(upstreamCommit.sha);
   await ff.buildBrowser();

@@ -1,0 +1,58 @@
+docker-size {
+  display: flex;
+  flex-direction: column;
+}
+    docker-size header {
+      padding: 10px;
+    }
+
+    docker-size footer {
+      display: flex;
+      padding: 10px;
+      justify-content: space-between;
+      border-top: 1px double var(--border-color);
+    }
+
+    docker-size h2 {
+      margin-bottom: 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    docker-size .row {
+      display: flex;
+      padding: 0 10px;
+    }
+        docker-size .row > * {
+          flex: none;
+        }
+
+        docker-size .row .hash {
+        }
+
+        docker-size .row .message {
+          flex-shrink: 1;
+          flex-grow: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          margin: 0 2px;
+        }
+
+    docker-size .size-delta {
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 80%;
+      font-family: var(--monospace);
+      margin: 2px 2px;
+      white-space: nowrap;
+    }
+
+    docker-size .size-decrease {
+      background-color: #DCEDC8;
+    }
+
+    docker-size .size-increase {
+      background-color: #FFEBEE;
+    }
+

@@ -1,4 +1,11 @@
 /* Mini CSS reset and basic typography  */
+:root {
+  --monospace: Consolas, Menlo, monospace;
+  --text-color: #24292e;
+  --background-color: #fff;
+  --link-color: #0366d6;
+  --border-color: #e0e0e0;
+}
 
 * {box-sizing: border-box}
 
@@ -16,7 +23,8 @@ body {
     font-style: normal;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    color: #111
+    color: var(--text-color);
+    font-size: 12px;
 }
 img, iframe {border: none}
 
@@ -38,4 +46,6 @@ table {border-collapse: collapse;border-spacing: 0}
 
 th, td {text-align: left;vertical-align: top}
 
-
+a {
+  color: var(--link-color);
+}

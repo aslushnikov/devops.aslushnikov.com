@@ -1,8 +1,37 @@
 import {html} from './zhtml.js';
 import {humanReadableSize} from './misc.js';
 
-export function dockerSizeStats(dockerData, rows = Infinity) {
-  const data = dockerData.infos.slice().sort((a, b) => b.timestamp - a.timestamp).slice(0, rows);
+export function fetchDockerStats() {
+  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/docker-image-size-data/data.json').then(r => r.json()).then(json => {
+    json.infos.sort((a, b) => b.timestamp - a.timestamp);
+    return json;
+  });
+}
+
+function badge() {
+  return html`
+    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/track-docker-size.yml'>
+      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/track%20docker%20size/badge.svg'>
+    </a>
+  `;
+}
+
+export function dockerSizeStats(dockerData, preview = false) {
+  const originalData = dockerData.infos;
+  let data = dockerData.infos;
+  let footer;
+  if (preview) {
+    const RECENT_RUNS = 5;
+    data = data.slice(0, RECENT_RUNS);
+    footer = html`
+      <footer>
+        <div>
+          Showing ${RECENT_RUNS} most recent commits. <a href="/full-docker-stats.html">See all</a>
+        </div>
+        ${badge()}
+      </footer>
+    `;
+  }
   return html`
     <docker-size class=tile>
       <header>
@@ -15,12 +44,13 @@ export function dockerSizeStats(dockerData, rows = Infinity) {
       <section>
         ${data.map((d, index) => renderRow(d, index))}
       </section>
+      ${footer}
     </docker-size>
   `;
 
   function renderRow(d, index) {
-    const rawDelta = index + 1 < data.length ? d.rawSize - data[index + 1].rawSize : d.rawSize;
-    const zipDelta = index + 1 < data.length ? d.zipSize - data[index + 1].zipSize : d.zipSize;
+    const rawDelta = index + 1 < originalData.length ? d.rawSize - originalData[index + 1].rawSize : d.rawSize;
+    const zipDelta = index + 1 < originalData.length ? d.zipSize - originalData[index + 1].zipSize : d.zipSize;
     return html`
       <div class=row>
         <a class=hash href="https://github.com/microsoft/playwright/commit/${d.sha}"><code>${d.sha.substring(0, 7)}</code></a>

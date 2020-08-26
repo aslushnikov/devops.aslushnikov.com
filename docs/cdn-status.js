@@ -4,18 +4,45 @@ import {humanReadableTimeInterval} from './misc.js';
 const CHECKMARK_EMOJI = '✅';
 const CROSS_EMOJI = '❌';
 
-export function renderWebkitCDNStatus(cdnData, rows = Infinity) {
-  return renderBrowserStatus('WebKit', '/wk.svg', cdnData.webkit.slice(0, rows), cdnData.timestamp);
+export async function fetchCDNStatus() {
+  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/cdn-status-data/status.json').then(r => r.json()).then(json => {
+    json.webkit.sort((a, b) => b.rev - a.rev);
+    json.firefox.sort((a, b) => b.rev - a.rev);
+    return json;
+  });
 }
 
-export function renderFirefoxCDNStatus(cdnData, rows = Infinity) {
-  return renderBrowserStatus('Firefox', '/ff.svg', cdnData.firefox.slice(0, rows), cdnData.timestamp);
+export function renderWebkitCDNStatus(cdnData, preview = false) {
+  return renderBrowserStatus('WebKit', '/wk.svg', cdnData.webkit, cdnData.timestamp, preview);
 }
 
-function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp) {
-          // <span class=title>${browserName} CDN status</span><span> (updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</span>
+export function renderFirefoxCDNStatus(cdnData, preview = false) {
+  return renderBrowserStatus('Firefox', '/ff.svg', cdnData.firefox, cdnData.timestamp, preview);
+}
+
+function badge() {
   return html`
-    <cdn-status class=tile>
+    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/cdn-status.yml'>
+      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/update%20CDN%20status/badge.svg'>
+    </a>
+  `;
+}
+
+function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, preview) {
+  let footer, header;
+
+  if (preview) {
+    const RECENT_RUNS = 5;
+    infos = infos.slice(0, RECENT_RUNS);
+    footer = html`
+      <footer>
+        <div>
+          Showing ${RECENT_RUNS} most recent builds. <a href="/full-${browserName.toLowerCase()}-cdn-status.html">See all</a>
+        </div>
+        ${badge()}
+      </footer>
+    `;
+    header = html`
       <header>
         <div>
           <h2>${browserName} CDN status</h2>
@@ -23,6 +50,27 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp) {
         </div>
         <img width=30px height=30px src="${logoUrl}">
       </header>
+    `;
+
+  } else {
+    footer = html`
+      <footer>
+        ${badge()}
+      </footer>
+    `;
+    header = html`
+      <header>
+        <div>
+          <h2>${browserName} CDN status</h2>
+          <div>(updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</div>
+        </div>
+        ${badge()}
+      </header>
+    `;
+  }
+  return html`
+    <cdn-status>
+      ${header}
       <section class=grid>
         <div class="cell header"></div>
         <div class="cell header">Linux</div>
@@ -35,6 +83,7 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp) {
           <div class="cell">${renderWinURLs(info.urls)}</div>
         `)}
       </section>
+      ${footer}
     </cdn-status>
   `;
 }

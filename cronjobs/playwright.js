@@ -63,6 +63,28 @@ class Playwright extends GitRepo {
     return new Playwright(checkoutPath);
   }
 
+  async runTests(browserName, executablePath = '') {
+    const testCommand = ({
+      firefox: 'ftest',
+      webkit: 'wtest',
+    })[browserName];
+    if (!testCommand)
+      throw new Error('ERROR: cannot run tests for browser ' + browserName);
+    const env = Object.assicn({}, process.env);
+    if (executablePath) {
+      const envName = ({
+        firefox: 'FFPATH',
+        webkit: 'WKPATH',
+      })[browserName];
+      env[envName] = executablePath;
+    }
+    //TODO: return test-report.json
+    await misc.spawnWithLog('npm', 'run', testCommand, {
+      cwd: this._checkoutPath,
+      env,
+    });
+  }
+
   async prepareBrowserCheckout(browserName) {
     if (browserName !== 'firefox' && browsername !== 'webkit')
       throw new Error('Unknown browser: ' + browserName);
@@ -114,6 +136,10 @@ class BrowserCheckout extends GitRepo {
       this._browserUpstreamRef = 'browser_upstream/master';
     else
       throw new Error('ERROR: unknown browser to create checkout - ' + browserName);
+  }
+
+  name() {
+    return this._browserName;
   }
 
   browserUpstreamRef() {

@@ -43,6 +43,13 @@ async function spawnOrDie(command, ...args) {
   return {stdout, stderr};
 }
 
+async function spawnWithLog(command, ...args) {
+  const options = extractSpawnOptions(args);
+  options.stdio = 'inherit';
+  const {code} = await spawn(command, ...args, options);
+  return {code};
+}
+
 async function spawnWithLogOrDie(command, ...args) {
   const options = extractSpawnOptions(args);
   options.stdio = 'inherit';
@@ -86,4 +93,4 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawn, spawnOrDie, spawnWithLogOrDie, headRequest, makeTempDir};
+module.exports = { setupProcessHooks, spawn, spawnOrDie, spawnWithLog, spawnWithLogOrDie, headRequest, makeTempDir};

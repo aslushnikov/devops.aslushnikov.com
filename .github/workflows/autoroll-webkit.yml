@@ -1,4 +1,4 @@
-name: autoroll firefox
+name: autoroll webkit
 on:
   push:
     branches:
@@ -16,8 +16,8 @@ jobs:
           git config --global user.email github-actions@github.com
       - run: |
           sudo apt-get update
-          sudo apt-get install -y autoconf2.13 libclang-dev clang
-      - run: node cronjobs/autoroll/index.js firefox
+          sudo apt-get install -y libharfbuzz-dev libepoxy-dev libgcrypt-dev libsoup2.4-dev libwebp-dev flatpak
+      - run: node cronjobs/autoroll/index.js webkit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

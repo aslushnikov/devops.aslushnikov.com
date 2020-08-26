@@ -86,7 +86,7 @@ class Playwright extends GitRepo {
   }
 
   async prepareBrowserCheckout(browserName) {
-    if (browserName !== 'firefox' && browsername !== 'webkit')
+    if (browserName !== 'firefox' && browserName !== 'webkit')
       throw new Error('Unknown browser: ' + browserName);
     console.log(`[playwright] preparing ${browserName} checkout`);
     await misc.spawnWithLogOrDie(this.filepath('browser_patches/prepare_checkout.sh'), browserName, {cwd: this._checkoutPath});

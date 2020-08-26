@@ -57,7 +57,7 @@ class DataBranch {
 
   async upload(message = 'update data') {
     // Check if there's anything to update.
-    if (!(await this.isDirty())) {
+    if (!(await this._git.isDirty())) {
       console.log('[databranch] FYI: no changes, nothing to upload');
       return;
     }

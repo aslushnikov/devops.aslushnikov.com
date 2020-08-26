@@ -30,13 +30,6 @@ body {
   grid-auto-flow: dense;
 }
 
-tile-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px;
-}
-
 .tile {
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -47,8 +40,14 @@ docker-size {
   display: flex;
   flex-direction: column;
 }
+    docker-size header {
+      padding: 10px;
+    }
+
     docker-size h2 {
-      argin-bottom: 0;
+      margin-bottom: 0;
+      display: flex;
+      justify-content: space-between;
     }
 
     docker-size .row {
@@ -95,6 +94,13 @@ cdn-status {
 }
     cdn-status h2 {
       margin-bottom: 0;
+    }
+
+    cdn-status header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
     }
 
     cdn-status .title {

@@ -5,10 +5,13 @@ export function dockerSizeStats(dockerData, rows = Infinity) {
   const data = dockerData.infos.slice().sort((a, b) => b.timestamp - a.timestamp).slice(0, rows);
   return html`
     <docker-size class=tile>
-      <tile-header>
-          <h2>Dockerfile.bionic image size</h2>
-          <h2>raw: ${humanReadableSize(data[0].rawSize)} zip: ${humanReadableSize(data[0].zipSize)}</h2>
-      </tile-header>
+      <header>
+        <h2>
+          <span>Dockerfile.bionic image size</span>
+          <span>raw: ${humanReadableSize(data[0].rawSize)} zip: ${humanReadableSize(data[0].zipSize)}</span>
+        </h2>
+        <div>(updates daily at 4AM PST)</div>
+      </header>
       <section>
         ${data.map((d, index) => renderRow(d, index))}
       </section>

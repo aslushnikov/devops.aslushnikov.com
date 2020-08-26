@@ -16,13 +16,13 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp) {
           // <span class=title>${browserName} CDN status</span><span> (updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</span>
   return html`
     <cdn-status class=tile>
-      <tile-header>
+      <header>
         <div>
           <h2>${browserName} CDN status</h2>
           <div>(updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</div>
         </div>
         <img width=30px height=30px src="${logoUrl}">
-      </tile-header>
+      </header>
       <section class=grid>
         <div class="cell header"></div>
         <div class="cell header">Linux</div>

@@ -73,4 +73,4 @@ function setupProcessHooks() {
   return cleanupHooks;
 }
 
-module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest, makeTempDir };
+module.exports = { setupProcessHooks, spawnAsync, spawnAsyncOrDie, headRequest, makeTempDir};

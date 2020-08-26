@@ -1,0 +1,23 @@
+name: autoroll Firefox
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 14
+      - run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf2.13 libclang-dev clang
+      - run: node cronjobs/autoroll/firefox.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

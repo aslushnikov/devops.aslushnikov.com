@@ -5,7 +5,49 @@ const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
-class Playwright {
+class GitRepo {
+  constructor(checkoutPath) {
+    this._checkoutPath = checkoutPath;
+  }
+
+  filepath(gitpath) {
+    return path.join(this._checkoutPath, gitpath);
+  }
+
+  async commitHistory(gitpath) {
+    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
+    return stdout.trim().split('\n').map(parseCommitString);
+  }
+
+  async exists(gitpath) {
+    return await fs.promises.stat(this.filepath(gitpath)).then(() => true).catch(e => false);
+  }
+
+  async checkoutRevision(sha) {
+    await misc.spawnAsyncOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
+  }
+
+  async rebase(sha) {
+    await misc.spawnAsyncOrDie('git', 'rebase', sha, {cwd: this._checkoutPath});
+  }
+
+  async getCommit(ref) {
+    const {stdout} = await misc.spawnAsyncOrDie('git', 'show', '-s', '--format=%H %ct %s', ref, {cwd: this._checkoutPath});
+    return parseCommitString(stdout.trim());
+  }
+}
+
+function parseCommitString(line) {
+  line = line.trim();
+  const tokens = line.split(' ');
+  const sha = tokens.shift();
+  const timestamp = tokens.shift();
+  const message = tokens.join(' ');
+  return {sha, timestamp, message};
+}
+
+
+class Playwright extends GitRepo {
   static async clone(cleanupHooks, options = {}) {
     const {
       fullHistory = false,
@@ -22,17 +64,12 @@ class Playwright {
     return new Playwright(checkoutPath);
   }
 
-  constructor(checkoutPath) {
-    this._checkoutPath = checkoutPath;
-  }
-
-  filepath(gitpath) {
-    return path.join(this._checkoutPath, gitpath);
-  }
-
   async prepareBrowserCheckout(browserName) {
+    if (browserName !== 'firefox' && browsername !== 'webkit')
+      throw new Error('Unknown browser: ' + browserName);
     console.log(`[playwright] preparing ${browserName} checkout`);
     await misc.spawnAsyncOrDie(this.filepath('browser_patches/prepare_checkout.sh'), browserName, {cwd: this._checkoutPath});
+    return new BrowserCheckout(browserName, this.filepath(`browser_patches/${browserName}/checkout`));
   }
 
   async webkitProtocol() {
@@ -65,26 +102,51 @@ class Playwright {
       cwd: this._checkoutPath,
     });
   }
+}
 
-  async commitHistory(gitpath) {
-    const {stdout} = await misc.spawnAsyncOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
-    return stdout.trim().split('\n').map(line => {
-      line = line.trim();
-      const tokens = line.split(' ');
-      const sha = tokens.shift();
-      const timestamp = tokens.shift();
-      const message = tokens.join(' ');
-      return {sha, timestamp, message};
+class BrowserCheckout extends GitRepo {
+  constructor(browserName, checkoutPath) {
+    super(checkoutPath);
+    this._browserName = browserName;
+    this._checkoutPath = checkoutPath;
+    if (browserName === 'firefox')
+      this._browserUpstreamRef = 'browser_upstream/beta';
+    else if (browserName === 'webkit')
+      this._browserUpstreamRef = 'browser_upstream/master';
+    else
+      throw new Error('ERROR: unknown browser to create checkout - ' + browserName);
+  }
+
+  browserUpstreamRef() {
+    return this._browserUpstreamRef;
+  }
+
+  async buildBrowser() {
+    if (this._browserName === 'webkit') {
+      await misc.spawnAsyncOrDie('Tools/gtk/install-dependencies', { cwd: this._checkoutPath });
+      await misc.spawnAsyncOrDie('Tools/wpe/install-dependencies', { cwd: this._checkoutPath });
+      await misc.spawnAsyncOrDie('Tools/Scripts/update-webkitwpe-libs', { cwd: this._checkoutPath });
+      await misc.spawnAsyncOrDie('Tools/Scripts/update-webkitgtk-libs', { cwd: this._checkoutPath });
+    } else if (this._browserName === 'firefox') {
+      await misc.spawnAsyncOrDie('./mach', 'bootstrap', '--no-interactive', '--application-choice="Firefox for Desktop"', {
+        cwd: this._checkoutPath,
+        env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
+      });
+    } else {
+      throw new Error('ERROR: unknown browser! ' + this._browserName);
+    }
+    await misc.spawnAsyncOrDie(`../build.sh`, {
+      cwd: this._checkoutPath,
+      env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
     });
   }
 
-  async exists(gitpath) {
-    return await fs.promises.stat(this.filepath(gitpath)).then(() => true).catch(e => false);
-  }
-
-  async checkoutRevision(sha) {
-    console.log(`[playwright] checking out revision ${sha}`);
-    await misc.spawnAsyncOrDie('git', 'checkout', sha, {cwd: this._checkoutPath});
+  executablePath() {
+    if (this._browserName === 'firefox')
+      return this.filepath(`obj-build-playwright/dist/bin/firefox`);
+    if (this._browserName === 'webkit')
+      return this.filepath(`../pw_run.sh`);
+    throw new Error('ERROR: cannot get executable path - I do not know this browser!');
   }
 }
 

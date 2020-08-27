@@ -74,3 +74,15 @@ spacer {
   border-radius: 4px;
   text-decoration: none;
 }
+
+.bad {
+  background-color: #ffcdd2;
+}
+
+.good {
+  background-color: #c8e6c9;
+}
+
+.neutral {
+  background-color: #e0e0e0;
+}

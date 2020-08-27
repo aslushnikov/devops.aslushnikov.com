@@ -4,23 +4,22 @@ import {humanReadableSize, commitURL} from './misc.js';
 export function fetchDockerStats() {
   return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/docker-image-size-data/data.json').then(r => r.json()).then(json => {
     json.infos.sort((a, b) => b.timestamp - a.timestamp);
+    for (let i = 0, N = json.infos.length; i < N; ++i) {
+      const info = json.infos[i];
+      const next = json.infos[i + 1] || {rawSize: 0, zipSize: 0};
+      info.rawDelta = info.rawSize - next.rawSize;
+      info.zipDelta = info.zipSize - next.zipSize;
+    }
     return json;
   });
 }
 
 export function dockerSizeStats(dockerData, preview = false) {
-  const originalData = dockerData.infos;
+  const RECENT_RUNS = 5;
   let data = dockerData.infos;
-  let footer;
-  if (preview) {
-    const RECENT_RUNS = 5;
+  if (preview)
     data = data.slice(0, RECENT_RUNS);
-    footer = html`
-      <footer>
-        Showing ${RECENT_RUNS} most recent commits. <a href="/full-docker-stats.html">See all</a>
-      </footer>
-    `;
-  }
+
   return html`
     <section class=docker-size>
       <header>
@@ -32,32 +31,32 @@ export function dockerSizeStats(dockerData, preview = false) {
         <div>(updates daily at 4AM PST)</div>
       </header>
       <section>
-        ${data.map((d, index) => renderRow(d, index))}
+        ${data.map(d => html`
+          <hbox class=row>
+            <span>
+              <a class=sha href="${commitURL('playwright', d.sha)}">${d.sha.substring(0, 7)}</a>
+            </span>
+            <span class=message>${d.message}</span>
+            <spacer></spacer>
+            ${renderBytesDelta('raw:', d.rawDelta)}
+            ${renderBytesDelta('zip:', d.zipDelta)}
+          </hbox>
+        `)}
       </section>
-      ${footer}
+      ${preview && html`
+        <footer>
+          Showing ${RECENT_RUNS} most recent commits. <a href="/full-docker-stats.html">See all</a>
+        </footer>
+      `}
     </section>
   `;
 
-  function renderRow(d, index) {
-    const rawDelta = index + 1 < originalData.length ? d.rawSize - originalData[index + 1].rawSize : d.rawSize;
-    const zipDelta = index + 1 < originalData.length ? d.zipSize - originalData[index + 1].zipSize : d.zipSize;
-    return html`
-      <hbox class=row>
-        <span>
-          <a class=sha href="${commitURL('playwright', d.sha)}">${d.sha.substring(0, 7)}</a>
-        </span>
-        <span class=message>${d.message}</span>
-        <spacer></spacer>
-        ${renderBytesDelta('raw:', rawDelta)}
-        ${renderBytesDelta('zip:', zipDelta)}
-      </hbox>
-    `;
-  }
-
   function renderBytesDelta(preffix, delta) {
-    const cls = delta < 0 ? 'size-decrease' : 'size-increase';
-    const sign = delta < 0 ? '': '+';
-    return html`<span class="size-delta ${cls}">${preffix} ${sign}${humanReadableSize(delta)}</span>`;
+    const cls = delta < 0 ? 'good' : 'bad';
+    // render deltas in MBs
+    const mb = delta / 1024 / 1024;
+    const sign = delta < 0 ? '' : '+';
+    return html`<span class="size-delta ${cls}">${preffix} ${sign}${mb.toFixed(2)}MB</span>`;
   }
 }
 

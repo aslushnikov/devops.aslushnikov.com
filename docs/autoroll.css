@@ -32,15 +32,3 @@
       border-radius: 5px;
       font-family: var(--monospace);
     }
-
-    .autoroll-data .step.fail {
-      background-color: #ffcdd2;
-    }
-
-    .autoroll-data .step.success {
-      background-color: #c8e6c9;
-    }
-
-    .autoroll-data .step.not-available {
-      background-color: #e0e0e0;
-    }

@@ -13,61 +13,46 @@ export async function fetchCDNStatus() {
 }
 
 export function renderWebkitCDNStatus(cdnData, preview = false) {
-  return renderBrowserStatus('WebKit', '/wk.svg', cdnData.webkit, cdnData.timestamp, preview);
+  return renderBrowserStatus('WebKit', cdnData.webkit, cdnData.timestamp, preview);
 }
 
 export function renderFirefoxCDNStatus(cdnData, preview = false) {
-  return renderBrowserStatus('Firefox', '/ff.svg', cdnData.firefox, cdnData.timestamp, preview);
+  return renderBrowserStatus('Firefox', cdnData.firefox, cdnData.timestamp, preview);
 }
 
-function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, preview) {
-  let footer, header;
-
-  if (preview) {
-    const RECENT_RUNS = 3;
+function renderBrowserStatus(browserName, infos, updateTimestamp, preview) {
+  const RECENT_RUNS = 3;
+  if (preview)
     infos = infos.slice(0, RECENT_RUNS);
-    footer = html`
-      <footer>
-        Showing ${RECENT_RUNS} most recent builds. <a href="/full-${browserName.toLowerCase()}-cdn-status.html">See all</a>
-      </footer>
-    `;
-    header = html`
-      <header>
-        <div>
-          <h2>${browserName} CDN status</h2>
-          <div>(updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</div>
-        </div>
-        <img width=30px height=30px src="${logoUrl}">
-      </header>
-    `;
 
-  } else {
-    header = html`
-      <header>
+  return html`
+    <section class=cdn-status>
+      <hbox class=header>
         <div>
           <h2>${browserName} CDN status</h2>
           <div>(updated ${humanReadableTimeInterval(Date.now() - updateTimestamp)} ago)</div>
         </div>
-      </header>
-    `;
-  }
-  return html`
-    <cdn-status>
-      ${header}
+        <spacer></spacer>
+        ${preview && browserLogo(browserName)}
+      </hbox>
       <section class=grid>
-        <div class="cell header"></div>
-        <div class="cell header">Linux</div>
-        <div class="cell header">Mac</div>
-        <div class="cell header">Win</div>
+        <vbox class="cell header"></vbox>
+        <vbox class="cell header">Linux</vbox>
+        <vbox class="cell header">Mac</vbox>
+        <vbox class="cell header">Win</vbox>
         ${infos.map(info => html`
-          <div class="cell revision">r${info.rev}</div>
-          <div class="cell">${renderLinuxURLs(info.urls)}</div>
-          <div class="cell">${renderMacURLs(info.urls)}</div>
-          <div class="cell">${renderWinURLs(info.urls)}</div>
+          <vbox class="cell revision">r${info.rev}</vbox>
+          <vbox class="cell">${renderLinuxURLs(info.urls)}</vbox>
+          <vbox class="cell">${renderMacURLs(info.urls)}</vbox>
+          <vbox class="cell">${renderWinURLs(info.urls)}</vbox>
         `)}
       </section>
-      ${footer}
-    </cdn-status>
+      ${preview && html`
+        <footer>
+          Showing ${RECENT_RUNS} most recent builds. <a href="/full-${browserName.toLowerCase()}-cdn-status.html">See all</a>
+        </footer>
+      `}
+    </section>
   `;
 }
 

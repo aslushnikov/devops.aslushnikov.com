@@ -33,11 +33,3 @@
       white-space: nowrap;
     }
 
-    .docker-size .size-decrease {
-      background-color: #DCEDC8;
-    }
-
-    .docker-size .size-increase {
-      background-color: #FFEBEE;
-    }
-

@@ -73,9 +73,9 @@ function renderDate(timestamp) {
 
 function renderSteps(d) {
   const statusToClass = {
-    'N/A': 'not-available',
-    'ok': 'success',
-    'fail': 'fail',
+    'N/A': 'neutral',
+    'ok': 'good',
+    'fail': 'bad',
   };
   return html`
     <hbox>

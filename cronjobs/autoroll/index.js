@@ -19,6 +19,8 @@ const BRANCH_NAME = `autoroll-${BROWSER_NAME}-data`;
   const cleanupHooks = misc.setupProcessHooks();
 
   const pw = await Playwright.clone(cleanupHooks);
+  await pw.installDependencies();
+  await pw.buildProject();
   const browserCheckout = await pw.prepareBrowserCheckout(BROWSER_NAME);
 
   const playwrightCommit = await pw.getCommit('HEAD');

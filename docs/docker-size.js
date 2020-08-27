@@ -1,5 +1,5 @@
 import {html} from './zhtml.js';
-import {humanReadableSize} from './misc.js';
+import {humanReadableSize, commitURL} from './misc.js';
 
 export function fetchDockerStats() {
   return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/docker-image-size-data/data.json').then(r => r.json()).then(json => {
@@ -22,32 +22,35 @@ export function dockerSizeStats(dockerData, preview = false) {
     `;
   }
   return html`
-    <docker-size>
+    <section class=docker-size>
       <header>
-        <h2>
-          <span>Dockerfile.bionic image size</span>
-          <span>raw: ${humanReadableSize(data[0].rawSize)} zip: ${humanReadableSize(data[0].zipSize)}</span>
-        </h2>
+        <hbox>
+          <h2>Dockerfile.bionic image size</h2>
+          <spacer></spacer>
+          <h2>raw: ${humanReadableSize(data[0].rawSize)} zip: ${humanReadableSize(data[0].zipSize)}</h2>
+        </hbox>
         <div>(updates daily at 4AM PST)</div>
       </header>
       <section>
         ${data.map((d, index) => renderRow(d, index))}
       </section>
       ${footer}
-    </docker-size>
+    </section>
   `;
 
   function renderRow(d, index) {
     const rawDelta = index + 1 < originalData.length ? d.rawSize - originalData[index + 1].rawSize : d.rawSize;
     const zipDelta = index + 1 < originalData.length ? d.zipSize - originalData[index + 1].zipSize : d.zipSize;
     return html`
-      <div class=row>
-        <a class=hash href="https://github.com/microsoft/playwright/commit/${d.sha}"><code>${d.sha.substring(0, 7)}</code></a>
+      <hbox class=row>
+        <span>
+          <a class=sha href="${commitURL('playwright', d.sha)}">${d.sha.substring(0, 7)}</a>
+        </span>
         <span class=message>${d.message}</span>
-        <span class=spacer></span>
+        <spacer></spacer>
         ${renderBytesDelta('raw:', rawDelta)}
         ${renderBytesDelta('zip:', zipDelta)}
-      </div>
+      </hbox>
     `;
   }
 

@@ -24,7 +24,7 @@ function renderBrowserStatus(browserName, logoUrl, infos, updateTimestamp, previ
   let footer, header;
 
   if (preview) {
-    const RECENT_RUNS = 5;
+    const RECENT_RUNS = 3;
     infos = infos.slice(0, RECENT_RUNS);
     footer = html`
       <footer>

@@ -1,5 +1,5 @@
 import {html} from './zhtml.js';
-import {humanReadableTimeInterval} from './misc.js';
+import {humanReadableTimeInterval, browserLogo} from './misc.js';
 
 const CHECKMARK_EMOJI = '✅';
 const CROSS_EMOJI = '❌';

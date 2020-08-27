@@ -25,6 +25,10 @@ docker-size {
           flex: none;
         }
 
+        docker-size .row .spacer {
+          flex: auto;
+        }
+
         docker-size .row .hash {
         }
 

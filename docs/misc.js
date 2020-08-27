@@ -1,3 +1,5 @@
+import {html} from './zhtml.js';
+
 export function humanReadableTimeInterval(diff) {
   const intervals = [
     [1000, 'second'],
@@ -37,5 +39,28 @@ export function humanReadableSize(bytes) {
   }
   const fraction = Math.floor(bytes / aggr * 10) / 10;
   return sign * fraction + '' + suffix;
-  
 }
+
+export function browserLogo(browserName, width = 30, height) {
+  const LOGO_URLS = {
+    firefox: '/ff.svg',
+    webkit: '/wk.svg',
+  };
+  if (height === undefined)
+    height = width;
+  return html`
+    <img src="${LOGO_URLS[browserName.toLowerCase()]}" width=${width} height=${height}>
+  `;
+}
+
+export function commitURL(browserName, sha) {
+  const base = {
+    firefox: 'https://github.com/mozilla/gecko-dev/commit/',
+    webkit: 'https://github.com/WebKit/webkit/commit/',
+    playwright: 'https://github.com/microsoft/playwright/commit/',
+  }[browserName.toLowerCase()];
+  if (!base)
+    return '';
+  return base + sha;
+}
+

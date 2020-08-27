@@ -48,4 +48,29 @@ th, td {text-align: left;vertical-align: top}
 
 a {
   color: var(--link-color);
+  text-decoration: none;
+}
+
+hbox {
+  display: flex;
+  align-items: center;
+}
+
+vbox {
+  display: flex;
+  flex-direction: column;
+}
+
+spacer {
+  flex-grow: 1000;
+  flex-shrink: 1000;
+}
+
+.sha {
+  background-color: #eee;
+  font-size: 85%;
+  font-family: var(--monospace);
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-decoration: none;
 }

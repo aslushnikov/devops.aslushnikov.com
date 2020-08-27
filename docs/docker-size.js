@@ -44,6 +44,7 @@ export function dockerSizeStats(dockerData, preview = false) {
       <div class=row>
         <a class=hash href="https://github.com/microsoft/playwright/commit/${d.sha}"><code>${d.sha.substring(0, 7)}</code></a>
         <span class=message>${d.message}</span>
+        <span class=spacer></span>
         ${renderBytesDelta('raw:', rawDelta)}
         ${renderBytesDelta('zip:', zipDelta)}
       </div>

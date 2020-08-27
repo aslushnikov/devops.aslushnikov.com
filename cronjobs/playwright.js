@@ -29,7 +29,7 @@ class Playwright extends misc.GitRepo {
     })[browserName];
     if (!testCommand)
       throw new Error('ERROR: cannot run tests for browser ' + browserName);
-    const env = Object.assicn({}, process.env);
+    const env = Object.assign({}, process.env);
     if (executablePath) {
       const envName = ({
         firefox: 'FFPATH',

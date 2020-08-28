@@ -5,7 +5,7 @@
 
 <style>
   #content {
-    max-width: 800px;
+    max-width: 600px;
     margin: 0 auto;
     padding: 20px;
   }
@@ -13,15 +13,16 @@
 
 <script type=module>
   import {html} from './zhtml.js';
-  import {fetchCDNStatus, renderWebkitCDNStatus} from './cdn-status.js';
+  import {fetchAutorollData, renderAutorollData} from './autoroll.js';
   import {cronjobBadgesHeader} from './cronjobs.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
-    const cdnData = await fetchCDNStatus();
+    const firefoxAutorollData = await fetchAutorollData('WebKit');
+
     document.body.append(html`
       ${cronjobBadgesHeader()}
       <section id=content>
-        ${renderWebkitCDNStatus(cdnData, false /* preview */)}
+        ${renderAutorollData(firefoxAutorollData, false /* preview */)}
       </section>
     `);
   }, false);

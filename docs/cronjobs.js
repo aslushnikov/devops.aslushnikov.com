@@ -40,13 +40,22 @@ export function cronjobAutorollWebKit() {
   `;
 }
 
-export function cronjobBadges() {
-  return [
-    cronjobCDNStatusBadge(),
-    cronjobDockerSizeBadge(),
-    cronjobPublishBrowserProtocols(),
-    cronjobAutorollFirefox(),
-    cronjobAutorollWebKit(),
-  ];
+export function cronjobBadgesHeader() {
+  return html`
+    <hbox class=cronjobs-header>
+      <a class=ghlogo href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img width=22px src='/github.png'></a>
+      <spacer></spacer>
+      <hbox class=badges>
+        ${[
+          cronjobCDNStatusBadge(),
+          cronjobDockerSizeBadge(),
+          cronjobPublishBrowserProtocols(),
+          cronjobAutorollFirefox(),
+          cronjobAutorollWebKit(),
+        ]}
+      </hbox>
+      <spacer></spacer>
+    </hbox>
+  `;
 }
 

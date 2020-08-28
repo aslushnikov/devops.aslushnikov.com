@@ -1,10 +1,7 @@
 <meta charset='utf-8'>
 <title>DevOps - Playwright</title>
 <link rel="icon" href="/favicon.svg">
-<link rel=stylesheet href=./typography.css>
-<link rel=stylesheet href=./docker-size.css>
-<link rel=stylesheet href=./cdn-status.css>
-<link rel=stylesheet href=./autoroll.css>
+<link rel=stylesheet href=./all.css>
 
 <style>
   .gallery {
@@ -22,26 +19,6 @@
     border-radius: 10px;
     box-shadow: 2px 2px 5px 0px #EEEEEE;
   }
-
-  .cronjobs-status {
-    background-color: #434449;
-    padding: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    flex-wrap: wrap;
-  }
-      .cronjobs-status a:not(.ghlogo) {
-        margin: 2 5px;
-      }
-
-      .cronjobs-status .ghlogo {
-        position: absolute;
-        width: 22px;
-        margin-right: 5px;
-        right: 0;
-      }
 </style>
 
 <script type=module>
@@ -49,7 +26,7 @@
   import {fetchCDNStatus, renderWebkitCDNStatus, renderFirefoxCDNStatus} from './cdn-status.js';
   import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
   import {fetchAutorollData, renderAutorollData} from './autoroll.js';
-  import {cronjobBadges} from './cronjobs.js';
+  import {cronjobBadgesHeader} from './cronjobs.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
     const [cdnData, dockerData, firefoxAutorollData, webkitAutorollData] = await Promise.all([
@@ -60,10 +37,7 @@
     ]);
 
     document.body.append(html`
-      <div class=cronjobs-status>
-        ${cronjobBadges()}
-        <a class=ghlogo href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img width=22px src='/github.png'></a>
-      </div>
+      ${cronjobBadgesHeader()}
       <div class="gallery">
         <div class=tile>${renderAutorollData(firefoxAutorollData, true /* preview */)}</div>
         <div class=tile>${renderAutorollData(webkitAutorollData, true /* preview */)}</div>

@@ -1,13 +1,10 @@
 <meta charset='utf-8'>
 <title>DevOps - Playwright</title>
 <link rel="icon" href="/favicon.svg">
-<link rel=stylesheet href=./typography.css>
-<link rel=stylesheet href=./docker-size.css>
-<link rel=stylesheet href=./cdn-status.css>
-<a style="position: absolute; right: 0; top: 0;" href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img src='/github.svg'></a>
+<link rel=stylesheet href=./all.css>
 
 <style>
-  body {
+  #content {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
@@ -17,8 +14,14 @@
 <script type=module>
   import {html} from './zhtml.js';
   import {fetchCDNStatus, renderFirefoxCDNStatus} from './cdn-status.js';
+  import {cronjobBadgesHeader} from './cronjobs.js';
   window.addEventListener('DOMContentLoaded', async () => {
     const cdnData = await fetchCDNStatus();
-    document.body.append(renderFirefoxCDNStatus(cdnData, false /* preview */));
+    document.body.append(html`
+      ${cronjobBadgesHeader()}
+      <section id=content>
+        ${renderFirefoxCDNStatus(cdnData, false /* preview */)}
+      </section>
+    `);
   }, false);
 </script>

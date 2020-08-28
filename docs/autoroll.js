@@ -23,9 +23,13 @@ export function renderAutorollData(autorollData, preview = false) {
   if (preview) {
     const RECENT_RUNS = 5;
     data = data.slice(0, RECENT_RUNS);
+    const url = {
+      firefox: '/full-firefox-autoroll.html',
+      webkit: '/full-webkit-autoroll.html',
+    }[browserName.toLowerCase()];
     footer = html`
       <footer>
-        Showing last ${RECENT_RUNS} rolls. <a href=#>See all</a>
+        Showing last ${RECENT_RUNS} rolls. <a href="${url}">See all</a>
       </footer>
     `;
   }

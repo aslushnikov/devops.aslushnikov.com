@@ -43,7 +43,7 @@ export function cronjobAutorollWebKit() {
 export function cronjobBadgesHeader() {
   return html`
     <hbox class=cronjobs-header>
-      <a class=ghlogo href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img width=22px src='/github.png'></a>
+      <a href="https://github.com/aslushnikov/devops.aslushnikov.com" aria-label="View source on GitHub"><img width=22px src='/octocat.svg'></a>
       <spacer></spacer>
       <hbox class=badges>
         ${[

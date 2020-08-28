@@ -38,7 +38,7 @@ class Playwright extends misc.GitRepo {
       env[envName] = executablePath;
     }
     //TODO: return test-report.json
-    await misc.spawnWithLog('npm', 'run', testCommand, {
+    await misc.spawnWithLogOrDie('npm', 'run', testCommand, {
       cwd: this._checkoutPath,
       env,
     });

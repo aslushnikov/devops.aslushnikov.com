@@ -99,6 +99,7 @@ const FORMAT_VERSION = 2;
 
   status.webkit = newWebKit;
   status.firefox = newFirefox;
+  status.timestamp = Date.now();
 
   await dataBranch.writeJSON('./status.json', status);
   await dataBranch.upload('update cdn-status');

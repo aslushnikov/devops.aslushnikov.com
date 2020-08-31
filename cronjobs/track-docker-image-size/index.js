@@ -1,23 +1,21 @@
-const {DataBranch} = require('../databranch.js');
+const {DataStore} = require('../datastore.js');
 const {Playwright} = require('../playwright.js');
 const misc = require('../misc.js');
 const fs = require('fs');
 const path = require('path');
 
-const BRANCH_NAME = 'docker-image-size-data';
-
 const FORMAT_VERSION = 1;
 
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
-  const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
+  const datastore = await DataStore.clone(__dirname);
 
   const defaultData = {
     version: FORMAT_VERSION,
     infos: [],
   };
 
-  let data = await dataBranch.readJSON('./data.json').catch(e => defaultData);
+  let data = await datastore.readJSON('./data.json').catch(e => defaultData);
   if (data.version !== FORMAT_VERSION)
     data = defaultData;
 
@@ -26,9 +24,9 @@ const FORMAT_VERSION = 1;
     shaToInfo.set(info.sha, info);
 
   // Clone Playwright with history so that we can use commitHistory command.
-  const pw = await Playwright.clone(cleanupHooks, { fullHistory: true });
+  const pw = await Playwright.clone(__dirname, { fullHistory: true });
   await pw.installDependencies();
-  await pw.buildProject();
+  await pw.build();
   const commits = await pw.commitHistory('docs/docker/Dockerfile.bionic');
   const missingCommits = commits.filter(commit => !shaToInfo.has(commit.sha));
 
@@ -63,8 +61,8 @@ const FORMAT_VERSION = 1;
     });
 
     data.infos = [...shaToInfo.values()];
-    await dataBranch.writeJSON('./data.json', data);
-    await dataBranch.upload();
+    await datastore.writeJSON('./data.json', data);
+    await datastore.upload();
   }
 })();
 

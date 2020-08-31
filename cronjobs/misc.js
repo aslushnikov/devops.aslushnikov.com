@@ -58,12 +58,19 @@ async function spawnWithLogOrDie(command, ...args) {
 
 async function headRequest(url) {
   return new Promise(resolve => {
-    let options = new URL(url);
-    options.method = 'HEAD';
-    const request = https.request(options, res => resolve(res.statusCode === 200));
+    const request = https.request(url, {method: 'HEAD', timeout: 3000}, res => {
+      resolve(res.statusCode === 200);
+      request.abort();
+    });
     request.on('error', error => resolve(false));
+    request.on('timeout', () => request.abort());
+    request.on('abort', () => resolve(false));
     request.end();
   });
+}
+
+async function existsAsync(filepath) {
+  return fs.promises.stat(filepath).then(() => true).catch(e => false);
 }
 
 // Process hooks are important so that github workflow actually crashes
@@ -100,6 +107,10 @@ class GitRepo {
 
   filepath(gitpath) {
     return path.join(this._checkoutPath, gitpath);
+  }
+
+  checkoutPath() {
+    return this._checkoutPath;
   }
 
   async commitHistory(gitpath) {
@@ -139,4 +150,4 @@ function parseCommitString(line) {
   return {sha, timestamp, message};
 }
 
-module.exports = { GitRepo, setupProcessHooks, spawn, spawnOrDie, spawnWithLog, spawnWithLogOrDie, headRequest, makeTempDir};
+module.exports = { existsAsync, GitRepo, setupProcessHooks, spawn, spawnOrDie, spawnWithLog, spawnWithLogOrDie, headRequest, makeTempDir};

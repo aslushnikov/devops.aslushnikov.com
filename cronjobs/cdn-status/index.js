@@ -1,8 +1,7 @@
-const {DataBranch} = require('../databranch.js');
+const {DataStore} = require('../datastore.js');
 const {Playwright} = require('../playwright.js');
 const misc = require('../misc.js');
 
-const BRANCH_NAME = 'cdn-status-data';
 const HOST = 'https://playwright.azureedge.net';
 
 const BLOB_NAMES = {
@@ -74,9 +73,9 @@ async function updateCDNStatus(browserName, buildNumber, cdnData) {
 const FORMAT_VERSION = 2;
 
 (async () => {
-  const cleanupHooks = misc.setupProcessHooks();
-  const dataBranch = await DataBranch.initialize(BRANCH_NAME, cleanupHooks);
-  const pw = await Playwright.clone(cleanupHooks);
+  misc.setupProcessHooks();
+  const datastore = await DataStore.clone(__dirname);
+  const pw = await Playwright.clone(__dirname);
   // Try to read last saved status and default to 'no status'
   const defaultData = {
     version: FORMAT_VERSION,
@@ -84,7 +83,7 @@ const FORMAT_VERSION = 2;
     webkit: [],
     firefox: [],
   };
-  let status = await dataBranch.readJSON('./status.json').catch(e => defaultData);
+  let status = await datastore.readJSON('./status.json').catch(e => defaultData);
   if (status.version !== FORMAT_VERSION)
     status = defaultData;
 
@@ -101,7 +100,7 @@ const FORMAT_VERSION = 2;
   status.firefox = newFirefox;
   status.timestamp = Date.now();
 
-  await dataBranch.writeJSON('./status.json', status);
-  await dataBranch.upload('update cdn-status');
+  await datastore.writeJSON('./status.json', status);
+  await datastore.upload('update cdn-status');
 })();
 

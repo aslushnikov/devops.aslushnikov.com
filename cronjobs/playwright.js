@@ -6,20 +6,33 @@ const misc = require('./misc.js');
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
 class Playwright extends misc.GitRepo {
-  static async clone(cleanupHooks, options = {}) {
+  static async clone(workdirPath, options = {}) {
+    const playwright = new Playwright(workdirPath);
+    if (await misc.existsAsync(playwright.checkoutPath()))
+      await fs.promises.rmdir(playwright.checkoutPath(), {recursive: true});
     const {
       fullHistory = false,
     } = options;
-    const checkoutPath = await misc.makeTempDir('devops-playwright-checkout-', cleanupHooks);
-    console.log(`[playwright] cloning Playwright at ${checkoutPath}`);
+    console.log(`[playwright] cloning Playwright at ${playwright.checkoutPath()}`);
     const cloneOptions = [
       '--single-branch',
       '--branch', 'master',
     ];
     if (!fullHistory)
       cloneOptions.push('--depth=1');
-    await misc.spawnOrDie('git', 'clone', ...cloneOptions, 'https://github.com/microsoft/playwright.git', checkoutPath);
-    return new Playwright(checkoutPath);
+    await misc.spawnWithLogOrDie('git', 'clone', ...cloneOptions, 'https://github.com/microsoft/playwright.git', playwright.checkoutPath());
+    return playwright;
+  }
+
+  static async pickup(workdirPath) {
+    const playwright = new Playwright(workdirPath);
+    if (!(await misc.existsAsync(playwright.checkoutPath())))
+      throw new Error(`ERROR: cannot initialize Playwright because ${playwright.checkoutPath()} does not exist!`);
+    return playwright;
+  }
+
+  constructor(workdirPath) {
+    super(path.join(workdirPath, 'workdir', 'playwright'));
   }
 
   async runTests(browserName, executablePath = '') {
@@ -44,12 +57,12 @@ class Playwright extends misc.GitRepo {
     });
   }
 
-  async prepareBrowserCheckout(browserName) {
-    if (browserName !== 'firefox' && browserName !== 'webkit')
-      throw new Error('Unknown browser: ' + browserName);
-    console.log(`[playwright] preparing ${browserName} checkout`);
-    await misc.spawnWithLogOrDie(this.filepath('browser_patches/prepare_checkout.sh'), browserName, {cwd: this._checkoutPath});
-    return new BrowserCheckout(browserName, this.filepath(`browser_patches/${browserName}/checkout`));
+  firefoxCheckout() {
+    return new FirefoxCheckout(this);
+  }
+
+  webkitCheckout() {
+    return new WebKitCheckout(this);
   }
 
   async webkitProtocol() {
@@ -76,7 +89,7 @@ class Playwright extends misc.GitRepo {
     });
   }
 
-  async buildProject() {
+  async build() {
     console.log(`[playwright] building project`);
     await misc.spawnWithLogOrDie('npm', 'run', 'build', {
       cwd: this._checkoutPath,
@@ -84,53 +97,63 @@ class Playwright extends misc.GitRepo {
   }
 }
 
-class BrowserCheckout extends misc.GitRepo {
-  constructor(browserName, checkoutPath) {
-    super(checkoutPath);
-    this._browserName = browserName;
-    this._checkoutPath = checkoutPath;
-    if (browserName === 'firefox')
-      this._browserUpstreamRef = 'browser_upstream/beta';
-    else if (browserName === 'webkit')
-      this._browserUpstreamRef = 'browser_upstream/master';
-    else
-      throw new Error('ERROR: unknown browser to create checkout - ' + browserName);
+class FirefoxCheckout extends misc.GitRepo {
+  constructor(playwright) {
+    super(playwright.filepath('browser_patches/firefox/checkout'));
+    this._playwright = playwright;
+    this._browserUpstreamRef = 'browser_upstream/beta';
   }
 
-  name() {
-    return this._browserName;
+  browserUpstreamRef() { return 'browser_upstream/beta'; }
+
+  executablePath() {
+    return this.filepath(`obj-build-playwright/dist/bin/firefox`);
+  }
+
+  async prepareCheckout() {
+    await misc.spawnWithLogOrDie(this._playwright.filepath('browser_patches/prepare_checkout.sh'), 'firefox', {cwd: this._playwright.checkoutPath()});
+  }
+
+  async build() {
+    await misc.spawnWithLogOrDie('./mach', 'bootstrap', '--no-interactive', '--application-choice=Firefox for Desktop', {
+      cwd: this.checkoutPath(),
+      env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
+    });
+    await misc.spawnWithLogOrDie(`browser_patches/firefox/build.sh`, {
+      cwd: this._playwright.checkoutPath(),
+      env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
+    });
+  }
+
+}
+
+class WebKitCheckout extends misc.GitRepo {
+  constructor(playwright) {
+    super(playwright.filepath('browser_patches/webkit/checkout'));
+    this._playwright = playwright;
   }
 
   browserUpstreamRef() {
-    return this._browserUpstreamRef;
+    return 'browser_upstream/master';
   }
 
-  async buildBrowser() {
-    if (this._browserName === 'webkit') {
-      await misc.spawnWithLogOrDie('Tools/gtk/install-dependencies', { cwd: this._checkoutPath });
-      await misc.spawnWithLogOrDie('Tools/wpe/install-dependencies', { cwd: this._checkoutPath });
-      await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitwpe-libs', { cwd: this._checkoutPath });
-      await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitgtk-libs', { cwd: this._checkoutPath });
-    } else if (this._browserName === 'firefox') {
-      await misc.spawnWithLogOrDie('./mach', 'bootstrap', '--no-interactive', '--application-choice=Firefox for Desktop', {
-        cwd: this._checkoutPath,
-        env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
-      });
-    } else {
-      throw new Error('ERROR: unknown browser! ' + this._browserName);
-    }
-    await misc.spawnWithLogOrDie(`../build.sh`, {
-      cwd: this._checkoutPath,
+  async prepareCheckout() {
+    await misc.spawnWithLogOrDie(this.filepath('browser_patches/prepare_checkout.sh'), 'webkit', {cwd: this._checkoutPath});
+  }
+
+  async build() {
+    await misc.spawnWithLogOrDie('Tools/gtk/install-dependencies', { cwd: this._checkoutPath });
+    await misc.spawnWithLogOrDie('Tools/wpe/install-dependencies', { cwd: this._checkoutPath });
+    await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitwpe-libs', { cwd: this._checkoutPath });
+    await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitgtk-libs', { cwd: this._checkoutPath });
+    await misc.spawnWithLogOrDie(`browser_patches/webkit/build.sh`, {
+      cwd: this._playwright.checkoutPath(),
       env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
     });
   }
 
   executablePath() {
-    if (this._browserName === 'firefox')
-      return this.filepath(`obj-build-playwright/dist/bin/firefox`);
-    if (this._browserName === 'webkit')
-      return this.filepath(`../pw_run.sh`);
-    throw new Error('ERROR: cannot get executable path - I do not know this browser!');
+    return this._playwright.filepath(`browser_patches/webkit/pw_run.sh`);
   }
 }
 

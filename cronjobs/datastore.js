@@ -5,16 +5,19 @@ const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
 
-class DataBranch {
-  static async initialize(branch, cleanupHooks = []) {
-    const checkoutPath = await misc.makeTempDir('devops-data-dir-tmp-folder-', cleanupHooks);
-    console.log(`[databranch] initializing at ${checkoutPath}`);
-    let url = `https://github.com/${GITHUB_REPOSITORY}.git`;
+class DataStore {
+  static async clone(workdirPath) {
+    const datastore = new DataStore(workdirPath);
+    const branch = 'datastore--' + path.basename(workdirPath);
+    const checkoutPath = path.join(workdirPath, 'workdir', 'datastore');
+    if (await misc.existsAsync(datastore._checkoutPath))
+      await fs.promises.rmdir(datastore._checkoutPath, {recursive: true});
+
+    console.log(`[datastore] created at ${checkoutPath}`);
+    let url = `git@github.com:${GITHUB_REPOSITORY}.git`;
     // Use github authentication if we have access to it.
     if (process.env.GITHUB_ACTOR && process.env.GITHUB_TOKEN)
       url = `https://${process.env.GITHUB_ACTOR}:${process.env.GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git`;
-
-    await fs.promises.mkdir(checkoutPath, {recursive: true});
     // Check existance of a remote branch for this bot.
     const {stdout} = await misc.spawn('git', 'ls-remote', '--heads', url, branch);
     // If there is no remote branch for this bot - create one.
@@ -28,15 +31,22 @@ class DataBranch {
     }
     await misc.spawnOrDie('git', 'config', 'user.email', `"github-actions@github.com"`, {cwd: checkoutPath});
     await misc.spawnOrDie('git', 'config', 'user.name', `"github-actions"`, {cwd: checkoutPath});
-    return new DataBranch(checkoutPath, branch);
+    return datastore;
   }
 
-  constructor(checkoutPath, branch) {
-    this._checkoutPath = checkoutPath;
+  static async pickup(workdirPath) {
+    const datastore = new DataStore(workdirPath);
+    if (!(await misc.existsAsync(datastore._checkoutPath)))
+      throw new Error(`ERROR: cannot initialize datastore because ${datastore._checkoutPath} does not exist!`);
+    return datastore;
+  }
+
+  constructor(workdirPath) {
+    this._checkoutPath = path.join(workdirPath, 'workdir', 'datastore');
     // We don't want to expose that our data store is backed with git,
     // so aggregate here instead of inheriting.
-    this._git = new misc.GitRepo(checkoutPath);
-    this._branch = branch;
+    this._git = new misc.GitRepo(this._checkoutPath);
+    this._branch = 'datastore--' + path.basename(workdirPath);
   }
 
   async readJSON(filepath) {
@@ -68,4 +78,4 @@ class DataBranch {
   }
 }
 
-module.exports = {DataBranch};
+module.exports = {DataStore};

@@ -1,0 +1,15 @@
+{
+  "name": "devops.aslushnikov.com",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright DevOps landing site",
+  "scripts": {
+    "tsc": "tsc -p cronjobs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^4.0.2"
+  }
+}

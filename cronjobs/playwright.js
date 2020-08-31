@@ -138,7 +138,7 @@ class WebKitCheckout extends misc.GitRepo {
   }
 
   async prepareCheckout() {
-    await misc.spawnWithLogOrDie(this.filepath('browser_patches/prepare_checkout.sh'), 'webkit', {cwd: this._checkoutPath});
+    await misc.spawnWithLogOrDie(this._playwright.filepath('browser_patches/prepare_checkout.sh'), 'webkit', {cwd: this._playwright.checkoutPath()});
   }
 
   async build() {

@@ -2,6 +2,9 @@ name: autoroll firefox
 on:
   schedule:
     - cron: '0 11 * * *'
+  push:
+    branches:
+      - master
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
@@ -23,8 +26,8 @@ jobs:
           sudo apt-get install -y autoconf2.13 libclang-dev clang
       - name: prepare checkout
         run: node cronjobs/autoroll-firefox/prepare.js
-      - name: rebaseline
-        run: node cronjobs/autoroll-firefox/rebaseline.js
+      - name: rebase
+        run: node cronjobs/autoroll-firefox/rebase.js
       - name: build firefox
         run: node cronjobs/autoroll-firefox/build.js
       - name: test firefox build

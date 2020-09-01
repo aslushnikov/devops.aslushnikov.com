@@ -2,8 +2,8 @@ import {html} from './zhtml.js';
 import {humanReadableTimeInterval, browserLogo, commitURL} from './misc.js';
 
 const DATA_URLS = {
-  firefox: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/autoroll-firefox-data/rolls.json',
-  webkit: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/autoroll-webkit-data/rolls.json',
+  firefox: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-firefox/rolls.json',
+  webkit: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-webkit/rolls.json',
 };
 
 export async function fetchAutorollData(browserName) {

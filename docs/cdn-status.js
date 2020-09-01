@@ -5,7 +5,7 @@ const CHECKMARK_EMOJI = '✅';
 const CROSS_EMOJI = '❌';
 
 export async function fetchCDNStatus() {
-  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/cdn-status-data/status.json').then(r => r.json()).then(json => {
+  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--cdn-status/status.json').then(r => r.json()).then(json => {
     json.webkit.sort((a, b) => b.rev - a.rev);
     json.firefox.sort((a, b) => b.rev - a.rev);
     return json;

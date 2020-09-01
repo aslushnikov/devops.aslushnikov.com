@@ -2,7 +2,7 @@ import {html} from './zhtml.js';
 import {humanReadableSize, commitURL} from './misc.js';
 
 export function fetchDockerStats() {
-  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/docker-image-size-data/data.json').then(r => r.json()).then(json => {
+  return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--track-docker-image-size/data.json').then(r => r.json()).then(json => {
     json.infos.sort((a, b) => b.timestamp - a.timestamp);
     for (let i = 0, N = json.infos.length; i < N; ++i) {
       const info = json.infos[i];

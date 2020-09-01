@@ -8,5 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: env
-      - run: echo ${{ job.container.id }}
+      - run: echo $FOOBAR
+        env:
+          FOOBAR: ${{ job.container.id }}
 

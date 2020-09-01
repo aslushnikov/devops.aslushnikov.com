@@ -27,6 +27,7 @@
   import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
   import {fetchAutorollData, renderAutorollData} from './autoroll.js';
   import {cronjobBadgesHeader} from './cronjobs.js';
+  import {renderUsefulLinks} from './useful-links.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
     const [cdnData, dockerData, firefoxAutorollData, webkitAutorollData] = await Promise.all([
@@ -44,6 +45,7 @@
         <div class=tile>${renderWebkitCDNStatus(cdnData, true /* preview */)}</div>
         <div class=tile>${renderFirefoxCDNStatus(cdnData, true /* preview */)}</div>
         <div class=tile>${dockerSizeStats(dockerData, true /* preview */)}</div>
+        <div class=tile>${renderUsefulLinks()}</div>
       </div>
     `);
   }, false);

@@ -1,0 +1,38 @@
+name: Test Docker
+on:
+  schedule:
+    - cron:  '0 1 * * *'
+  push:
+    paths:
+      - '.github/workflows/test-docker.yml'
+    branches:
+      - master
+  pull_request:
+    paths:
+      - '.github/workflows/test-docker.yml'
+    branches:
+      - master
+jobs:
+  test_linux_docker:
+    name: Docker
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        repository: microsoft/playwright
+    - uses: actions/setup-node@v1
+      with:
+        node-version: 10
+    - uses: microsoft/playwright-github-action@v1
+    - run: npm ci
+    - run: npm run build
+    - name: Build
+      run: bash docs/docker/build.sh
+    - name: Test
+      run: |
+        npm run clean
+        rm -rf node_modules/
+        CONTAINER_ID="$(docker run --rm -v $(pwd):/root/playwright --name playwright-docker-test -d -t playwright:localbuild /bin/bash)"
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm ci
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm run build
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" npx test-runner test/ --jobs=1 --forbid-only --timeout=30000 --retries=3 --reporter=dot

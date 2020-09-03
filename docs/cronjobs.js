@@ -1,43 +1,35 @@
 import {html} from './zhtml.js';
 
-export function cronjobCDNStatusBadge() {
+function generateStatusBadge(workflowName) {
   return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/cdn-status.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/update%20CDN%20status/badge.svg'>
+    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/actions?query=${encodeURIComponent(`workflow:"${workflowName}"`)}'>
+      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/${encodeURIComponent(workflowName)}/badge.svg'>
     </a>
   `;
 }
 
-export function cronjobDockerSizeBadge() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/track-docker-image-size.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/track%20docker%20size/badge.svg'>
-    </a>
-  `;
+function cronjobCDNStatusBadge() {
+  return generateStatusBadge('update CDN status')
 }
 
-export function cronjobPublishBrowserProtocols() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/publish-browser-protocols.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/publish%20browser%20protocols/badge.svg'>
-    </a>
-  `;
+function cronjobDockerSizeBadge() {
+  return generateStatusBadge('track docker size')
 }
 
-export function cronjobAutorollFirefox() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/autoroll-firefox.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/autoroll%20firefox/badge.svg'>
-    </a>
-  `;
+function cronjobPublishBrowserProtocols() {
+  return generateStatusBadge('publish browser protocols')
 }
 
-export function cronjobAutorollWebKit() {
-  return html`
-    <a href='https://github.com/aslushnikov/devops.aslushnikov.com/blob/master/.github/workflows/autoroll-webkit.yml'>
-      <img title="cronjob status (green is good, red - broken!)" src='https://github.com/aslushnikov/devops.aslushnikov.com/workflows/autoroll%20webkit/badge.svg'>
-    </a>
-  `;
+function cronjobAutorollFirefox() {
+  return generateStatusBadge('autoroll firefox')
+}
+
+function cronjobAutorollWebKit() {
+  return generateStatusBadge('autoroll webkit')
+}
+
+export function dockerImageTests() {
+  return generateStatusBadge('Test Docker')
 }
 
 export function cronjobBadgesHeader() {
@@ -52,6 +44,7 @@ export function cronjobBadgesHeader() {
           cronjobPublishBrowserProtocols(),
           cronjobAutorollFirefox(),
           cronjobAutorollWebKit(),
+          dockerImageTests(),
         ]}
       </hbox>
       <spacer></spacer>

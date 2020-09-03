@@ -2,6 +2,16 @@ name: publish browser protocols
 on:
   schedule:
     - cron: '0 10 * * *'
+  push:
+    paths:
+      - '.github/workflows/publish-browser-protocols.yml'
+    branches:
+      - master
+  pull_request:
+    paths:
+      - '.github/workflows/publish-browser-protocols.yml'
+    branches:
+      - master
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -2,6 +2,16 @@ name: autoroll webkit
 on:
   schedule:
     - cron: '0 11 * * *'
+  push:
+    paths:
+      - '.github/workflows/autoroll-webkit.yml'
+    branches:
+      - master
+  pull_request:
+    paths:
+      - '.github/workflows/autoroll-webkit.yml'
+    branches:
+      - master
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:

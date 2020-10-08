@@ -14,7 +14,7 @@ const fs = require('fs');
   const roll = rolls[rolls.length - 1];
 
   try {
-    await fs.promises.writeFile(pw.filepath('browser_patches/chromium/BUILD_NUMBER'), roll.chromiumRevision);
+    await fs.promises.writeFile(pw.filepath('browser_patches/chromium/BUILD_NUMBER'), '' + roll.chromiumRevision);
     await misc.spawnWithLogOrDie('browser_patches/chromium/build.sh', { cwd: pw.checkoutPath() });
     roll.steps.build = 'ok';
   } catch (e) {

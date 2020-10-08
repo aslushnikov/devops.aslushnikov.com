@@ -59,6 +59,8 @@ async function updateCDNStatus(pw, browserName, cdnData) {
   }));
   console.timeEnd(`Reading all build numbers for ${browserName}`);
 
+  console.log(buildNumbers);
+
   // Build a list of all missing status data.
   const revisionToInfo = new Map();
   for (const entry of cdnData)
@@ -98,8 +100,8 @@ const FORMAT_VERSION = 2;
 
 (async () => {
   misc.setupProcessHooks();
-  const datastore = await DataStore.clone(__dirname);
-  const pw = await Playwright.clone(__dirname);
+  const datastore = await DataStore.cloneWithoutHistory(__dirname);
+  const pw = await Playwright.cloneWithHistory(__dirname);
   // Try to read last saved status and default to 'no status'
   const defaultData = {
     version: FORMAT_VERSION,

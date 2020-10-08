@@ -6,7 +6,7 @@ const misc = require('./misc.js');
 const GITHUB_REPOSITORY = 'aslushnikov/devops.aslushnikov.com';
 
 class DataStore {
-  static async clone(workdirPath) {
+  static async cloneWithoutHistory(workdirPath) {
     const datastore = new DataStore(workdirPath);
     const branch = 'datastore--' + path.basename(workdirPath);
     const checkoutPath = path.join(workdirPath, 'workdir', 'datastore');

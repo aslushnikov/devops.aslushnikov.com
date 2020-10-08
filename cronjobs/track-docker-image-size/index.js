@@ -8,7 +8,7 @@ const FORMAT_VERSION = 1;
 
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
-  const datastore = await DataStore.clone(__dirname);
+  const datastore = await DataStore.cloneWithoutHistory(__dirname);
 
   const defaultData = {
     version: FORMAT_VERSION,
@@ -24,7 +24,7 @@ const FORMAT_VERSION = 1;
     shaToInfo.set(info.sha, info);
 
   // Clone Playwright with history so that we can use commitHistory command.
-  const pw = await Playwright.clone(__dirname, { fullHistory: true });
+  const pw = await Playwright.cloneWithHistory(__dirname);
   await pw.installDependencies();
   await pw.build();
   const commits = await pw.commitHistory('docs/docker/Dockerfile.bionic');

@@ -4,8 +4,8 @@ const misc = require('../misc.js');
 
 (async () => {
   misc.setupProcessHooks();
-  const datastore = await DataStore.clone(__dirname);
-  const pw = await Playwright.clone(__dirname);
+  const datastore = await DataStore.cloneWithoutHistory(__dirname);
+  const pw = await Playwright.cloneWithoutHistory(__dirname);
 
   {
     // Write Firefox protocol.js file

@@ -5,23 +5,31 @@ const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
+function clone(workdirPath, options = {}) {
+  const playwright = new Playwright(workdirPath);
+  if (await misc.existsAsync(playwright.checkoutPath()))
+    await fs.promises.rmdir(playwright.checkoutPath(), {recursive: true});
+  const {
+    fullHistory = false,
+  } = options;
+  console.log(`[playwright] cloning Playwright at ${playwright.checkoutPath()}`);
+  const cloneOptions = [
+    '--single-branch',
+    '--branch', 'master',
+  ];
+  if (!fullHistory)
+    cloneOptions.push('--depth=1');
+  await misc.spawnWithLogOrDie('git', 'clone', ...cloneOptions, 'https://github.com/microsoft/playwright.git', playwright.checkoutPath());
+  return playwright;
+}
+
 class Playwright extends misc.GitRepo {
-  static async clone(workdirPath, options = {}) {
-    const playwright = new Playwright(workdirPath);
-    if (await misc.existsAsync(playwright.checkoutPath()))
-      await fs.promises.rmdir(playwright.checkoutPath(), {recursive: true});
-    const {
-      fullHistory = false,
-    } = options;
-    console.log(`[playwright] cloning Playwright at ${playwright.checkoutPath()}`);
-    const cloneOptions = [
-      '--single-branch',
-      '--branch', 'master',
-    ];
-    if (!fullHistory)
-      cloneOptions.push('--depth=1');
-    await misc.spawnWithLogOrDie('git', 'clone', ...cloneOptions, 'https://github.com/microsoft/playwright.git', playwright.checkoutPath());
-    return playwright;
+  static async cloneWithoutHistory(workdirPath) {
+    return await clone(workdirPath, {fullHistory: false});
+  }
+
+  static async cloneWithHistory(workdirPath) {
+    return await clone(workdirPath, {fullHistory: true});
   }
 
   static async pickup(workdirPath) {

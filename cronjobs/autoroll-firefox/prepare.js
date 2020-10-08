@@ -5,7 +5,7 @@ const misc = require('../misc.js');
 (async () => {
   const cleanupHooks = misc.setupProcessHooks();
 
-  const pw = await Playwright.clone(__dirname);
+  const pw = await Playwright.cloneWithoutHistory(__dirname);
   await pw.installDependencies();
   await pw.build();
 
@@ -24,7 +24,7 @@ const misc = require('../misc.js');
     runURL: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
   };
 
-  const datastore = await DataStore.clone(__dirname);
+  const datastore = await DataStore.cloneWithoutHistory(__dirname);
   let rolls = await datastore.readJSON('./rolls.json').catch(e => ([]));
   rolls.push(roll);
   await datastore.writeJSON('./rolls.json', rolls);

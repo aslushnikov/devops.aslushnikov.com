@@ -50,7 +50,15 @@ async function collectRevisionInfo(rev, urls) {
 }
 
 async function updateCDNStatus(pw, browserName, cdnData) {
-  const buildNumber = await pw.buildNumber(browserName);
+  const gitpath = `browser_patches/${browserName}/BUILD_NUMBER`;
+  console.time(`Reading all build numbers for ${browserName}`);
+  const commits = await pw.commitHistory(gitpath);
+  const buildNumbers = await Promise.all(commits.map(async commit => {
+    const text = await pw.show(commit.sha, gitpath);
+    return parseInt(text.split('\n')[0], 10);
+  }));
+  console.timeEnd(`Reading all build numbers for ${browserName}`);
+
   // Build a list of all missing status data.
   const revisionToInfo = new Map();
   for (const entry of cdnData)
@@ -58,13 +66,13 @@ async function updateCDNStatus(pw, browserName, cdnData) {
 
   const revisionsToFetch = new Set();
   // Fetch all revisions we don't have info about.
-  for (let i = 1000; i <= buildNumber; ++i) {
-    if (!revisionToInfo.has(i))
-      revisionsToFetch.add(i);
+  for (const buildNumber of buildNumbers) {
+    if (!revisionToInfo.has(buildNumber))
+      revisionsToFetch.add(buildNumber);
   }
-  // Also re-fetch information about 5 last revisions - since it changes.
-  for (let i = buildNumber - 4; i <= buildNumber; ++i)
-    revisionsToFetch.add(i);
+  // Also re-fetch information about 5 last revisions - since it migth change.
+  for (let i = 0; i < Math.min(5, buildNumbers.length); ++i)
+    revisionsToFetch.add(buildNumbers[i]);
 
   // Limit run to maximum of 50 missing revisions.
   // Cronjob will fill all missing over time.

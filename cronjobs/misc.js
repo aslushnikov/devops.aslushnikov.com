@@ -113,6 +113,11 @@ class GitRepo {
     return this._checkoutPath;
   }
 
+  async show(sha, gitpath) {
+    const {stdout} = await spawnOrDie('git', 'show', `${sha}:${gitpath}`, {cwd: this._checkoutPath});
+    return stdout;
+  }
+
   async commitHistory(gitpath) {
     const {stdout} = await spawnOrDie('git', 'log', '--follow', '--format=%H %ct %s', gitpath, {cwd: this._checkoutPath});
     return stdout.trim().split('\n').map(parseCommitString);

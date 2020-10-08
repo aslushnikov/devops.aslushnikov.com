@@ -47,6 +47,7 @@ class Playwright extends misc.GitRepo {
     const testCommand = ({
       firefox: 'ftest',
       webkit: 'wtest',
+      chromium: 'ctest',
     })[browserName];
     if (!testCommand)
       throw new Error('ERROR: cannot run tests for browser ' + browserName);
@@ -55,6 +56,7 @@ class Playwright extends misc.GitRepo {
       const envName = ({
         firefox: 'FFPATH',
         webkit: 'WKPATH',
+        chromium: 'CRPATH',
       })[browserName];
       env[envName] = executablePath;
     }

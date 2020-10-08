@@ -5,11 +5,13 @@ on:
   push:
     paths:
       - '.github/workflows/autoroll-chromium.yml'
+      - 'cronjobs/autoroll-chromium/*'
     branches:
       - master
   pull_request:
     paths:
       - '.github/workflows/autoroll-chromium.yml'
+      - 'cronjobs/autoroll-chromium/*'
     branches:
       - master
 env:

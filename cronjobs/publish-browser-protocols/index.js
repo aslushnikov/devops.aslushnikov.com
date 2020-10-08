@@ -10,7 +10,7 @@ const misc = require('../misc.js');
   {
     // Write Firefox protocol.js file
     await datastore.writeFile('firefox_protocol.js', await pw.firefoxProtocol());
-    await datastore.writeJSON('firefox_protocol_version', await pw.ffBuildNumber());
+    await datastore.writeJSON('firefox_protocol_version', await pw.buildNumber('firefox'));
   }
 
   {
@@ -19,7 +19,7 @@ const misc = require('../misc.js');
     await webkit.prepareCheckout();
 
     await datastore.writeFile('webkit_protocol.json', await pw.webkitProtocol());
-    await datastore.writeJSON('webkit_protocol_version', await pw.wkBuildNumber());
+    await datastore.writeJSON('webkit_protocol_version', await pw.buildNumber('webkit'));
   }
 
   console.log(await datastore.upload('update firefox & webkit protocols'));

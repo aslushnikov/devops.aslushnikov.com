@@ -74,12 +74,8 @@ class Playwright extends misc.GitRepo {
     return await fs.promises.readFile(this.filepath('browser_patches/firefox/juggler/protocol/Protocol.js'), 'utf8');
   }
 
-  async wkBuildNumber() {
-    return parseInt((await fs.promises.readFile(this.filepath('browser_patches/webkit/BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
-  }
-
-  async ffBuildNumber() {
-    return parseInt((await fs.promises.readFile(this.filepath('browser_patches/firefox/BUILD_NUMBER'), 'utf8')).split('\n')[0], 10);
+  async buildNumber(appName) {
+    return parseInt((await fs.promises.readFile(this.filepath(`browser_patches/${appName}/BUILD_NUMBER`), 'utf8')).split('\n')[0], 10);
   }
 
   async installDependencies() {

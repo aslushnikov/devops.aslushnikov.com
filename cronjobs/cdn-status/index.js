@@ -5,6 +5,21 @@ const misc = require('../misc.js');
 const HOST = 'https://playwright.azureedge.net';
 
 const BLOB_NAMES = {
+  chromium: [
+    'chromium-linux',
+    'chromium-mac',
+    'chromium-win32',
+    'chromium-win64',
+  ],
+  ffmpeg: [
+    'ffmpeg-linux',
+    'ffmpeg-mac',
+    'ffmpeg-win32',
+    'ffmpeg-win64',
+  ],
+  winldd: [
+    'winldd-win64',
+  ],
   webkit: [
     'webkit-ubuntu-18.04',
     'webkit-ubuntu-20.04',
@@ -34,7 +49,8 @@ async function collectRevisionInfo(rev, urls) {
   };
 }
 
-async function updateCDNStatus(browserName, buildNumber, cdnData) {
+async function updateCDNStatus(pw, browserName, cdnData) {
+  const buildNumber = await pw.buildNumber(browserName);
   // Build a list of all missing status data.
   const revisionToInfo = new Map();
   for (const entry of cdnData)
@@ -82,22 +98,34 @@ const FORMAT_VERSION = 2;
     timestamp: Date.now(),
     webkit: [],
     firefox: [],
+    chromium: [],
+    winldd: [],
+    ffmpeg: [],
   };
   let status = await datastore.readJSON('./status.json').catch(e => defaultData);
   if (status.version !== FORMAT_VERSION)
     status = defaultData;
 
-  const newWebKit = await updateCDNStatus('webkit', await pw.wkBuildNumber(), status.webkit);
-  const newFirefox = await updateCDNStatus('firefox', await pw.ffBuildNumber(), status.firefox);
+  const newWebKit = await updateCDNStatus(pw, 'webkit', status.webkit);
+  const newFirefox = await updateCDNStatus(pw, 'firefox', status.firefox);
+  const newChromium = await updateCDNStatus(pw, 'chromium', status.chromium);
+  const newFfmpeg = await updateCDNStatus(pw, 'ffmpeg', status.ffmpeg);
+  const newWinldd = await updateCDNStatus(pw, 'winldd', status.winldd);
 
   if (JSON.stringify(newWebKit) === JSON.stringify(status.webkit) &&
-      JSON.stringify(newFirefox) === JSON.stringify(status.firefox)) {
+      JSON.stringify(newFirefox) === JSON.stringify(status.firefox) &&
+      JSON.stringify(newChromium) === JSON.stringify(status.chromium) &&
+      JSON.stringify(newFfmpeg) === JSON.stringify(status.ffmpeg) &&
+      JSON.stringify(newWinldd) === JSON.stringify(status.winldd)) {
     console.log('FYI: CDN status did not change - do nothing.');
     return;
   }
 
   status.webkit = newWebKit;
   status.firefox = newFirefox;
+  status.chromium = newChromium;
+  status.winldd = newWinldd;
+  status.ffmpeg = newFfmpeg;
   status.timestamp = Date.now();
 
   await datastore.writeJSON('./status.json', status);

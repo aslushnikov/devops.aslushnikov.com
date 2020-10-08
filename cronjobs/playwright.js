@@ -5,7 +5,7 @@ const misc = require('./misc.js');
 
 const GITHUB_REPOSITORY = 'microsoft/playwright';
 
-function clone(workdirPath, options = {}) {
+async function clone(workdirPath, options = {}) {
   const playwright = new Playwright(workdirPath);
   if (await misc.existsAsync(playwright.checkoutPath()))
     await fs.promises.rmdir(playwright.checkoutPath(), {recursive: true});

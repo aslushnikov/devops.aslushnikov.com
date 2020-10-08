@@ -29,7 +29,6 @@
 
     .cdn-status .cell.revision {
       justify-content: center;
-      font-weight: bold;
       border-right: 1px solid var(--border-color);
     }
 

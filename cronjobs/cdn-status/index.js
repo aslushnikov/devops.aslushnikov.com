@@ -106,11 +106,11 @@ const FORMAT_VERSION = 2;
   if (status.version !== FORMAT_VERSION)
     status = defaultData;
 
-  const newWebKit = await updateCDNStatus(pw, 'webkit', status.webkit);
-  const newFirefox = await updateCDNStatus(pw, 'firefox', status.firefox);
-  const newChromium = await updateCDNStatus(pw, 'chromium', status.chromium);
-  const newFfmpeg = await updateCDNStatus(pw, 'ffmpeg', status.ffmpeg);
-  const newWinldd = await updateCDNStatus(pw, 'winldd', status.winldd);
+  const newWebKit = await updateCDNStatus(pw, 'webkit', status.webkit || []);
+  const newFirefox = await updateCDNStatus(pw, 'firefox', status.firefox || []);
+  const newChromium = await updateCDNStatus(pw, 'chromium', status.chromium || []);
+  const newFfmpeg = await updateCDNStatus(pw, 'ffmpeg', status.ffmpeg || []);
+  const newWinldd = await updateCDNStatus(pw, 'winldd', status.winldd || []);
 
   if (JSON.stringify(newWebKit) === JSON.stringify(status.webkit) &&
       JSON.stringify(newFirefox) === JSON.stringify(status.firefox) &&

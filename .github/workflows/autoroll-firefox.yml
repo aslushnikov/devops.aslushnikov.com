@@ -14,8 +14,9 @@ on:
       - master
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
-  build:
+  autoroll_job:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2

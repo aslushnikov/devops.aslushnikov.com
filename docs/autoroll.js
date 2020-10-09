@@ -4,6 +4,7 @@ import {humanReadableTimeInterval, browserLogo, commitURL} from './misc.js';
 const DATA_URLS = {
   firefox: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-firefox/rolls.json',
   webkit: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-webkit/rolls.json',
+  chromium: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-chromium/rolls.json',
 };
 
 export async function fetchAutorollData(browserName) {
@@ -16,24 +17,64 @@ export async function fetchAutorollData(browserName) {
   });
 }
 
-export function renderAutorollData(autorollData, preview = false) {
+function renderUpstreamCommit(browserName, roll) {
+  let sha, shortSHA;
+  // All but chromium have upstream commit, whereas chromium has `chromiumRevision`.
+  if (roll.upstreamCommit) {
+    sha = roll.upstreamCommit.sha;
+    shortSHA = sha.substring(0, 7);
+  } else {
+    sha = roll.chromiumRevision;
+    shortSHA = sha;
+  }
+  return html`
+    <span class=commit>
+      ${browserName}:
+      <a class=sha href="${commitURL(browserName, sha)}">${shortSHA}</a>
+    </span>
+  `;
+}
+
+export function renderAutorollDataPreview({firefox, webkit, chromium}) {
+  const rows = [
+    {name: 'Chromium', roll: chromium.rolls[0]},
+    {name: 'Firefox', roll: firefox.rolls[0]},
+    {name: 'WebKit', roll: webkit.rolls[0]},
+  ];
+  return html`
+    <section class=autoroll-data>
+      <hbox class=header>
+        <div>
+          <h2>Autoroll</h2>
+          <div>(attempted daily at 4AM PST)</div>
+        </div>
+      </hbox>
+      <section>
+        ${rows.map(({name, roll}) => html`
+          <hbox class=row>
+            <a href="${roll.runURL}">${renderDate(roll.timestamp)}</a>
+            <span class=commit>
+              Playwright:
+              <a class=sha href="${commitURL('playwright', roll.playwrightCommit.sha)}">${roll.playwrightCommit.sha.substring(0, 7)}</a>
+            </span>
+            ${renderUpstreamCommit(name, roll)}
+            <spacer></spacer>
+            ${renderSteps(roll)}
+          </hbox>
+        `)}
+      </section>
+      <footer>
+        Full log: ${rows.map(({name}) => html`
+          <a class="" href="/autoroll-${name.toLowerCase()}.html">[${name}] </a>
+        `)}
+      </footer>
+    </section>
+  `;
+}
+
+export function renderAutorollDataFull(autorollData) {
   const browserName = autorollData.browserName;
   let data = autorollData.rolls;
-  let footer;
-  if (preview) {
-    const RECENT_RUNS = 5;
-    data = data.slice(0, RECENT_RUNS);
-    const url = {
-      firefox: '/full-firefox-autoroll.html',
-      webkit: '/full-webkit-autoroll.html',
-    }[browserName.toLowerCase()];
-    footer = html`
-      <footer>
-        Showing last ${RECENT_RUNS} rolls. <a href="${url}">See all</a>
-      </footer>
-    `;
-  }
-  console.log(data);
   return html`
     <section class=autoroll-data>
       <hbox class=header>
@@ -54,16 +95,12 @@ export function renderAutorollData(autorollData, preview = false) {
               Playwright:
               <a class=sha href="${commitURL('playwright', d.playwrightCommit.sha)}">${d.playwrightCommit.sha.substring(0, 7)}</a>
             </span>
-            <span class=commit>
-              ${browserName}:
-              <a class=sha href="${commitURL(browserName, d.upstreamCommit.sha)}">${d.upstreamCommit.sha.substring(0, 7)}</a>
-            </span>
+            ${renderUpstreamCommit(browserName, d)}
             <spacer></spacer>
             ${renderSteps(d)}
           </hbox>
         `)}
       </section>
-      ${footer}
     </section>
   `;
 }
@@ -83,7 +120,12 @@ function renderSteps(d) {
   };
   return html`
     <hbox>
-      <span class="step ${statusToClass[d.steps.rebase]}">rebase</span>
+      ${d.steps.rebase && html`
+        <span class="step ${statusToClass[d.steps.rebase]}">rebase</span>
+      `}
+      ${d.steps.find_revision && html`
+        <span class="step ${statusToClass[d.steps.find_revision]}">findrev</span>
+      `}
       <span class="step ${statusToClass[d.steps.build]}">build</span>
       <span class="step ${statusToClass[d.steps.test]}">test</span>
     </hbox>

@@ -13,16 +13,14 @@
 
 <script type=module>
   import {html} from './zhtml.js';
-  import {fetchAutorollData, renderAutorollData} from './autoroll.js';
+  import {fetchAutorollData, renderAutorollDataFull} from './autoroll.js';
   import {cronjobBadgesHeader} from './cronjobs.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
-    const firefoxAutorollData = await fetchAutorollData('Firefox');
-
     document.body.append(html`
       ${cronjobBadgesHeader()}
       <section id=content>
-        ${renderAutorollData(firefoxAutorollData, false /* preview */)}
+        ${renderAutorollDataFull(await fetchAutorollData('Firefox'))}
       </section>
     `);
   }, false);

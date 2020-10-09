@@ -25,23 +25,27 @@
   import {html} from './zhtml.js';
   import {fetchCDNStatus, renderCDNStatusPreview} from './cdn-status.js';
   import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
-  import {fetchAutorollData, renderAutorollData} from './autoroll.js';
+  import {fetchAutorollData, renderAutorollDataPreview} from './autoroll.js';
   import {cronjobBadgesHeader} from './cronjobs.js';
   import {renderUsefulLinks} from './useful-links.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
-    const [cdnData, dockerData, firefoxAutorollData, webkitAutorollData] = await Promise.all([
+    const [cdnData, dockerData, firefoxAutorollData, webkitAutorollData, chromiumAutorollData] = await Promise.all([
       fetchCDNStatus(),
       fetchDockerStats(),
       fetchAutorollData('Firefox'),
       fetchAutorollData('WebKit'),
+      fetchAutorollData('Chromium'),
     ]);
 
     document.body.append(html`
       ${cronjobBadgesHeader()}
       <div class="gallery">
-        <div class=tile>${renderAutorollData(firefoxAutorollData, true /* preview */)}</div>
-        <div class=tile>${renderAutorollData(webkitAutorollData, true /* preview */)}</div>
+        <div class=tile>${renderAutorollDataPreview({
+          firefox: firefoxAutorollData,
+          webkit: webkitAutorollData,
+          chromium: chromiumAutorollData,
+        })}</div>
         <div class=tile>${renderCDNStatusPreview(cdnData)}</div>
         <div class=tile>${dockerSizeStats(dockerData, true /* preview */)}</div>
         <div class=tile>${renderUsefulLinks()}</div>

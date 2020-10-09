@@ -58,6 +58,7 @@ export function commitURL(browserName, sha) {
     firefox: 'https://github.com/mozilla/gecko-dev/commit/',
     webkit: 'https://github.com/WebKit/webkit/commit/',
     playwright: 'https://github.com/microsoft/playwright/commit/',
+    chromium: 'https://crrev.com/',
   }[browserName.toLowerCase()];
   if (!base)
     return '';

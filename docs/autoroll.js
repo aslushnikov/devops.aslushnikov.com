@@ -18,19 +18,21 @@ export async function fetchAutorollData(browserName) {
 }
 
 function renderUpstreamCommit(browserName, roll) {
-  let sha, shortSHA;
+  let sha, shortSHA, cls;
   // All but chromium have upstream commit, whereas chromium has `chromiumRevision`.
   if (roll.upstreamCommit) {
     sha = roll.upstreamCommit.sha;
     shortSHA = sha.substring(0, 7);
+    cls = 'sha';
   } else {
     sha = roll.chromiumRevision;
-    shortSHA = sha;
+    shortSHA = 'r' + sha;
+    cls = '';
   }
   return html`
     <span class=commit>
       ${browserName}:
-      <a class=sha href="${commitURL(browserName, sha)}">${shortSHA}</a>
+      <a class=${cls} href="${commitURL(browserName, sha)}">${shortSHA}</a>
     </span>
   `;
 }
@@ -53,11 +55,11 @@ export function renderAutorollDataPreview({firefox, webkit, chromium}) {
         ${rows.map(({name, roll}) => html`
           <hbox class=row>
             <a href="${roll.runURL}">${renderDate(roll.timestamp)}</a>
+            ${renderUpstreamCommit(name, roll)}
             <span class=commit>
               Playwright:
               <a class=sha href="${commitURL('playwright', roll.playwrightCommit.sha)}">${roll.playwrightCommit.sha.substring(0, 7)}</a>
             </span>
-            ${renderUpstreamCommit(name, roll)}
             <spacer></spacer>
             ${renderSteps(roll)}
           </hbox>

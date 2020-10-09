@@ -8,30 +8,6 @@ function generateStatusBadge(workflowName) {
   `;
 }
 
-function cronjobCDNStatusBadge() {
-  return generateStatusBadge('update CDN status')
-}
-
-function cronjobDockerSizeBadge() {
-  return generateStatusBadge('track docker size')
-}
-
-function cronjobPublishBrowserProtocols() {
-  return generateStatusBadge('publish browser protocols')
-}
-
-function cronjobAutorollFirefox() {
-  return generateStatusBadge('autoroll firefox')
-}
-
-function cronjobAutorollWebKit() {
-  return generateStatusBadge('autoroll webkit')
-}
-
-export function dockerImageTests() {
-  return generateStatusBadge('Test Docker')
-}
-
 export function cronjobBadgesHeader() {
   return html`
     <hbox class=cronjobs-header>
@@ -39,12 +15,13 @@ export function cronjobBadgesHeader() {
       <spacer></spacer>
       <hbox class=badges>
         ${[
-          cronjobCDNStatusBadge(),
-          cronjobDockerSizeBadge(),
-          cronjobPublishBrowserProtocols(),
-          cronjobAutorollFirefox(),
-          cronjobAutorollWebKit(),
-          dockerImageTests(),
+          generateStatusBadge('CDN status'),
+          generateStatusBadge('track docker size'),
+          generateStatusBadge('publish browser protocols'),
+          generateStatusBadge('autoroll firefox'),
+          generateStatusBadge('autoroll webkit'),
+          generateStatusBadge('autoroll chromium'),
+          generateStatusBadge('Test Docker'),
         ]}
       </hbox>
       <spacer></spacer>

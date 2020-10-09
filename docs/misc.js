@@ -45,6 +45,7 @@ export function browserLogo(browserName, width = 30, height) {
   const LOGO_URLS = {
     firefox: '/ff.svg',
     webkit: '/wk.svg',
+    chromium: '/cr.svg',
   };
   if (height === undefined)
     height = width;

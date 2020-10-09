@@ -5,19 +5,19 @@
 
 <style>
   .gallery {
-    margin: 0 auto;
     padding: 20px;
+    margin: 0 auto;
     max-width: 1300px;
-    display: grid;
-    grid-gap: 15px;
-    grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
-    grid-auto-flow: dense;
+    columns: 2;
   }
 
   .tile {
+    padding: 4px;
+    margin-bottom: 10px;
     border: 1px solid var(--border-color);
     border-radius: 10px;
     box-shadow: 2px 2px 5px 0px #EEEEEE;
+    break-inside: avoid-column;
   }
 </style>
 

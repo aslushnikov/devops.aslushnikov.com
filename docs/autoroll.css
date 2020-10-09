@@ -26,6 +26,7 @@
       display: block;
       margin: 2px;
       font-size: 90%;
+      color: var(--black);
       flex: none;
       width: 50px;
       text-align: center;

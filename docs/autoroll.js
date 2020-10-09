@@ -123,13 +123,13 @@ function renderSteps(d) {
   return html`
     <hbox>
       ${d.steps.rebase && html`
-        <span class="step ${statusToClass[d.steps.rebase]}">rebase</span>
+        <a href="${d.runURL}" class="step ${statusToClass[d.steps.rebase]}">rebase</a>
       `}
       ${d.steps.find_revision && html`
-        <span class="step ${statusToClass[d.steps.find_revision]}">findrev</span>
+        <a href="${d.runURL}" class="step ${statusToClass[d.steps.find_revision]}">findrev</a>
       `}
-      <span class="step ${statusToClass[d.steps.build]}">build</span>
-      <span class="step ${statusToClass[d.steps.test]}">test</span>
+      <a href="${d.runURL}" class="step ${statusToClass[d.steps.build]}">build</a>
+      <a href="${d.runURL}" class="step ${statusToClass[d.steps.test]}">test</a>
     </hbox>
   `;
 }

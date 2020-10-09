@@ -37,7 +37,7 @@ const FORMAT_VERSION = 1;
     console.log(`* building docker file`);
     if (await pw.exists('./docs/docker/build.sh')) {
       const buildFilePath = pw.filepath('./docs/docker/build.sh');
-      await misc.spawnWithLogOrDie('bash', buildFilePath, {
+      await misc.spawnWithLogOrDie('bash', buildFilePath, 'bionic', {
         cwd: pw.filepath('./docs/docker'),
       });
     } else {

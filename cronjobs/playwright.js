@@ -61,10 +61,17 @@ class Playwright extends misc.GitRepo {
       env[envName] = executablePath;
     }
     //TODO: return test-report.json
-    await misc.spawnWithLogOrDie('npm', 'run', testCommand, {
-      cwd: this._checkoutPath,
-      env,
-    });
+    if (process.platform == 'linux') {
+      await misc.spawnWithLogOrDie('xvfb-run', '--auto-servernum', 'npm', 'run', testCommand, {
+        cwd: this._checkoutPath,
+        env,
+      });
+    } else {
+      await misc.spawnWithLogOrDie('npm', 'run', testCommand, {
+        cwd: this._checkoutPath,
+        env,
+      });
+    }
   }
 
   firefoxCheckout() {

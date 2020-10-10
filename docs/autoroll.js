@@ -46,10 +46,9 @@ export function renderAutorollDataPreview({firefox, webkit, chromium}) {
   return html`
     <section class=autoroll-data>
       <hbox class=header>
-        <div>
-          <h2>Autoroll</h2>
-          <div>(attempted daily at 4AM PST)</div>
-        </div>
+        <h2>Autoroll</h2>
+        <spacer></spacer>
+        <div>(attempted daily at 4AM PST)</div>
       </hbox>
       <section>
         ${rows.map(({name, roll}) => html`

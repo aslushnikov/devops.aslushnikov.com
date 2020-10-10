@@ -26,11 +26,9 @@ export function renderCDNStatusPreview(cdnData) {
   return html`
     <section class=cdn-status>
       <hbox class=header>
-        <div>
-          <h2>CDN status</h2>
-          <div>(updated ${humanReadableTimeInterval(Date.now() - cdnData.timestamp)} ago)</div>
-        </div>
+        <h2>CDN status</h2>
         <spacer></spacer>
+        <div>(updated ${humanReadableTimeInterval(Date.now() - cdnData.timestamp)} ago)</div>
       </hbox>
       <section class=grid>
         <vbox class="cell header"></vbox>

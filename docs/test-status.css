@@ -1,0 +1,11 @@
+.test-status {
+  padding: 10px;
+}
+    .test-status h2 {
+      margin-bottom: 0;
+    }
+
+    .test-status .header {
+      align-self: start;
+    }
+

@@ -41,16 +41,21 @@ export function humanReadableSize(bytes) {
   return sign * fraction + '' + suffix;
 }
 
+const LOGO_URLS = {
+  firefox: '/ff.svg',
+  webkit: '/wk.svg',
+  chromium: '/cr.svg',
+};
+
+export function browserLogoURL(browserName) {
+  return LOGO_URLS[browserName.toLowerCase()]
+}
+
 export function browserLogo(browserName, width = 30, height) {
-  const LOGO_URLS = {
-    firefox: '/ff.svg',
-    webkit: '/wk.svg',
-    chromium: '/cr.svg',
-  };
   if (height === undefined)
     height = width;
   return html`
-    <img src="${LOGO_URLS[browserName.toLowerCase()]}" width=${width} height=${height}>
+    <img src="${browserLogoURL(browserName)}" width=${width} height=${height}>
   `;
 }
 

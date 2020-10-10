@@ -15,7 +15,6 @@
     padding: 4px;
     margin-bottom: 10px;
     border: 1px solid var(--border-color);
-    border-radius: 10px;
     box-shadow: 2px 2px 5px 0px #EEEEEE;
     break-inside: avoid-column;
   }
@@ -24,14 +23,16 @@
 <script type=module>
   import {html} from './zhtml.js';
   import {fetchCDNStatus, renderCDNStatusPreview} from './cdn-status.js';
+  import {fetchTestStatus, renderTestStatusPreview} from './test-status.js';
   import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
   import {fetchAutorollData, renderAutorollDataPreview} from './autoroll.js';
   import {cronjobBadgesHeader} from './cronjobs.js';
   import {renderUsefulLinks} from './useful-links.js';
 
   window.addEventListener('DOMContentLoaded', async () => {
-    const [cdnData, dockerData, firefoxAutorollData, webkitAutorollData, chromiumAutorollData] = await Promise.all([
+    const [cdnData, testData, dockerData, firefoxAutorollData, webkitAutorollData, chromiumAutorollData] = await Promise.all([
       fetchCDNStatus(),
+      fetchTestStatus(),
       fetchDockerStats(),
       fetchAutorollData('Firefox'),
       fetchAutorollData('WebKit'),
@@ -41,13 +42,14 @@
     document.body.append(html`
       ${cronjobBadgesHeader()}
       <div class="gallery">
+        <div class=tile>${renderTestStatusPreview(testData)}</div>
         <div class=tile>${renderAutorollDataPreview({
           firefox: firefoxAutorollData,
           webkit: webkitAutorollData,
           chromium: chromiumAutorollData,
         })}</div>
-        <div class=tile>${renderCDNStatusPreview(cdnData)}</div>
         <div class=tile>${dockerSizeStats(dockerData, true /* preview */)}</div>
+        <div class=tile>${renderCDNStatusPreview(cdnData)}</div>
         <div class=tile>${renderUsefulLinks()}</div>
       </div>
     `);

@@ -1,5 +1,5 @@
 import {html} from './zhtml.js';
-import {humanReadableTimeInterval, browserLogoURL} from './misc.js';
+import {humanReadableTimeInterval, browserLogoURL, browserLogo} from './misc.js';
 
 export async function fetchTestStatus() {
   return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--test-status/status.json').then(r => r.json()).then(json => {
@@ -9,15 +9,102 @@ export async function fetchTestStatus() {
 
 export function renderTestStatusPreview(entries) {
   const cdnData = entries[entries.length - 1];
+  return html`
+    <section class=test-status>
+      <hbox class=header>
+        <h2>Test Status</h2>
+        <spacer></spacer>
+        <div>(updated ${humanReadableTimeInterval(Date.now() - cdnData.timestamp)} ago)</div>
+      </hbox>
+      <a href="/test-status-details.html">
+        <section class=body>
+          <hbox>
+          <spacer></spacer>
+          ${renderChart(perBrowserTests(cdnData.tests))}
+          <spacer></spacer>
+          </hbox>
+        </section>
+      </a>
+    </section>
+  `;
+}
+
+export function renderTestStatusDetails(entries) {
+  const cdnData = entries[entries.length - 1];
+  const tests = cdnData.tests;
+
+  const N = Math.min(...tests.map(test => test.filepath.length));
+  let commonPathPrefix = 0;
+  for (commonPathPrefix = 0; commonPathPrefix < N; ++commonPathPrefix) {
+    const char = tests[0].filepath.charAt(commonPathPrefix);
+    if (!tests.every(test => test.filepath.charAt(commonPathPrefix) === char))
+      break;
+  }
+
+  console.log(cdnData);
+  const testsPerBrowser = perBrowserTests(cdnData.tests);
+
+
+  function renderBrowserTests(browserName) {
+    const tests = testsPerBrowser[browserName.toLowerCase()];
+    const filepathToTests = perFileTests([...tests]);
+    return html`
+      <vbox style="width: 33%">
+        <hbox class=header>
+          ${browserLogo(browserName)}<h2>${browserName}</h2>
+        </hbox>
+        ${[...filepathToTests].map(([filepath, tests]) => html`
+          <details>
+            <summary>${filepath.substring(commonPathPrefix)}</summary>
+            <ul>
+            ${tests.map(test => html`
+              <li>${test.title}</li>
+            `)}
+            </ul>
+          </details>
+        `)}
+      </vbox>
+    `;
+  }
+
+  return html`
+    <hbox class="test-status-details">
+      ${renderBrowserTests('Chromium')}
+      <spacer></spacer>
+      ${renderBrowserTests('WebKit')}
+      <spacer></spacer>
+      ${renderBrowserTests('Firefox')}
+    </hbox>
+  `;
+}
+
+function perBrowserTests(tests) {
   const testsPerBrowser = {
     firefox: new Set(),
     webkit: new Set(),
     chromium: new Set(),
   };
-  for (const test of cdnData.tests) {
+  for (const test of tests) {
     for (const b of [...test.fail, ...test.fixme, ...test.fail])
       testsPerBrowser[b].add(test);
   }
+  return testsPerBrowser;
+}
+
+function perFileTests(tests) {
+  const result = new Map();
+  for (const test of tests) {
+    let bucket = result.get(test.filepath);
+    if (!bucket) {
+      bucket = [];
+      result.set(test.filepath, bucket);
+    }
+    bucket.push(test);
+  }
+  return result;
+}
+
+function renderChart(testsPerBrowser, chartWidth = 250) {
   const chartData = [
     {
       imgsrc: browserLogoURL('firefox'),
@@ -57,7 +144,7 @@ export function renderTestStatusPreview(entries) {
     {
       x: BAR_WIDTH,
       y: CHART_HEIGHT - height1,
-      fill: '#eeeeee',
+      fill: '#ffecb3',
       width: BAR_WIDTH,
       height: height1,
       imgsize: imgsize1,
@@ -68,7 +155,7 @@ export function renderTestStatusPreview(entries) {
     {
       x: 0,
       y: CHART_HEIGHT - height2,
-      fill: '#ffecb3',
+      fill: '#eeeeee',
       width: BAR_WIDTH,
       height: height2,
       imgsize: imgsize2,
@@ -106,29 +193,14 @@ export function renderTestStatusPreview(entries) {
     `;
   }
 
-  const viewbox = `${-PAD} ${-PAD} ${3 * BAR_WIDTH + PAD} ${2 * BAR_HEIGHT + PAD}`;
-  const result = html`
-    <section class=test-status>
-      <hbox>
-        <div class=header>
-          <h2>Test Status</h2>
-          <div>(updated ${humanReadableTimeInterval(Date.now() - cdnData.timestamp)} ago)</div>
-        </div>
-        <spacer></spacer>
-        <svg xmlns="http://www.w3.org/2000/svg" width=250></svg>
-        <spacer></spacer>
-      </hbox>
-      <section class=body>
-      </section>
-    </section>
-  `;
-  const svg = result.$('svg');
+  const svg = html`<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+  const viewbox = `${-PAD} ${-PAD} ${3 * BAR_WIDTH + 2 * PAD} ${2 * BAR_HEIGHT + 2 * PAD}`;
   svg.setAttribute('viewBox', viewbox);
+  svg.setAttribute('width', chartWidth);
   svg.innerHTML = `
       ${drawSVGBar(bars[0])}
       ${drawSVGBar(bars[1])}
       ${drawSVGBar(bars[2])}
   `;
-  return result;
+  return svg;
 }
-

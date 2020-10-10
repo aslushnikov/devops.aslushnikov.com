@@ -9,3 +9,9 @@
       align-self: start;
     }
 
+.test-status-details {
+  align-items: start; 
+}
+    .test-status-details img {
+      margin-right: 1em;
+    }

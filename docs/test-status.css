@@ -35,3 +35,8 @@
     .test-status-details ol {
       padding-inline-start: 2em;
     }
+
+    .test-status-details .toggle {
+      border-bottom: 1px dashed var(--text-color);
+      cursor: pointer;
+    }

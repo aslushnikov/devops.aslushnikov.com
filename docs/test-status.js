@@ -47,24 +47,17 @@ export function renderTestStatusDetails(entries) {
     });
 
     let expandAll = true;
-    function renderToggleButton() {
-      const title = expandAll ? `Expand All` : `Collapse All`;
-      return html`<button onclick=${onToggleClick}> ${title}</button>`;
-    }
-
     function onToggleClick({target}) {
       for (const detail of result.$$('details'))
         detail.open = expandAll;
       expandAll = !expandAll;
-      target.replaceWith(renderToggleButton());
     }
 
     const result = html`
       <vbox style="width: 33%">
         <hbox class=header>
-          ${browserLogo(browserName)}<h2>${browserName}: ${tests.size} tests</h2>
+          ${browserLogo(browserName)}<h2>${browserName}: <span class=toggle onclick=${onToggleClick}>${tests.size} tests</span></h2>
         </hbox>
-        <div>${renderToggleButton()}</div>
         ${sortedFilepaths.map(filepath => [filepath, filepathToTests.get(filepath)]).map(([filepath, tests]) => html`
           <details>
             <summary>${filepath} (<span class=total-bad-tests>${tests.length}</span><span class=total-tests>/${stats[filepath]}</span>)</summary>

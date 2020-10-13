@@ -29,7 +29,7 @@ const MAX_ENTRIES = 1000;
   });
 
   const report = JSON.parse(await fs.promises.readFile(REPORT_PATH, 'utf8'));
-  const tests = filterTests(report);
+  const tests = filterTests(pw, report);
   tests.sort((t1, t2) => {
     if (t1.filepath !== t2.filepath)
       return t1.filepath < t2.filepath ? -1 : 1;
@@ -43,6 +43,7 @@ const MAX_ENTRIES = 1000;
   // Check if we actually update anything.
   const newEntry = {
     timestamp: Date.now(),
+    commit: await pw.getCommit('HEAD'),
     tests,
   };
 
@@ -75,10 +76,10 @@ const MAX_ENTRIES = 1000;
   await datastore.upload('update test status');
 })();
 
-function filterTests(suite, result = []) {
+function filterTests(pw, suite, result = []) {
   if (suite.suites) {
     for (const child of suite.suites)
-      filterTests(child, result);
+      filterTests(pw, child, result);
   }
   for (const spec of suite.specs || []) {
     const flakyBrowsers = new Set();
@@ -100,8 +101,13 @@ function filterTests(suite, result = []) {
     }
     if (!flakyBrowsers.size && !fixmeBrowsers.size && !failBrowsers.size)
       continue;
+    const locationParts = spec.location.split(':');
+    const column = locationParts.pop();
+    const line = locationParts.pop();
     result.push({
-      filepath: spec.file,
+      filepath: path.relative(pw.checkoutPath(), spec.file),
+      line,
+      column,
       title: spec.title,
       flaky: [...flakyBrowsers].sort(),
       fixme: [...fixmeBrowsers].sort(),

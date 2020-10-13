@@ -14,9 +14,11 @@ const MAX_ENTRIES = 1000;
   const pw = await Playwright.cloneWithoutHistory(__dirname);
   await pw.installDependencies();
   await pw.build();
+  /*
   // Uncomment for local testing:
-  // const datastore = await DataStore.pickup(__dirname);
-  // const pw = await Playwright.pickup(__dirname);
+  const datastore = await DataStore.pickup(__dirname);
+  const pw = await Playwright.pickup(__dirname);
+  */
 
   console.log(pw.checkoutPath());
   await misc.spawnWithLogOrDie('npm', 'run', 'test', '--', '--list', '--reporter=json', {
@@ -29,7 +31,7 @@ const MAX_ENTRIES = 1000;
   });
 
   const report = JSON.parse(await fs.promises.readFile(REPORT_PATH, 'utf8'));
-  const tests = filterTests(pw, report);
+  const {tests, stats} = filterTests(pw, report);
   tests.sort((t1, t2) => {
     if (t1.filepath !== t2.filepath)
       return t1.filepath < t2.filepath ? -1 : 1;
@@ -37,6 +39,8 @@ const MAX_ENTRIES = 1000;
       return t1.title < t2.title ? -1 : 1;
     return 0;
   });
+  // stabilize stats
+  const newStats = Object.fromEntries([...Object.entries(stats)].sort((a, b) => a[0] < b[0]));
 
   const status = await datastore.readJSON('./status.json').catch(e => ([]));
 
@@ -45,11 +49,13 @@ const MAX_ENTRIES = 1000;
     timestamp: Date.now(),
     commit: await pw.getCommit('HEAD'),
     tests,
+    stats: newStats,
   };
 
   if (status.length) {
     const lastEntry = status[status.length - 1];
-    if (JSON.stringify(lastEntry.tests) === JSON.stringify(newEntry.tests)) {
+    if (JSON.stringify(lastEntry.tests) === JSON.stringify(newEntry.tests) &&
+        JSON.stringify(lastEntry.stats) === JSON.stringify(newEntry.stats)) {
       console.log('FYI: nothing changed; fast-returning');
       return;
     }
@@ -76,7 +82,7 @@ const MAX_ENTRIES = 1000;
   await datastore.upload('update test status');
 })();
 
-function filterTests(pw, suite, result = []) {
+function filterTests(pw, suite, result = {stats: {}, tests: []}) {
   if (suite.suites) {
     for (const child of suite.suites)
       filterTests(pw, child, result);
@@ -99,13 +105,16 @@ function filterTests(pw, suite, result = []) {
       if (test.annotations.some(a => a.type === 'fail'))
         failBrowsers.add(browserName);
     }
+    const filepath = path.relative(pw.checkoutPath(), spec.file);
+    if (spec.tests.length)
+      result.stats[filepath] = (result.stats[filepath] || 0) + 1;
     if (!flakyBrowsers.size && !fixmeBrowsers.size && !failBrowsers.size)
       continue;
     const locationParts = spec.location.split(':');
     const column = locationParts.pop();
     const line = locationParts.pop();
-    result.push({
-      filepath: path.relative(pw.checkoutPath(), spec.file),
+    result.tests.push({
+      filepath,
       line,
       column,
       title: spec.title,

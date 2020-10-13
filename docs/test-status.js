@@ -63,7 +63,12 @@ export function renderTestStatusDetails(entries) {
             <summary>${filepath} (<span class=total-bad-tests>${tests.length}</span><span class=total-tests>/${stats[filepath]}</span>)</summary>
             <ol>
             ${tests.map(test => html`
-              <li><a href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.title} (L${test.line})</a></li>
+              <li>
+                ${test.flaky.includes(browserName.toLowerCase()) && html`<strong class=flaky>flaky</strong>`}
+                ${test.fail.includes(browserName.toLowerCase()) && html`<strong class=fail>fail</strong>`}
+                ${test.fixme.includes(browserName.toLowerCase()) && html`<strong class=fixme>fixme</strong>`}
+                <a href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.title} (L${test.line})</a>
+              </li>
             `)}
             </ol>
           </details>
@@ -92,7 +97,7 @@ function perBrowserTests(tests) {
     chromium: new Set(),
   };
   for (const test of tests) {
-    for (const b of [...test.fail, ...test.fixme, ...test.fail])
+    for (const b of [...test.flaky, ...test.fixme, ...test.fail])
       testsPerBrowser[b].add(test);
   }
   return testsPerBrowser;

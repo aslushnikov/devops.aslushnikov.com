@@ -23,7 +23,7 @@ const MAX_ENTRIES = 1000;
     cwd: pw.checkoutPath(),
     env: {
       ...process.env,
-      PWRUNNER_JSON_REPORT: REPORT_PATH,
+      FOLIO_JSON_OUTPUT_NAME: REPORT_PATH,
       PWTESTREPORT: 1,
     },
   });

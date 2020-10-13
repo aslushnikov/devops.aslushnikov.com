@@ -33,47 +33,61 @@ export function renderTestStatusDetails(entries) {
   const cdnData = entries[entries.length - 1];
   const tests = cdnData.tests;
 
-  const N = Math.min(...tests.map(test => test.filepath.length));
-  let commonPathPrefix = 0;
-  for (commonPathPrefix = 0; commonPathPrefix < N; ++commonPathPrefix) {
-    const char = tests[0].filepath.charAt(commonPathPrefix);
-    if (!tests.every(test => test.filepath.charAt(commonPathPrefix) === char))
-      break;
-  }
-
-  console.log(cdnData);
   const testsPerBrowser = perBrowserTests(cdnData.tests);
 
-
-  function renderBrowserTests(browserName) {
+  function renderBrowserTests(browserName, testsPerBrowser, stats) {
     const tests = testsPerBrowser[browserName.toLowerCase()];
     const filepathToTests = perFileTests([...tests]);
-    return html`
+    const sortedFilepaths = [...filepathToTests.keys()];
+    // Sort filepaths from the least covered to the most covered.
+    sortedFilepaths.sort((f1, f2) => {
+      const r1 = filepathToTests.get(f1).length / stats[f1];
+      const r2 = filepathToTests.get(f2).length / stats[f2];
+      return r2 - r1;
+    });
+
+    let expandAll = true;
+    function renderToggleButton() {
+      const title = expandAll ? `Expand All` : `Collapse All`;
+      return html`<button onclick=${onToggleClick}> ${title}</button>`;
+    }
+
+    function onToggleClick({target}) {
+      for (const detail of result.$$('details'))
+        detail.open = expandAll;
+      expandAll = !expandAll;
+      target.replaceWith(renderToggleButton());
+    }
+
+    const result = html`
       <vbox style="width: 33%">
         <hbox class=header>
-          ${browserLogo(browserName)}<h2>${browserName}</h2>
+          ${browserLogo(browserName)}<h2>${browserName}: ${tests.size} tests</h2>
         </hbox>
-        ${[...filepathToTests].map(([filepath, tests]) => html`
+        <div>${renderToggleButton()}</div>
+        ${sortedFilepaths.map(filepath => [filepath, filepathToTests.get(filepath)]).map(([filepath, tests]) => html`
           <details>
-            <summary>${filepath.substring(commonPathPrefix)}</summary>
-            <ul>
+            <summary>${filepath} (<span class=total-bad-tests>${tests.length}</span><span class=total-tests>/${stats[filepath]}</span>)</summary>
+            <ol>
             ${tests.map(test => html`
-              <li>${test.title}</li>
+              <li><a href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.title} (L${test.line})</a></li>
             `)}
-            </ul>
+            </ol>
           </details>
         `)}
       </vbox>
     `;
+    return result;
+
   }
 
   return html`
     <hbox class="test-status-details">
-      ${renderBrowserTests('Chromium')}
+      ${renderBrowserTests('Chromium', testsPerBrowser, cdnData.stats)}
       <spacer></spacer>
-      ${renderBrowserTests('WebKit')}
+      ${renderBrowserTests('WebKit', testsPerBrowser, cdnData.stats)}
       <spacer></spacer>
-      ${renderBrowserTests('Firefox')}
+      ${renderBrowserTests('Firefox', testsPerBrowser, cdnData.stats)}
     </hbox>
   `;
 }

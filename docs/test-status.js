@@ -3,6 +3,13 @@ import {humanReadableTimeInterval, browserLogoURL, browserLogo} from './misc.js'
 
 export async function fetchTestStatus() {
   return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--test-status/status.json').then(r => r.json()).then(json => {
+    for (const entry of json) {
+      entry.tests.sort((t1, t2) => {
+        if (t1.filepath !== t2.filepath)
+          return t1.filepath < t2.filepath ? -1 : 1;
+        return t1.line - t2.line;
+      });
+    }
     return json;
   });
 }
@@ -32,63 +39,213 @@ export function renderTestStatusPreview(entries) {
 export function renderTestStatusDetails(entries) {
   const cdnData = entries[entries.length - 1];
   const tests = cdnData.tests;
+  const filepathToTests = [...perFileTests([...tests])];
 
-  const testsPerBrowser = perBrowserTests(cdnData.tests);
-
-  function renderBrowserTests(browserName, testsPerBrowser, stats) {
-    const tests = testsPerBrowser[browserName.toLowerCase()];
-    const filepathToTests = perFileTests([...tests]);
-    const sortedFilepaths = [...filepathToTests.keys()];
-    // Sort filepaths from the least covered to the most covered.
-    sortedFilepaths.sort((f1, f2) => {
-      const r1 = filepathToTests.get(f1).length / stats[f1];
-      const r2 = filepathToTests.get(f2).length / stats[f2];
-      return r2 - r1;
-    });
-
-    let expandAll = true;
-    function onToggleClick({target}) {
-      for (const detail of result.$$('details'))
-        detail.open = expandAll;
-      expandAll = !expandAll;
-    }
-
-    const result = html`
-      <vbox style="width: 33%">
-        <hbox class=header>
-          ${browserLogo(browserName)}<h2>${browserName}: <span class=toggle onclick=${onToggleClick}>${tests.size} tests</span></h2>
-        </hbox>
-        ${sortedFilepaths.map(filepath => [filepath, filepathToTests.get(filepath)]).map(([filepath, tests]) => html`
-          <details>
-            <summary>${filepath} (<span class=total-bad-tests>${tests.length}</span><span class=total-tests>/${stats[filepath]}</span>)</summary>
-            <ol>
-            ${tests.map(test => html`
-              <li>
-                ${test.flaky.includes(browserName.toLowerCase()) && html`<strong class=flaky>flaky</strong>`}
-                ${test.fail.includes(browserName.toLowerCase()) && html`<strong class=fail>fail</strong>`}
-                ${test.fixme.includes(browserName.toLowerCase()) && html`<strong class=fixme>fixme</strong>`}
-                <a href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.title} (L${test.line})</a>
-              </li>
-            `)}
-            </ol>
-          </details>
-        `)}
-      </vbox>
-    `;
-    return result;
-
+  const N = Math.min(...tests.map(test => test.filepath.length));
+  let commonPathPrefix = 0;
+  for (commonPathPrefix = 0; commonPathPrefix < N; ++commonPathPrefix) {
+    const char = tests[0].filepath.charAt(commonPathPrefix);
+    if (!tests.every(test => test.filepath.charAt(commonPathPrefix) === char))
+      break;
   }
 
-  return html`
-    <hbox class="test-status-details">
-      ${renderBrowserTests('Chromium', testsPerBrowser, cdnData.stats)}
-      <spacer></spacer>
-      ${renderBrowserTests('WebKit', testsPerBrowser, cdnData.stats)}
-      <spacer></spacer>
-      ${renderBrowserTests('Firefox', testsPerBrowser, cdnData.stats)}
-    </hbox>
-  `;
+  const expandedFilepaths  = new Set();
+  const toggleFilePath = (filepath) => {
+    if (expandedFilepaths.has(filepath))
+      expandedFilepaths.delete(filepath);
+    else
+      expandedFilepaths.add(filepath);
+    rerenderGrid();
+  };
+
+  const toggleTestsVisibility = (tests, {open}) => {
+    for (const test of tests) {
+      if (open)
+        expandedFilepaths.add(test.filepath);
+      else
+        expandedFilepaths.delete(test.filepath);
+    }
+    rerenderGrid();
+  };
+
+  let currentSortButton = null;
+  const sortAlphabetically = ({direction, target}) => {
+    if (currentSortButton && target !== currentSortButton)
+      currentSortButton.setDirection(0);
+    currentSortButton = target;
+    filepathToTests.sort(([f1, tests1], [f2, tests2]) => {
+      if (f1 !== f2)
+        return (f1 < f2 ? -1 : 1) * direction;
+      return 0;
+    });
+    rerenderGrid();
+  }
+  const sortByBrowser = (browserName, {direction, target}) => {
+    if (currentSortButton && target !== currentSortButton)
+      currentSortButton.setDirection(0);
+    currentSortButton = target;
+    filepathToTests.sort(([f1, tests1], [f2, tests2]) => {
+      const r1 = browserTests(tests1, browserName).length / cdnData.stats[f1];
+      const r2 = browserTests(tests2, browserName).length / cdnData.stats[f2];
+      return (r2 - r1) * direction;
+    });
+    rerenderGrid();
+  }
+
+  const alphabeticalSortButton = new SortButton(sortAlphabetically);
+  const expandAllButton = new ExpandButton(toggleTestsVisibility.bind(null, tests));
+
+  const browserSortButtons = {
+    chromium: new SortButton(sortByBrowser.bind(null, 'chromium')),
+    firefox: new SortButton(sortByBrowser.bind(null, 'firefox')),
+    webkit: new SortButton(sortByBrowser.bind(null, 'webkit')),
+  };
+  const browserExpandButtons = {
+    chromium: new ExpandButton(toggleTestsVisibility.bind(null, browserTests(tests, 'chromium'))),
+    firefox: new ExpandButton(toggleTestsVisibility.bind(null, browserTests(tests, 'firefox'))),
+    webkit: new ExpandButton(toggleTestsVisibility.bind(null, browserTests(tests, 'webkit'))),
+  };
+
+  let grid = renderGrid();
+  return html`<section class="test-status-details">${grid}</section>`;
+
+  function rerenderGrid() {
+    const newGrid = renderGrid();
+    grid.replaceWith(newGrid);
+    grid = newGrid;
+  }
+
+  function renderGrid() {
+    const COLLAPSED_CHAR = '▶';
+    const EXPANDED_CHAR = '▼';
+    const browserNames = ['chromium', 'webkit', 'firefox'];
+
+    return html`
+      <section>
+        <!-- header row -->
+        <grid-row class=titlerow>
+          <grid-cell class=cell-filepath>
+            <h4>
+              ${expandAllButton}
+              ${alphabeticalSortButton}
+            </h4>
+          </grid-cell>
+          ${browserNames.map(browserName => html`
+            <grid-cell class=cell-browser>
+              <div>${browserLogo(browserName)}</div>
+              <h4>
+                ${browserTests(tests, browserName).length} tests
+                ${browserSortButtons[browserName]}
+              </h4>
+            </grid-cell>
+          `)}
+        </grid-row>
+
+
+        ${filepathToTests.map(([filepath, tests]) => html`
+          <grid-row class=filepathrow onclick=${toggleFilePath.bind(null, filepath)}>
+            <grid-cell class=cell-filepath>
+              ${expandedFilepaths.has(filepath) ? EXPANDED_CHAR : COLLAPSED_CHAR} ${filepath.substring(commonPathPrefix)}
+            </grid-cell>
+
+            ${browserNames.map(browserName => html`
+              <grid-cell class=cell-browser>
+                <hbox>
+                  ${browserTests(tests, browserName).length ? html`
+                    <span class=total-bad-tests>${browserTests(tests, browserName).length}</span>
+                    <span class=total-tests>/${cdnData.stats[filepath]}</span>
+                  ` : '·'}
+                </hbox>
+              </grid-cell>
+            `)}
+          </grid-row>
+
+          ${expandedFilepaths.has(filepath) && tests.map(test => html`
+            <grid-row class=testrow>
+              <grid-cell class=cell-filepath>
+                <a class=testname href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.line}: ${test.title}</a>
+              </grid-cell>
+
+              ${browserNames.map(browserName => html`
+                <grid-cell class=cell-browser>
+                  ${[...test.flaky, ...test.fixme, ...test.fail].includes(browserName) ? html`
+                    ${test.flaky.includes(browserName) && html`<strong class=flaky>flaky</strong>`}
+                    ${test.fixme.includes(browserName) && html`<strong class=fixme>fixme</strong>`}
+                    ${test.fail.includes(browserName) && html`<strong class=fail>fail</strong>`}
+                  `: '·'}
+                </grid-cell>
+              `)}
+            </grid-row>
+          `)}
+        `)}
+      </section>
+    `;
+  }
 }
+
+function browserTests(tests, browserName) {
+  browserName = browserName.toLowerCase();
+  return tests.filter(test => [...test.flaky, ...test.fixme, ...test.fail].includes(browserName));
+}
+
+class SortButton extends HTMLElement {
+  constructor(callback = () => {}) {
+    super();
+    this._callback = callback;
+    this.addEventListener('click', this._onClick.bind(this), false);
+    this.setDirection(0);
+  }
+
+  _onClick() {
+    if (this._direction !== 1)
+      this._direction = 1;
+    else
+      this._direction = -1;
+    this._render();
+    this._callback.call(null, {direction: this._direction, target: this, });
+  }
+
+  _render() {
+    if (this._direction === 1)
+      this.textContent = '↓';
+    else if (this._direction === -1)
+      this.textContent = '↑';
+    else
+      this.textContent = '⇅';
+  }
+
+  direction() { return this._direction; }
+
+  setDirection(direction) {
+    this._direction = direction;
+    this._render();
+  }
+}
+customElements.define('sort-button', SortButton);
+
+class ExpandButton extends HTMLElement {
+  constructor(callback = () => {}) {
+    super();
+    this._callback = callback;
+    this._state = false;
+    this.addEventListener('click', this._onClick.bind(this), false);
+    this._render();
+  }
+
+  _render() {
+    if (this._state)
+      this.textContent = '⊟';
+    else
+      this.textContent = '⊞';
+  }
+
+  _onClick() {
+    this._state = !this._state;
+    this._render();
+    this._callback.call(null, { open: this._state, target: this, } );
+  }
+}
+customElements.define('expand-button', ExpandButton);
 
 function perBrowserTests(tests) {
   const testsPerBrowser = {

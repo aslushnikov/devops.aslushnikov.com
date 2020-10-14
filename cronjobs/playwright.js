@@ -97,7 +97,7 @@ class Playwright extends misc.GitRepo {
 
   async installDependencies() {
     console.log(`[playwright] installing dependencies`);
-    await misc.spawnWithLogOrDie('npm', 'install', {
+    await misc.spawnWithLogOrDie('npm', 'ci', {
       cwd: this._checkoutPath,
     });
   }

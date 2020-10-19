@@ -39,4 +39,4 @@ jobs:
         CONTAINER_ID="$(docker run --rm -v $(pwd):/root/playwright --name playwright-docker-test -d -t playwright:localbuild-${{ matrix.tag }} /bin/bash)"
         docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm ci
         docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm run build
-        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" npx test-runner test/ --jobs=1 --forbid-only --timeout=30000 --retries=3 --reporter=dot
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" npx folio test/ --workers=1 --forbid-only --global-timeout=5400000 --retries=3 --reporter=dot

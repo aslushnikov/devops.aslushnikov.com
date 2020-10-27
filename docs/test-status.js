@@ -1,4 +1,4 @@
-import {html} from './zhtml.js';
+import {html, svg} from './zhtml.js';
 import {humanReadableTimeInterval, browserLogoURL, browserLogo} from './misc.js';
 
 export async function fetchTestStatus() {
@@ -353,23 +353,14 @@ function renderChart(testsPerBrowser, chartWidth = 250) {
     bar.texty = bar.y - IMG_PADDING - bar.textsize / 2;
   }
 
-  function drawSVGBar(bar) {
-    return `
-      <rect x=${bar.x} y=${bar.y} width=${bar.width} height=${bar.height} stroke="black" stroke-width="${BORDER_WIDTH}" fill="${bar.fill}"/>
-      <text x=${bar.x + bar.width / 2} y=${bar.y + bar.height / 2} font-size=60px dominant-baseline="middle" text-anchor="middle">${bar.podiumText}</text>
-      <image x=${bar.imgx} y=${bar.imgy} width=${bar.imgsize} height=${bar.imgsize} xlink:href="${bar.imgsrc}" dominant-baseline="middle" text-anchor="middle"/>
-      <text x=${bar.textx} y=${bar.texty} font-size="${bar.textsize}px" dominant-baseline="middle" text-anchor="middle">${bar.text}</text>
-    `;
-  }
-
-  const svg = html`<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
-  const viewbox = `${-PAD} ${-PAD} ${3 * BAR_WIDTH + 2 * PAD} ${2 * BAR_HEIGHT + 2 * PAD}`;
-  svg.setAttribute('viewBox', viewbox);
-  svg.setAttribute('width', chartWidth);
-  svg.innerHTML = `
-      ${drawSVGBar(bars[0])}
-      ${drawSVGBar(bars[1])}
-      ${drawSVGBar(bars[2])}
+  return svg`
+    <svg width=${chartWidth} viewbox="${-PAD} ${-PAD} ${3 * BAR_WIDTH + 2 * PAD} ${2 * BAR_HEIGHT + 2 * PAD}">
+      ${bars.map(bar => svg`
+        <rect x=${bar.x} y=${bar.y} width=${bar.width} height=${bar.height} stroke="black" stroke-width="${BORDER_WIDTH}" fill="${bar.fill}"/>
+        <text x=${bar.x + bar.width / 2} y=${bar.y + bar.height / 2} font-size=60px dominant-baseline="middle" text-anchor="middle">${bar.podiumText}</text>
+        <image x=${bar.imgx} y=${bar.imgy} width=${bar.imgsize} height=${bar.imgsize} href="${bar.imgsrc}" dominant-baseline="middle" text-anchor="middle"/>
+        <text x=${bar.textx} y=${bar.texty} font-size="${bar.textsize}px" dominant-baseline="middle" text-anchor="middle">${bar.text}</text>
+      `)}
+    </svg>
   `;
-  return svg;
 }

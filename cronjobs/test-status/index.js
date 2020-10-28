@@ -105,18 +105,15 @@ function filterTests(pw, suite, result = {stats: {}, tests: []}) {
       if (test.annotations.some(a => a.type === 'fail'))
         failBrowsers.add(browserName);
     }
-    const filepath = path.relative(pw.checkoutPath(), spec.file);
+    const filepath = spec.file;
     if (spec.tests.length)
       result.stats[filepath] = (result.stats[filepath] || 0) + 1;
     if (!flakyBrowsers.size && !fixmeBrowsers.size && !failBrowsers.size)
       continue;
-    const locationParts = spec.location.split(':');
-    const column = locationParts.pop();
-    const line = locationParts.pop();
     result.tests.push({
       filepath,
-      line,
-      column,
+      line: spec.line,
+      column: spec.column,
       title: spec.title,
       flaky: [...flakyBrowsers].sort(),
       fixme: [...fixmeBrowsers].sort(),

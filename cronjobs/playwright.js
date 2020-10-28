@@ -155,11 +155,7 @@ class WebKitCheckout extends misc.GitRepo {
   }
 
   async build() {
-    await misc.spawnWithLogOrDie('Tools/gtk/install-dependencies', { cwd: this._checkoutPath });
-    await misc.spawnWithLogOrDie('Tools/wpe/install-dependencies', { cwd: this._checkoutPath });
-    await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitwpe-libs', { cwd: this._checkoutPath });
-    await misc.spawnWithLogOrDie('Tools/Scripts/update-webkitgtk-libs', { cwd: this._checkoutPath });
-    await misc.spawnWithLogOrDie(`browser_patches/webkit/build.sh`, {
+    await misc.spawnWithLogOrDie(`browser_patches/webkit/build.sh`, '--full', {
       cwd: this._playwright.checkoutPath(),
       env: Object.assign({}, process.env, {SHELL: '/bin/bash'}),
     });

@@ -1,5 +1,6 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableTimeInterval, browserLogoURL, browserLogo} from './misc.js';
+import {SortButton, ExpandButton} from './widgets.js';
 
 export async function fetchTestStatus() {
   return fetch('https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--test-status/status.json').then(r => r.json()).then(json => {
@@ -187,65 +188,6 @@ function browserTests(tests, browserName) {
   browserName = browserName.toLowerCase();
   return tests.filter(test => [...test.flaky, ...test.fixme, ...test.fail].includes(browserName));
 }
-
-class SortButton extends HTMLElement {
-  constructor(callback = () => {}) {
-    super();
-    this._callback = callback;
-    this.addEventListener('click', this._onClick.bind(this), false);
-    this.setDirection(0);
-  }
-
-  _onClick() {
-    if (this._direction !== 1)
-      this._direction = 1;
-    else
-      this._direction = -1;
-    this._render();
-    this._callback.call(null, {direction: this._direction, target: this, });
-  }
-
-  _render() {
-    if (this._direction === 1)
-      this.textContent = '↓';
-    else if (this._direction === -1)
-      this.textContent = '↑';
-    else
-      this.textContent = '⇅';
-  }
-
-  direction() { return this._direction; }
-
-  setDirection(direction) {
-    this._direction = direction;
-    this._render();
-  }
-}
-customElements.define('sort-button', SortButton);
-
-class ExpandButton extends HTMLElement {
-  constructor(callback = () => {}) {
-    super();
-    this._callback = callback;
-    this._state = false;
-    this.addEventListener('click', this._onClick.bind(this), false);
-    this._render();
-  }
-
-  _render() {
-    if (this._state)
-      this.textContent = '⊟';
-    else
-      this.textContent = '⊞';
-  }
-
-  _onClick() {
-    this._state = !this._state;
-    this._render();
-    this._callback.call(null, { open: this._state, target: this, } );
-  }
-}
-customElements.define('expand-button', ExpandButton);
 
 function perBrowserTests(tests) {
   const testsPerBrowser = {

@@ -1,5 +1,5 @@
 import {html} from './zhtml.js';
-import {humanReadableTimeInterval, browserLogo, commitURL} from './misc.js';
+import {humanReadableDate, humanReadableTimeInterval, browserLogo, commitURL} from './misc.js';
 
 const DATA_URLS = {
   firefox: 'https://raw.githubusercontent.com/aslushnikov/devops.aslushnikov.com/datastore--autoroll-firefox/rolls.json',
@@ -107,9 +107,8 @@ export function renderAutorollDataFull(autorollData) {
 }
 
 function renderDate(timestamp) {
-  const date = new Date(timestamp);
   return html`
-    <span class=date>(${date.toLocaleString('default', {month: 'short'}) + ', ' + date.getDate()})</span>
+    <span class=date>(${humanReadableDate(new Date(timestamp))})</span>
   `;
 }
 

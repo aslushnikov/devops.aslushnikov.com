@@ -21,6 +21,10 @@ export function humanReadableTimeInterval(diff) {
   return aggr === 1 ? 'Just Now' :  fraction + ' ' + time + (fraction > 1 ? 's' : '');
 }
 
+export function humanReadableDate(date) {
+  return date.toLocaleString('default', {month: 'short'}) + ', ' + date.getDate();
+}
+
 export function humanReadableSize(bytes) {
   const intervals = [
     [1024, 'KB'],
@@ -59,13 +63,13 @@ export function browserLogo(browserName, width = 30, height) {
   `;
 }
 
-export function commitURL(browserName, sha) {
+export function commitURL(repoName, sha) {
   const base = {
     firefox: 'https://github.com/mozilla/gecko-dev/commit/',
     webkit: 'https://github.com/WebKit/webkit/commit/',
     playwright: 'https://github.com/microsoft/playwright/commit/',
     chromium: 'https://crrev.com/',
-  }[browserName.toLowerCase()];
+  }[repoName.toLowerCase()];
   if (!base)
     return '';
   return base + sha;

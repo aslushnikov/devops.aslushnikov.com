@@ -9,24 +9,6 @@
       align-self: start;
     }
 
-sort-button {
-  cursor: pointer;
-  width: 1em;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-expand-button {
-  cursor: pointer;
-  width: 1em;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .test-status-details {
 }
     .test-status-details grid-row {

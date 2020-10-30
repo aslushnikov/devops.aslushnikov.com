@@ -1,7 +1,10 @@
 @import url("./typography.css");
+@import url("./widgets.css");
+@import url("./popover.css");
 @import url("./cronjobs.css");
 @import url("./docker-size.css");
 @import url("./cdn-status.css");
 @import url("./test-status.css");
 @import url("./autoroll.css");
 @import url("./useful-links.css");
+@import url("./flakiness.css");

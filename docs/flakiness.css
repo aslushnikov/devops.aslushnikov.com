@@ -1,0 +1,88 @@
+
+
+.flakiness {
+}
+
+  .flakiness .commit-date {
+    color: grey;
+  }
+
+  .flakiness .specfile {
+    border-top: 1px solid var(--border-color);
+  }
+
+  .flakiness .specname {
+    margin-left: 1em;
+  }
+
+  .flakiness .healthstats {
+    cursor: pointer;
+  }
+
+  .flakiness table-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .flakiness spec-column {
+    display: flex;
+    align-items: center;
+    width: 400px;
+    flex: none;
+  }
+
+  .flakiness health-column {
+    display: flex;
+    align-items: center;
+    width: 5em;
+    flex: none;
+  }
+
+  .flakiness results-column {
+    display: flex;
+    align-items: center;
+    width: 400px;
+    flex: none;
+  }
+
+  .flakiness commit-info {
+    flex-shrink: 0;
+    border: 1px solid white;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    padding: 2px;
+    box-sizing: content-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+      .flakiness commit-info:hover {
+        cursor: pointer;
+        filter: brightness(.8);
+      }
+
+.testruns {
+  min-width: 250px;
+}
+
+test-info {
+  padding: 0 2px;
+  color: #fff;
+  font-family: var(--monospace);
+  font-size: 9px;
+  border-radius: 2px;
+  margin: 0 2px;
+  width: 5ch;
+  display: inline-block;
+  box-sizing: content-box;
+  text-align: center;
+}
+    test-info.flaky {
+      background-color: #ff9800;
+    }
+
+    test-info.fail {
+      background-color: #f44336;
+    }

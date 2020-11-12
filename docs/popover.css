@@ -16,6 +16,7 @@ the-popover popover-content {
   border: var(--border);
   border-radius: 2px;
   min-width: 50px;
+  max-width: 400px;
   padding: calc(var(--arrow-size) * 1.41 / 2);
 }
 

@@ -86,3 +86,45 @@ test-info {
     test-info.fail {
       background-color: #f44336;
     }
+
+test-name {
+  font-weight: bold;
+  color: #999999;
+}
+
+details > summary {
+  list-style: none;
+}
+details[open] > summary {
+  background: rgba(59, 209, 255, 0.1);
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+error-description {
+  display: block;
+  max-width: 850px;
+  background: #f5f5f5;
+  margin: 5px;
+  padding: 5px;
+  overflow: auto;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+codemirror-placeholder,
+.CodeMirror {
+  display: block;
+  height: 116px !important;
+  border: 1px solid #eaeaea;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  background: white !important;
+
+}
+
+.CodeMirror .error {
+  background: rgba(255,0,0,0.2);
+}
+
+pre {
+  margin: 0;
+}

@@ -16,3 +16,14 @@ expand-button {
   justify-content: center;
 }
 
+filter-selector {
+}
+    filter-selector button {
+      appearance: none;
+      border: none;
+      background: initial;
+      cursor: pointer;
+    }
+    filter-selector select {
+      text-align-last: center;
+    }

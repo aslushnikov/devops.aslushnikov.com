@@ -130,3 +130,60 @@ export class Popover {
     this._anchor = null;
   }
 }
+
+export class FilterSelector extends HTMLElement {
+  constructor(parameters, onchange = () => {}) {
+    super();
+
+    this._parameters = parameters;
+    this._onchange = onchange.bind(null, this);
+
+    this._nameElement = html`<select oninput=${() => {
+      this._renderValues();
+      this._onchange();
+    }}>
+      ${[...parameters.keys()].map(key => html`
+        <option>${key}</option>
+      `)}
+    </select>`;
+    this._conditions = ['equal', 'unequal'],
+    this._conditionElement = html`<button onclick=${() => {
+      this._conditions.reverse();
+      this._renderCondition();
+      this._onchange();
+    }}>=</button>`;
+    this._valueElement = html`<select oninput=${() => this._onchange()}></select>`;
+    this.append(this._nameElement);
+    this.append(this._conditionElement);
+    this.append(this._valueElement);
+    this._renderCondition();
+    this._renderValues();
+  }
+
+  state() {
+    const entries = [...this._parameters.entries()];
+    return {
+      name: entries[this._nameElement.selectedIndex][0],
+      cnd: this._conditions[0],
+      value: this._valueElement.selectedIndex === 0 ? 'any' : [...entries[this._nameElement.selectedIndex][1]][this._valueElement.selectedIndex - 1],
+    };
+  }
+
+  _renderCondition() {
+    if (this._conditions[0] === 'equal')
+      this._conditionElement.textContent = '=';
+    else
+      this._conditionElement.textContent = '≠';
+  }
+
+  _renderValues() {
+    this._valueElement.textContent = '';
+    this._valueElement.append(html`
+      <option>any</option>
+      ${[...this._parameters.get(this._nameElement.value)].map(value => html`
+            <option>${value + ''}</option>
+      `)}
+    `);
+  }
+}
+customElements.define('filter-selector', FilterSelector);

@@ -1,6 +1,6 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.js';
-import {SortButton, ExpandButton, Popover} from './widgets.js';
+import {SortButton, ExpandButton, FilterSelector, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
   return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
@@ -21,34 +21,29 @@ class FlakinessDashboard {
   constructor(data) {
     this.element = html`<section class=flakiness></section>`;
 
-    this._data = data;
-    this._render();
-  }
+    this._specIdToSpec = new Map();
+    this._specIdToShaToSpecInfo = new Map();
+    this._shaToDetails = new Map();
+    this._allParameters = new Map();
 
-  _render() {
-    const specIdToSpec = new Map();
-    const specIdToShaToSpecInfo = new Map();
-    const shaToDetails = new Map();
-    const allParameters = new Map();
-
-    for (const run of this._data.buildbotRuns) {
+    for (const run of data.buildbotRuns) {
       const sha = run.metadata.commitSHA;
-      shaToDetails.set(run.metadata.commitSHA, {
+      this._shaToDetails.set(run.metadata.commitSHA, {
         sha,
         timestamp: run.metadata.commitTimestamp,
       });
       for (const spec of run.specs) {
         const specId = spec.file + ' @@@ ' + spec.title;
-        specIdToSpec.set(specId, {
+        this._specIdToSpec.set(specId, {
           specId,
           file: spec.file,
           line: spec.line,
           title: spec.title,
         });
-        let shaToShaInfo = specIdToShaToSpecInfo.get(specId);
+        let shaToShaInfo = this._specIdToShaToSpecInfo.get(specId);
         if (!shaToShaInfo) {
           shaToShaInfo = new Map();
-          specIdToShaToSpecInfo.set(specId, shaToShaInfo);
+          this._specIdToShaToSpecInfo.set(specId, shaToShaInfo);
         }
         let specInfo = shaToShaInfo.get(sha);
         if (!specInfo) {
@@ -75,10 +70,10 @@ class FlakinessDashboard {
             return `${key}=${value}`;
           }).join(' / ');
           for (const [name, value] of Object.entries(test.parameters)) {
-            let values = allParameters.get(name);
+            let values = this._allParameters.get(name);
             if (!values) {
               values = new Set();
-              allParameters.set(name, values);
+              this._allParameters.set(name, values);
             }
             values.add(value);
           }
@@ -87,7 +82,27 @@ class FlakinessDashboard {
       }
     }
 
-    const allSpecs = [...specIdToSpec.values()].sort((spec1, spec2) => {
+    // Cleanup parameters: if parameter has only one value, then we can ignore it.
+    for (const [key, value] of this._allParameters) {
+      if (value.size === 1)
+        this._allParameters.delete(key);
+    }
+    console.log(this._allParameters);
+
+    this._filterElement = new FilterSelector(this._allParameters, (e) => this._render());
+
+    this._render();
+  }
+
+  _applyFilterToTest(test) {
+    const state = this._filterElement.state();
+    if (state.value === 'any')
+      return true;
+    return state.cnd === 'equal' ? test.parameters[state.name] === state.value : test.parameters[state.name] !== state.value;
+  }
+
+  _render() {
+    const allSpecs = [...this._specIdToSpec.values()].sort((spec1, spec2) => {
       if (spec1.file !== spec2.file)
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
@@ -95,11 +110,11 @@ class FlakinessDashboard {
 
     const specIdToCommitsInfo = new Map();
     for (const spec of allSpecs) {
-      const commits = [...specIdToShaToSpecInfo.get(spec.specId).keys()].map(sha => shaToDetails.get(sha)).sort((c1, c2) => c1.timestamp - c2.timestamp);
+      const commits = [...this._specIdToShaToSpecInfo.get(spec.specId).keys()].map(sha => this._shaToDetails.get(sha)).sort((c1, c2) => c1.timestamp - c2.timestamp);
       const commitsInfo = [];
       for (const commit of commits) {
-        const specInfo = specIdToShaToSpecInfo.get(spec.specId).get(commit.sha);
-        const tests = specInfo.tests.filter(test => test.parameters.browserName === 'chromium');
+        const specInfo = this._specIdToShaToSpecInfo.get(spec.specId).get(commit.sha);
+        const tests = specInfo.tests.filter(test => this._applyFilterToTest(test));
         const flakyTests = tests.filter(isFlakyTest);
         const failingTests = tests.filter(isFailingTest);
         let className = 'good';
@@ -135,13 +150,13 @@ class FlakinessDashboard {
       specs.push(spec);
     }
 
-
     const COLLAPSED_CHAR = '▶';
     const EXPANDED_CHAR = '▼';
     const RIGHT_ARROW = '⟶';
 
     this.element.textContent = '';
     this.element.append(html`
+      ${this._filterElement}
       <table-row>
         <spec-column></spec-column>
         <health-column>Health</health-column>
@@ -172,8 +187,6 @@ class FlakinessDashboard {
         tests.push(...info.flakyTests, ...info.failingTests);
       return html`
         <section class=testruns>
-          <div><b>file:</b> ${specIdToSpec.get(specId).file}</div>
-          <div><b>name:</b> ${specIdToSpec.get(specId).title}</div>
           <h4>Unhappy Runs</h4>
           ${renderTests(tests)}
         </section>
@@ -183,8 +196,6 @@ class FlakinessDashboard {
     function renderCommitInfo(specId, commitInfo) {
       return html`
         <section class=testruns>
-          <div><b>file:</b> ${specIdToSpec.get(specId).file}</div>
-          <div><b>name:</b> ${specIdToSpec.get(specId).title}</div>
           <div><b>commit:</b><a href="${commitURL('playwright', commitInfo.sha)}"><span class=sha>${commitInfo.sha.substring(0, 7)}</span></a></div>
           <h4>Unhappy Runs</h4>
           ${renderTests([...commitInfo.failingTests, ...commitInfo.flakyTests])}
@@ -214,9 +225,10 @@ class FlakinessDashboard {
         <div><a href="${test.url}">${info}</a> ${test.name}</div>
       `;
     }
-
   }
 }
+
+const PLUS_CHARACTER = '⊕';
 
 function isHealthyTest(test) {
   if (test.runs.length !== 1)

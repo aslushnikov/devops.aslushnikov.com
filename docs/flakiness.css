@@ -9,6 +9,7 @@
 
   .flakiness .specfile {
     border-top: 1px solid var(--border-color);
+    margin-top: 2px;
   }
 
   .flakiness .specname {

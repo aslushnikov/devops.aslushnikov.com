@@ -1,6 +1,6 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.js';
-import {SortButton, ExpandButton, FilterSelector, Popover} from './widgets.js';
+import {SortButton, ExpandButton, FilterGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
   return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
@@ -87,18 +87,21 @@ class FlakinessDashboard {
       if (value.size === 1)
         this._allParameters.delete(key);
     }
-    console.log(this._allParameters);
-
-    this._filterElement = new FilterSelector(this._allParameters, (e) => this._render());
+    this._filterGroup = new FilterGroup(this._allParameters, (e) => this._render());
 
     this._render();
   }
 
   _applyFilterToTest(test) {
-    const state = this._filterElement.state();
-    if (state.value === 'any')
-      return true;
-    return state.cnd === 'equal' ? test.parameters[state.name] === state.value : test.parameters[state.name] !== state.value;
+    const states = this._filterGroup.states();
+    for (const state of states) {
+      if (state.value === 'any')
+        continue;
+      const isSatisfied = state.cnd === 'equal' ? test.parameters[state.name] === state.value : test.parameters[state.name] !== state.value;
+      if (!isSatisfied)
+        return false;
+    }
+    return true;
   }
 
   _render() {
@@ -156,7 +159,7 @@ class FlakinessDashboard {
 
     this.element.textContent = '';
     this.element.append(html`
-      ${this._filterElement}
+      ${this._filterGroup}
       <table-row>
         <spec-column></spec-column>
         <health-column>Health</health-column>
@@ -196,7 +199,7 @@ class FlakinessDashboard {
     function renderCommitInfo(specId, commitInfo) {
       return html`
         <section class=testruns>
-          <div><b>commit:</b><a href="${commitURL('playwright', commitInfo.sha)}"><span class=sha>${commitInfo.sha.substring(0, 7)}</span></a></div>
+          <div><a href="${commitURL('playwright', commitInfo.sha)}"><span class=sha>${commitInfo.sha.substring(0, 7)}</span></a>${commitInfo.message}</div>
           <h4>Unhappy Runs</h4>
           ${renderTests([...commitInfo.failingTests, ...commitInfo.flakyTests])}
         </section>
@@ -227,8 +230,6 @@ class FlakinessDashboard {
     }
   }
 }
-
-const PLUS_CHARACTER = '⊕';
 
 function isHealthyTest(test) {
   if (test.runs.length !== 1)

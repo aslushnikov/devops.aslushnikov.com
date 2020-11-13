@@ -136,11 +136,11 @@ export class FilterSelector extends HTMLElement {
     super();
 
     this._parameters = parameters;
-    this._onchange = onchange.bind(null, this);
+    this._onchangeCallback = onchange;
 
     this._nameElement = html`<select oninput=${() => {
       this._renderValues();
-      this._onchange();
+      this._updateState();
     }}>
       ${[...parameters.keys()].map(key => html`
         <option>${key}</option>
@@ -150,23 +150,38 @@ export class FilterSelector extends HTMLElement {
     this._conditionElement = html`<button onclick=${() => {
       this._conditions.reverse();
       this._renderCondition();
-      this._onchange();
+      this._updateState();
     }}>=</button>`;
-    this._valueElement = html`<select oninput=${() => this._onchange()}></select>`;
+    this._valueElement = html`<select oninput=${() => this._updateState()}></select>`;
     this.append(this._nameElement);
     this.append(this._conditionElement);
     this.append(this._valueElement);
     this._renderCondition();
     this._renderValues();
+
+    this._updateState(true /* muteOnChange */);
+  }
+
+  setNameValue(name) {
+    if (!this._parameters.has(name))
+      throw new Error(`There is no parameter with name "${name}"`);
+    this._nameElement.value = name;
+    this._renderValues();
   }
 
   state() {
+    return this._state;
+  }
+
+  _updateState(muteOnChange = false) {
     const entries = [...this._parameters.entries()];
-    return {
+    this._state = {
       name: entries[this._nameElement.selectedIndex][0],
       cnd: this._conditions[0],
       value: this._valueElement.selectedIndex === 0 ? 'any' : [...entries[this._nameElement.selectedIndex][1]][this._valueElement.selectedIndex - 1],
     };
+    if (!muteOnChange)
+      this._onchangeCallback(this, this._state);
   }
 
   _renderCondition() {
@@ -187,3 +202,54 @@ export class FilterSelector extends HTMLElement {
   }
 }
 customElements.define('filter-selector', FilterSelector);
+
+const PLUS_CHARACTER = '⊕';
+const CROSS_CHARACTER = '✗';
+export class FilterGroup extends HTMLElement {
+  constructor(parameters, onchange = () => {}) {
+    super();
+
+    this._addButton = html`<button onclick=${() => this._onAddFilter()} class=add-filter>${PLUS_CHARACTER}</button>`;
+    this._parameters = parameters;
+    this._onchange = onchange.bind(null, this);
+
+    this._filterStates = new Map();
+
+    this.append(this._addButton);
+    this._onAddFilter();
+  }
+
+  _onAddFilter() {
+    const filter = new FilterSelector(this._parameters, this._onFilterChanged.bind(this));
+    // Pick a default filter name that wasn't used before.
+    const allNames = new Set(this._parameters.keys());
+    for (const state of this._filterStates.values())
+      allNames.delete(state.name);
+    if (allNames.size)
+      filter.setNameValue([...allNames][0]);
+    this._filterStates.set(filter, filter.state());
+
+    const filterLine = html`
+      <div>
+        ${filter}<button class=remove-filter onclick=${event => {
+          this._filterStates.delete(filter);
+          filterLine.remove();
+          this._onchange();
+        }}>${CROSS_CHARACTER}</button>
+      </div>
+    `;
+
+    this.insertBefore(filterLine, this._addButton);
+  }
+
+  _onFilterChanged(filter) {
+    this._filterStates.set(filter, filter.state());
+    this._onchange();
+  }
+
+  states() {
+    return [...this._filterStates.values()];
+  }
+}
+customElements.define('filter-group', FilterGroup);
+

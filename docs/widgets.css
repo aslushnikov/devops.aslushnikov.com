@@ -35,12 +35,19 @@ filter-group {
 }
     filter-group > div > .remove-filter {
       visibility: hidden;
-    }
-    filter-group:hover > div > .remove-filter {
-      visibility: visible;
+      font-size: 18px;
+      font-size: 18px;
+      appearance: none;
+      border: none;
+      background: initial;
+      cursor: pointer;
+      flex: none;
       color: red;
       opacity: 0.3;
       filter: grayscale(1);
+    }
+    filter-group:hover > div > .remove-filter {
+      visibility: visible;
     }
     filter-group > div > .remove-filter:hover {
       opacity: 1;
@@ -49,7 +56,6 @@ filter-group {
 
     filter-group > div > .remove-filter,
     filter-group > .add-filter {
-      font-size: 18px;
       appearance: none;
       border: none;
       background: initial;

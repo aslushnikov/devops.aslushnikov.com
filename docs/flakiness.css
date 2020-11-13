@@ -32,6 +32,10 @@
     flex: none;
   }
 
+  .flakiness filter-column {
+    width: calc(5em + 400px);
+  }
+
   .flakiness health-column {
     display: flex;
     align-items: center;

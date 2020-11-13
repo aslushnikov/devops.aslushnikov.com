@@ -167,6 +167,7 @@ export class FilterSelector extends HTMLElement {
       throw new Error(`There is no parameter with name "${name}"`);
     this._nameElement.value = name;
     this._renderValues();
+    this._updateState(true /* muteOnChange */);
   }
 
   state() {
@@ -209,7 +210,7 @@ export class FilterGroup extends HTMLElement {
   constructor(parameters, onchange = () => {}) {
     super();
 
-    this._addButton = html`<button onclick=${() => this._onAddFilter()} class=add-filter>${PLUS_CHARACTER}</button>`;
+    this._addButton = html`<a onclick=${() => this._onAddFilter()} class=add-filter>Add Filter</a>`;
     this._parameters = parameters;
     this._onchange = onchange.bind(null, this);
 

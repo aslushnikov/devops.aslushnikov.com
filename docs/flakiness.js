@@ -12,7 +12,6 @@ const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
 export function renderFlakiness(data) {
-  console.log(data);
   const dashboard = new FlakinessDashboard(data);
   return dashboard.element;
 }
@@ -31,6 +30,9 @@ class FlakinessDashboard {
       this._shaToDetails.set(run.metadata.commitSHA, {
         sha,
         timestamp: run.metadata.commitTimestamp,
+        message: run.metadata.commitTitle,
+        author: run.metadata.commitAuthorName,
+        email: run.metadata.commitAuthorEmail,
       });
       for (const spec of run.specs) {
         const specId = spec.file + ' @@@ ' + spec.title;
@@ -127,6 +129,7 @@ class FlakinessDashboard {
           className = 'normal';
         commitsInfo.push({
           sha: commit.sha,
+          message: commit.message,
           timestamp: commit.timestamp,
           flakyTests,
           failingTests,
@@ -159,11 +162,16 @@ class FlakinessDashboard {
 
     this.element.textContent = '';
     this.element.append(html`
-      ${this._filterGroup}
+      <table-row>
+        <spec-column></spec-column>
+        <filter-column>${this._filterGroup}</filter-column>
+      </table-row>
+
       <table-row>
         <spec-column></spec-column>
         <health-column>Health</health-column>
-        <results-column>Commits: Newer ${RIGHT_ARROW} Older</results-column>
+        <results-column>Commits: Newer ${RIGHT_ARROW} Older
+        </results-column>
       </table-row>
       ${[...fileToSpecs].map(([file, specs]) => html`
         <div class=specfile>${file}</div>

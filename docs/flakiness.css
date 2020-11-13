@@ -96,6 +96,7 @@ details > summary {
   list-style: none;
 }
 details[open] > summary {
+  font-weight: bold;
   background: rgba(59, 209, 255, 0.1);
 }
 details > summary::-webkit-details-marker {
@@ -114,7 +115,7 @@ error-description {
 codemirror-placeholder,
 .CodeMirror {
   display: block;
-  height: 116px !important;
+  height: 135px !important;
   border: 1px solid #eaeaea;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   background: white !important;

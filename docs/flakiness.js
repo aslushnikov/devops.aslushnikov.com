@@ -5,9 +5,41 @@ import {parse} from './stack-trace.js';
 
 export async function fetchFlakiness() {
   return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
-    console.log(json.buildbotRuns.flatMap(m => m.specs).filter(e => !e.ok));
-    return json;
+    return filterFlakinessJSON(json);
   });
+}
+
+function filterFlakinessJSON(json) {
+  json.buildbotRuns = json.buildbotRuns.filter(({metadata}) => {
+    for (const [name, value] of Object.entries(metadata)) {
+      if (hasSearchParam(name) && !hasSearchParamValue(name, String(value))) {
+        console.log(name, value)
+        return false;
+      }
+    }
+    return true;
+  });
+  const specsWithFailures = new Set();
+  for (const buildbotRun of json.buildbotRuns) {
+    for (const spec of buildbotRun.specs) {
+      spec.tests = spec.tests.filter(test => {
+        for (const [name, value] of Object.entries(test.parameters)) {
+          if (hasSearchParam(name) && !hasSearchParamValue(name, String(value)))
+            return false;
+        }
+        return true;
+      });
+      if (spec.tests.some(test => isFailingTest(test) || isFlakyTest(test)))
+        specsWithFailures.add(spec.file + ' - ' + spec.title);
+    }
+  }
+  for (const buildbotRun of json.buildbotRuns) {
+    buildbotRun.specs = buildbotRun.specs.filter(spec => {
+      return specsWithFailures.has(spec.file + ' - ' + spec.title);
+    });
+  }
+  
+  return json;
 }
 
 const popover = new Popover(document);
@@ -126,7 +158,7 @@ export function renderFlakiness(data) {
         ${[...fileToSpecs].map(([file, specs]) => html`
           <div class=specfile>${file}</div>
           ${specs.map(spec => html`
-            <details>
+            <details open=${hasSearchParam('expanded')}>
             <summary>
             <table-row>
               <spec-column>
@@ -223,24 +255,40 @@ export function renderFlakiness(data) {
 
   function renderSpecErrors(spec) {
     const infos = specIdToCommitsInfo.get(spec.specId);
-    const tests = infos.flatMap(info => [...info.flakyTests, ...info.failingTests]);
-    const runs = tests.flatMap(test => test.runs);
-    const errors = new Set();
-    for (const run of runs) {
-      if (!run.status || run.status === 'skipped' || run.status === 'passed')
-        continue;
-      if (run.error)
-        errors.add(JSON.stringify(run.error));
-      else
-        errors.add(JSON.stringify(run.status));
+    const errorToRunInfo = new Map();
+    for (const info of infos) {
+      for (const test of [...info.flakyTests, ...info.failingTests]) {
+        for (const run of test.runs) {
+          if (!run.status || run.status === 'skipped' || run.status === 'passed')
+            continue;
+          const errorString = run.error ? JSON.stringify(run.error) : JSON.stringify(run.status);
+          if (!errorToRunInfo.has(errorString))
+            errorToRunInfo.set(errorString, []);
+          errorToRunInfo.get(errorString).push({info, test, run});
+        }
+      }
     }
     return html`
-    <error-description>
-      ${[...errors].map(errorString => renderError(JSON.parse(errorString), spec.file))}
-    </error-description>`;
+      ${[...errorToRunInfo.entries()].map(([errorString, infos]) => html`
+        <error-description>
+        ${renderErrorHeader(infos)}
+        ${renderError(JSON.parse(errorString), infos[0].info.sha, spec.file)}
+        </error-description>`)}
+    `;
   }
 
-  function renderError(error, file) {
+  function renderErrorHeader(infos) {
+    const botNames = new Set(infos.map(info => info.test.name));
+
+    return html`
+      ${[...botNames].map(name => {
+        return html`<div><b>${name}</b></div>`;
+      })}
+    `
+    
+  }
+
+  function renderError(error, hash, file) {
     if (typeof error === 'string')
       return html`${error}`;
     if (!error.message)
@@ -252,8 +300,6 @@ export function renderFlakiness(data) {
     const preamble = error.stack.substring(0, messageLocation + error.message.length);
     tokens.push(preamble);
     const callsite = file ? callsiteInFile(error, file) : null;
-    if (callsite)
-      console.log(callsite);
     return html`
   <pre>${highlightTerminalText(preamble)}</pre>
   ${lazyRender(async () => {
@@ -261,7 +307,7 @@ export function renderFlakiness(data) {
       return html``;
     const [CodeMirror, contents] = await Promise.all([
       getCodeMirror(),
-      getFile(callsite.fileName),
+      getFile(callsite.fileName, hash),
     ]);
     const host = document.createElement('div');
     host.style.overflow = 'hidden';
@@ -281,12 +327,12 @@ export function renderFlakiness(data) {
       }
     );
     setTimeout(() => {
+      cm.refresh();
       const coords = cm.charCoords({
         line: callsite.lineNumber,
         ch: callsite.columnNumber,
       }, 'local');
-      cm.refresh();
-      cm.scrollTo(coords.left - 460, (coords.top + coords.bottom)/2 - 58 - 4 );  
+      cm.scrollTo(coords.left - 460, (coords.top + coords.bottom)/2 - 67.5 - 19 );  
     }, 0);
     return host;
   }, html`<codemirror-placeholder></codemirror-placeholder>`)}
@@ -296,18 +342,17 @@ export function renderFlakiness(data) {
   return render();
 }
 
-async function getFile(file) {
+async function getFile(file, hash) {
   // TODO remove playwright-specific stuff here
   const bases = [
     `/home/runner/work/playwright/playwright/`,
     `/Users/runner/work/playwright/playwright/`,
-    // TODO windows base
+    `D:\\a\\playwright\\playwright\\`
   ];
   const base = bases.find(base => file.startsWith(base));
   if (!base)
     return '';
-  // TODO: replace master with commit hash from one of the runs
-  const response = await fetch(`https://raw.githubusercontent.com/microsoft/playwright/master/${file.substring(base.length)}`)
+  const response = await fetch(`https://raw.githubusercontent.com/microsoft/playwright/${hash}/${file.substring(base.length)}`)
   return await response.text();
 }
 function callsiteInFile(error, file) {
@@ -392,4 +437,12 @@ async function getCodeMirror() {
   link.href = './codemirror/codemirror.css';
   document.head.appendChild(link);
   return CodeMirror;
+}
+
+function hasSearchParam(name) {
+  return new URLSearchParams(location.search).has(name);
+}
+
+function hasSearchParamValue(name, value) {
+  return new URLSearchParams(location.search).getAll(name).some(v => String(value).toLowerCase() === String(v).toLowerCase())
 }

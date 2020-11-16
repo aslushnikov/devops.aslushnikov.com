@@ -1,9 +1,10 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.js';
-import {SortButton, ExpandButton, FilterGroup, Popover} from './widgets.js';
+import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
-  return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
+  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
+  return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
     return json;
   });
 }
@@ -62,6 +63,8 @@ class FlakinessDashboard {
           // Overwrite test platform parameter with a more specific information from
           // build run.
           test.parameters.platform = run.metadata.osName + ' ' + run.metadata.osVersion;
+          if (test.parameters.platform.toUpperCase().startsWith('MINGW'))
+            test.parameters.platform = 'Windows';
           // Pull test URL.
           test.url = run.metadata.runURL;
           test.name = Object.entries(test.parameters).filter(([key, value]) => !!value).map(([key, value]) => {
@@ -89,7 +92,7 @@ class FlakinessDashboard {
       if (value.size === 1)
         this._allParameters.delete(key);
     }
-    this._filterGroup = new FilterGroup(this._allParameters, (e) => this._render());
+    this._filterGroup = new FilterConjunctionGroup(this._allParameters, (e) => this._render());
 
     this._render();
   }

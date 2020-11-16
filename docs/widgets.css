@@ -24,16 +24,38 @@ filter-selector {
       border: none;
       background: initial;
       cursor: pointer;
-    }
-    filter-selector select {
+      width: 1em;
+      padding: 0;
     }
 
-filter-group {
+    filter-selector select {
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+
+filter-conjunction {
   display: inline-flex;
-  flex-direction: column;
-  align-items: start;
+  align-items: center;
+  flex-wrap: wrap;
 }
-    filter-group > div > .remove-filter {
+    filter-conjunction > .and-chip {
+      font-family: var(--monospace);
+      color: white;
+      background: #009688;
+      padding: 1px 3px;
+      font-size: 8px;
+      font-weight: bold;
+      border-radius: 2px;
+      flex: none;
+      margin-right: 6px;
+    }
+
+    filter-conjunction > .filter-chip {
+      flex: none;
+    }
+
+    filter-conjunction > .filter-chip > .remove-filter {
       visibility: hidden;
       font-size: 18px;
       font-size: 18px;
@@ -46,19 +68,23 @@ filter-group {
       opacity: 0.3;
       filter: grayscale(1);
     }
-    filter-group:hover > div > .remove-filter {
+    filter-conjunction> .filter-chip:hover > .remove-filter {
       visibility: visible;
     }
-    filter-group > div > .remove-filter:hover {
+    filter-conjunction > .filter-chip > .remove-filter:hover {
       opacity: 1;
       filter: grayscale(0);
     }
 
-    filter-group > div > .remove-filter,
-    filter-group > .add-filter {
-      appearance: none;
-      border: none;
-      background: initial;
+    filter-conjunction > .filter-chip > .remove-filter,
+    filter-conjunction > .add-filter {
+      visibility: hidden;
       cursor: pointer;
-      flex: none;
+      opacity: 0.5;
     }
+        filter-conjunction:hover > .add-filter {
+          visibility: visible;
+        }
+        filter-conjunction > .add-filter:hover {
+          opacity: 1;
+        }

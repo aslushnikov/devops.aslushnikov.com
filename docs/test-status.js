@@ -164,7 +164,7 @@ export function renderTestStatusDetails(entries) {
           ${expandedFilepaths.has(filepath) && tests.map(test => html`
             <grid-row class=testrow>
               <grid-cell class=cell-filepath>
-                <a class=testname href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/${filepath}#L${test.line}">${test.line}: ${test.title}</a>
+                <a class=testname href="https://github.com/microsoft/playwright/blob/${cdnData.commit.sha}/test/${filepath}#L${test.line}">${test.line}: ${test.title}</a>
               </grid-cell>
 
               ${browserNames.map(browserName => html`

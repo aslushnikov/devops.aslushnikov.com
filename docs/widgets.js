@@ -1,4 +1,5 @@
-import {html } from './zhtml.js';
+import {html} from './zhtml.js';
+import {createEvent, emitEvent, consumeDOMEvent} from './utils.js';
 
 export class SortButton extends HTMLElement {
   constructor(callback = () => {}) {
@@ -131,20 +132,30 @@ export class Popover {
   }
 }
 
+const CROSS_CHARACTER = '✗';
 export class FilterSelector extends HTMLElement {
-  constructor(parameters, onchange = () => {}) {
+  constructor(parameters) {
     super();
 
-    this._parameters = parameters;
-    this._onchangeCallback = onchange;
+    this.events = {
+      onchange: createEvent(),
+      onremove: createEvent(),
+    };
 
-    this._conditions = ['equal', 'unequal'],
-    this._conditionElement = html`<button onclick=${() => {
-      this._conditions.reverse();
-      this._renderCondition();
-      this._updateState();
-    }}>=</button>`;
-    this._valueElement = html`<select oninput=${() => this._updateState()}>
+    this._parameters = parameters;
+
+    this._chips = [
+      html`<op-chip data-value="and" onclick=${this._onOpClick.bind(this)} class=and-chip>and</op-chip>`,
+      html`<op-chip data-value="or" onclick=${this._onOpClick.bind(this)} class=or-chip>or</op-chip>`,
+    ];
+
+    this._equals = [
+      html`<button data-value="equal" onclick=${this._onEqualClick.bind(this)}>=</button>`,
+      html`<button data-value="nonequal" onclick=${this._onEqualClick.bind(this)}>≠</button>`,
+    ];
+
+    this._valueElement = html`<select oninput=${e => this._onValueChanged(e)}>
+      <option selected disabled>&lt;pick a filter&gt;</option>
       ${[...parameters].map(([name, values]) => html`
         <optgroup label=${name}>
           ${[...values].sort().map(value => html`
@@ -153,92 +164,194 @@ export class FilterSelector extends HTMLElement {
         </optgroup>
       `)}
     </select>`;
-    this.append(this._conditionElement);
+
+    this._removeButton = html`<button onclick=${e => this._onRemoveButtonClicked(e)} class=remove-button>${CROSS_CHARACTER}</button>`;
+
+    this._parenthesisLeft = html`<span class="parenthesis left"></span>`;
+    this._parenthesisRight = html`<span class="parenthesis right"></span>`;
+
+    this.append(this._chips[0]);
+    this.append(this._parenthesisLeft);
+    this.append(this._equals[0]);
     this.append(this._valueElement);
-    this._renderCondition();
+    this.append(this._removeButton);
+    this.append(this._parenthesisRight);
+  }
+
+  setLeftParenthesisEnabled(value) {
+    this._parenthesisLeft.classList.toggle('visible', value);
+  }
+
+  setRightParenthesisEnabled(value) {
+    this._parenthesisRight.classList.toggle('visible', value);
+  }
+
+  _onEqualClick(e) {
+    consumeDOMEvent(e);
+    this._equals[0].replaceWith(this._equals[1]);
+    this._equals.reverse();
+    this._fireStateChanged();
+  }
+
+  _onOpClick(e) {
+    consumeDOMEvent(e);
+    this._chips[0].replaceWith(this._chips[1]);
+    this._chips.reverse();
+    this._fireStateChanged();
+  }
+
+  _onValueChanged(e) {
+    consumeDOMEvent(e);
+    this._fireStateChanged();
+  }
+
+  _onRemoveButtonClicked(e) {
+    consumeDOMEvent(e);
+    emitEvent(this.events.onremove);
+  }
+
+  _fireStateChanged() {
+    this._state = null;
+    emitEvent(this.events.onchange);
+  }
+
+  setOpChipHidden(hidden) {
+    this._chips[0].classList.toggle('hidden', hidden);
+    this._chips[1].classList.toggle('hidden', hidden);
+  }
+
+  setOpChip(value) {
+    if (value !== 'and' && value !== 'or')
+      throw new Error('ERROR: unknown operation chip name - ' + value);
+    if (this._chips[0].dataset['value'] !== value) {
+      this._chips[0].replaceWith(this._chips[1]);
+      this._chips.reverse();
+    }
   }
 
   state() {
-    if (!this._state) {
+    // selectedIndex === 0 is the default option.
+    if (!this._state && this._valueElement.selectedIndex) {
       const json = JSON.parse(this._valueElement.value);
       this._state = {
         ...json,
-        cnd: this._conditions[0],
+        eq: this._equals[0].dataset['value'],
+        op: this._chips[0].dataset['value'],
       };
     }
     return this._state;
-  }
-
-  _updateState() {
-    this._state = null;
-    this._onchangeCallback(this, this.state());
-  }
-
-  _renderCondition() {
-    if (this._conditions[0] === 'equal')
-      this._conditionElement.textContent = '=';
-    else
-      this._conditionElement.textContent = '≠';
   }
 }
 customElements.define('filter-selector', FilterSelector);
 
 const PLUS_CHARACTER = '⊕';
-const CROSS_CHARACTER = '✗';
 export class FilterConjunctionGroup extends HTMLElement {
-  constructor(parameters, onchange = () => {}) {
+  constructor(parameters) {
     super();
 
-    this._addFilterButton = html`<a style="cursor: pointer" onclick=${() => this._onAddFilter()}>Add filter</a>`;
-    this._addButton = html`<a onclick=${() => this._onAddFilter()} class="add-filter and-chip">and</a>`;
+    this.events = {
+      onchange: createEvent(),
+    };
+
+    this._createFilterButton = html`<a style="cursor: pointer" onclick=${() => this._onAddFilter()}>Create filter</a>`;
+    this._resetFilterButton = html`<a style="cursor: pointer" onclick=${() => this._onResetFilter()}>Remove filter</a>`;
+    this._addAndFilter = html`<a onclick=${() => this._onAddFilter('and')} class="add-filter and-chip">and</a>`;
+    this._addOrFilter = html`<a onclick=${() => this._onAddFilter('or')} class="add-filter or-chip">or</a>`;
     this._parameters = parameters;
-    this._onchange = onchange.bind(null, this);
 
-    this._filterStates = new Map();
+    this._filters = new Set();
 
-    this.append(this._addFilterButton);
+    this.append(this._createFilterButton);
   }
 
-  _onAddFilter(fire = true) {
-    const filter = new FilterSelector(this._parameters, this._onFilterChanged.bind(this));
-    this._filterStates.set(filter, filter.state());
-    this._addFilterButton.remove();
+  _onResetFilter() {
+    for (const f of this._filters)
+      f.remove();
+    this._addAndFilter.remove();
+    this._addOrFilter.remove();
+    this._resetFilterButton.remove();
+    this.append(this._createFilterButton);
+  }
 
-    let andChip = null;
-    if (this._filterStates.size > 1) {
-      andChip = html`<span class=and-chip>and</span>`;
-      this.append(andChip);
+  _onAddFilter(operation = '') {
+    if (!this._resetFilterButton.isConnected)
+      this._createFilterButton.replaceWith(this._resetFilterButton);
+    const filter = new FilterSelector(this._parameters);
+    if (operation)
+      filter.setOpChip(operation);
+    this._filters.add(filter);
+    this._createFilterButton.remove();
+
+    this.append(filter);
+    this.append(this._addAndFilter);
+    this.append(this._addOrFilter);
+    filter.events.onchange(() => this._fireStateChanged());
+    filter.events.onremove(() => this._onFilterRemoved(filter));
+    this._fireStateChanged();
+  }
+
+  _updateFiltersOperationVisibility() {
+    if (!this._filters.size)
+      return;
+    const filters = [...this._filters];
+    const [first, ...others] = filters;
+    first.setOpChipHidden(true);
+    first.setOpChip('and');
+    for (const f of others)
+      f.setOpChipHidden(false);
+
+    for (const f of filters) {
+      f.setLeftParenthesisEnabled(false);
+      f.setRightParenthesisEnabled(false);
     }
-    const filterChip = html`
-      <div class=filter-chip>
-        ${filter}<button class=remove-filter onclick=${event => {
-          this._filterStates.delete(filter);
-          filterChip.remove();
-          if (andChip)
-            andChip.remove();
-          if (this.firstElementChild && this.firstElementChild.classList.contains('and-chip'))
-            this.firstElementChild.remove();
-          if (!this._filterStates.size)
-            this.append(this._addFilterButton);
-          this._onchange();
-        }}>${CROSS_CHARACTER}</button>
-      </div>
-    `;
-
-    this._addButton.remove();
-    this.append(filterChip);
-    this.append(this._addButton);
-    if (fire)
-      this._onFilterChanged(filter);
+    const orGroups = this.state();
+    if (orGroups.length > 1) {
+      let counter = 0;
+      for (const andGroup of orGroups) {
+        if (andGroup.length > 1) {
+          filters[counter].setLeftParenthesisEnabled(true);
+          filters[counter + andGroup.length - 1].setRightParenthesisEnabled(true);
+        }
+        counter += andGroup.length;
+      }
+    }
   }
 
-  _onFilterChanged(filter) {
-    this._filterStates.set(filter, filter.state());
-    this._onchange();
+  _onFilterRemoved(filter) {
+    this._filters.delete(filter);
+    filter.remove();
+    if (!this._filters.size) {
+      this._addAndFilter.remove();
+      this._addOrFilter.remove();
+      this.append(this._createFilterButton);
+    }
+    this._fireStateChanged();
   }
 
-  states() {
-    return [...this._filterStates.values()];
+  _fireStateChanged() {
+    this._state = null;
+    this._updateFiltersOperationVisibility();
+    emitEvent(this.events.onchange);
+  }
+
+  state() {
+    if (!this._state) {
+      const orGroups = [];
+      let andGroup = null;
+      for (const f of this._filters) {
+        const state = f.state();
+        if (!state)
+          continue;
+        if (!andGroup || state.op === 'or') {
+          andGroup = [state];
+          orGroups.push(andGroup);
+        } else {
+          andGroup.push(state);
+        }
+      }
+      this._state = orGroups;
+    }
+    return this._state;
   }
 }
 customElements.define('filter-conjunction', FilterConjunctionGroup);

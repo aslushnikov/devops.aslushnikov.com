@@ -18,7 +18,32 @@ expand-button {
 
 filter-selector {
   padding: 1px;
+  display: flex;
+  align-items: center;
 }
+    filter-selector .parenthesis {
+      font-size: large;
+      visibility: hidden;
+      display: inline-block;
+      width: 12px;
+      height: 30px;
+      border-radius: 12px;
+    }
+        filter-selector .parenthesis.left {
+          margin-right: -10px;
+          border-left: 2px solid #757575;
+        }
+
+        filter-selector .parenthesis.right {
+          margin-left: -10px;
+          border-right: 2px solid #757575;
+        }
+
+
+    filter-selector .parenthesis.visible {
+      visibility: visible;
+    }
+
     filter-selector button {
       appearance: none;
       border: none;
@@ -34,6 +59,43 @@ filter-selector {
       border-right: none;
     }
 
+    filter-selector .remove-button {
+      visibility: hidden;
+      opacity: 0.5;
+    }
+        filter-selector:hover .remove-button {
+          visibility: visible;
+        }
+        filter-selector .remove-button:hover {
+          visibility: visible;
+          opacity: 1;
+        }
+
+    filter-selector op-chip {
+      font-family: var(--monospace);
+      color: white;
+      padding: 1px 3px;
+      font-size: 8px;
+      font-weight: bold;
+      border-radius: 2px;
+      flex: none;
+      margin-right: 6px;
+      cursor: pointer;
+      text-align: center;
+    }
+        filter-selector op-chip.hidden {
+          display: none;
+        }
+
+        filter-selector op-chip.and-chip {
+          background: #009688;
+        }
+
+        filter-selector op-chip.or-chip {
+          background: #f57c00;
+        }
+
+
 filter-conjunction {
   display: inline-flex;
   align-items: center;
@@ -43,6 +105,19 @@ filter-conjunction {
       font-family: var(--monospace);
       color: white;
       background: #009688;
+      padding: 1px 3px;
+      font-size: 8px;
+      font-weight: bold;
+      border-radius: 2px;
+      flex: none;
+      margin-right: 6px;
+      cursor: pointer;
+    }
+
+    filter-conjunction > .or-chip {
+      font-family: var(--monospace);
+      color: white;
+      background: #f57c00;
       padding: 1px 3px;
       font-size: 8px;
       font-weight: bold;

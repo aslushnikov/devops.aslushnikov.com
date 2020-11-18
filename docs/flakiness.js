@@ -3,8 +3,8 @@ import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
-  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
-  return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
+  return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
+  // return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
     return json;
   });
 }
@@ -25,6 +25,7 @@ class FlakinessDashboard {
     this._specIdToShaToSpecInfo = new Map();
     this._shaToDetails = new Map();
     this._allParameters = new Map();
+    this._commitsToBeHealthy = 20;
 
     for (const run of data.buildbotRuns) {
       const sha = run.metadata.commitSHA;
@@ -92,21 +93,22 @@ class FlakinessDashboard {
       if (value.size === 1)
         this._allParameters.delete(key);
     }
-    this._filterGroup = new FilterConjunctionGroup(this._allParameters, (e) => this._render());
+    this._filterGroup = new FilterConjunctionGroup(this._allParameters);
+    this._filterGroup.events.onchange(() => this._render());
 
     this._render();
   }
 
   _applyFilterToTest(test) {
-    const states = this._filterGroup.states();
-    for (const state of states) {
-      if (state.value === 'any')
-        continue;
-      const isSatisfied = state.cnd === 'equal' ? test.parameters[state.name] === state.value : test.parameters[state.name] !== state.value;
-      if (!isSatisfied)
-        return false;
-    }
-    return true;
+    const orGroups = this._filterGroup.state().map(andGroup => {
+      for (const state of andGroup) {
+        const isSatisfied = state.eq === 'equal' ? test.parameters[state.name] === state.value : test.parameters[state.name] !== state.value;
+        if (!isSatisfied)
+          return false;
+      }
+      return true;
+    });
+    return !orGroups.length || orGroups.some(Boolean);
   }
 
   _render() {
@@ -118,7 +120,7 @@ class FlakinessDashboard {
 
     const specIdToCommitsInfo = new Map();
     for (const spec of allSpecs) {
-      const commits = [...this._specIdToShaToSpecInfo.get(spec.specId).keys()].map(sha => this._shaToDetails.get(sha)).sort((c1, c2) => c1.timestamp - c2.timestamp);
+      const commits = [...this._specIdToShaToSpecInfo.get(spec.specId).keys()].map(sha => this._shaToDetails.get(sha)).sort((c1, c2) => c1.timestamp - c2.timestamp).slice(-this._commitsToBeHealthy);
       const commitsInfo = [];
       for (const commit of commits) {
         const specInfo = this._specIdToShaToSpecInfo.get(spec.specId).get(commit.sha);
@@ -165,11 +167,7 @@ class FlakinessDashboard {
 
     this.element.textContent = '';
     this.element.append(html`
-      <table-row>
-        <spec-column></spec-column>
-        <filter-column>${this._filterGroup}</filter-column>
-      </table-row>
-
+      <filter-column>${this._filterGroup}</filter-column>
       <table-row>
         <spec-column></spec-column>
         <health-column>Health</health-column>

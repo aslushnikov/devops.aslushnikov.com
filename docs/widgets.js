@@ -155,7 +155,7 @@ export class FilterSelector extends HTMLElement {
     ];
 
     this._valueElement = html`<select oninput=${e => this._onValueChanged(e)}>
-      <option selected disabled>&lt;pick a filter&gt;</option>
+      <option selected disabled></option>
       ${[...parameters].map(([name, values]) => html`
         <optgroup label=${name}>
           ${[...values].sort().map(value => html`
@@ -229,9 +229,12 @@ export class FilterSelector extends HTMLElement {
     }
   }
 
+  isUndecided() {
+    return this._valueElement.selectedIndex === 0;
+  }
+
   state() {
-    // selectedIndex === 0 is the default option.
-    if (!this._state && this._valueElement.selectedIndex) {
+    if (!this._state && !this.isUndecided()) {
       const json = JSON.parse(this._valueElement.value);
       this._state = {
         ...json,
@@ -253,10 +256,14 @@ export class FilterConjunctionGroup extends HTMLElement {
       onchange: createEvent(),
     };
 
-    this._createFilterButton = html`<a style="cursor: pointer" onclick=${() => this._onAddFilter()}>Create filter</a>`;
-    this._resetFilterButton = html`<a style="cursor: pointer" onclick=${() => this._onResetFilter()}>Remove filter</a>`;
-    this._addAndFilter = html`<a onclick=${() => this._onAddFilter('and')} class="add-filter and-chip">and</a>`;
-    this._addOrFilter = html`<a onclick=${() => this._onAddFilter('or')} class="add-filter or-chip">or</a>`;
+    this._createFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onAddFilter()}>Create filter</a>`;
+    this._removeFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onResetFilter()}>Remove filter</a>`;
+    this._addFilterButtons = html`
+      <span class=add-filter-buttons>
+        <op-chip onclick=${() => this._onAddFilter('and')} class=and-chip>and</op-chip>
+        <op-chip onclick=${() => this._onAddFilter('or')} class=or-chip>or</op-chip>
+      </span>
+    `;
     this._parameters = parameters;
 
     this._filters = new Set();
@@ -267,15 +274,14 @@ export class FilterConjunctionGroup extends HTMLElement {
   _onResetFilter() {
     for (const f of this._filters)
       f.remove();
-    this._addAndFilter.remove();
-    this._addOrFilter.remove();
-    this._resetFilterButton.remove();
-    this.append(this._createFilterButton);
+    this._filters.clear();
+    this._fireStateChanged();
   }
 
   _onAddFilter(operation = '') {
-    if (!this._resetFilterButton.isConnected)
-      this._createFilterButton.replaceWith(this._resetFilterButton);
+    if (!this._removeFilterButton.isConnected)
+      this._createFilterButton.replaceWith(this._removeFilterButton);
+
     const filter = new FilterSelector(this._parameters);
     if (operation)
       filter.setOpChip(operation);
@@ -283,23 +289,42 @@ export class FilterConjunctionGroup extends HTMLElement {
     this._createFilterButton.remove();
 
     this.append(filter);
-    this.append(this._addAndFilter);
-    this.append(this._addOrFilter);
     filter.events.onchange(() => this._fireStateChanged());
     filter.events.onremove(() => this._onFilterRemoved(filter));
     this._fireStateChanged();
   }
 
-  _updateFiltersOperationVisibility() {
-    if (!this._filters.size)
-      return;
-    const filters = [...this._filters];
-    const [first, ...others] = filters;
-    first.setOpChipHidden(true);
-    first.setOpChip('and');
-    for (const f of others)
-      f.setOpChipHidden(false);
+  _onFilterRemoved(filter) {
+    this._filters.delete(filter);
+    filter.remove();
+    this._fireStateChanged();
+  }
 
+  _fireStateChanged() {
+    this._state = null;
+    this._updateDecorations();
+    emitEvent(this.events.onchange);
+  }
+
+  _updateDecorations() {
+    const filters = [...this._filters];
+
+    // Ensure the "create filter" or "remove filter" button.
+    if (filters.length && this._createFilterButton.isConnected)
+      this._createFilterButton.replaceWith(this._removeFilterButton);
+    else if (!filters.length && this._removeFilterButton.isConnected)
+      this._removeFilterButton.replaceWith(this._createFilterButton);
+
+    // Hide boolean operation for the very first filter.
+    if (filters.length) {
+      const [first, ...others] = filters;
+      first.setOpChipHidden(true);
+      first.setOpChip('and');
+      for (const f of others)
+        f.setOpChipHidden(false);
+    }
+
+    // Draw parenthesis around AND groups, if necessary.
     for (const f of filters) {
       f.setLeftParenthesisEnabled(false);
       f.setRightParenthesisEnabled(false);
@@ -315,24 +340,14 @@ export class FilterConjunctionGroup extends HTMLElement {
         counter += andGroup.length;
       }
     }
+
+    // Figure if we need to show the and/or button chips.
+    if (!filters.length || filters.some(filter => filter.isUndecided()))
+      this._addFilterButtons.remove();
+    else
+      this.append(this._addFilterButtons);
   }
 
-  _onFilterRemoved(filter) {
-    this._filters.delete(filter);
-    filter.remove();
-    if (!this._filters.size) {
-      this._addAndFilter.remove();
-      this._addOrFilter.remove();
-      this.append(this._createFilterButton);
-    }
-    this._fireStateChanged();
-  }
-
-  _fireStateChanged() {
-    this._state = null;
-    this._updateFiltersOperationVisibility();
-    emitEvent(this.events.onchange);
-  }
 
   state() {
     if (!this._state) {

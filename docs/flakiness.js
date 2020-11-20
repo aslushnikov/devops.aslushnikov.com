@@ -3,8 +3,8 @@ import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
-  return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
-  // return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
+  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
+  return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
     return json;
   });
 }

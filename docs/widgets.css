@@ -71,29 +71,6 @@ filter-selector {
           opacity: 1;
         }
 
-    filter-selector op-chip {
-      font-family: var(--monospace);
-      color: white;
-      padding: 1px 3px;
-      font-size: 8px;
-      font-weight: bold;
-      border-radius: 2px;
-      flex: none;
-      margin-right: 6px;
-      cursor: pointer;
-      text-align: center;
-    }
-        filter-selector op-chip.hidden {
-          display: none;
-        }
-
-        filter-selector op-chip.and-chip {
-          background: #009688;
-        }
-
-        filter-selector op-chip.or-chip {
-          background: #f57c00;
-        }
 
 
 filter-conjunction {
@@ -101,65 +78,45 @@ filter-conjunction {
   align-items: center;
   flex-wrap: wrap;
 }
-    filter-conjunction > .and-chip {
+    filter-conjunction op-chip {
       font-family: var(--monospace);
       color: white;
-      background: #009688;
       padding: 1px 3px;
       font-size: 8px;
       font-weight: bold;
       border-radius: 2px;
       flex: none;
-      margin-right: 6px;
       cursor: pointer;
+      text-align: center;
     }
+        filter-conjunction op-chip.hidden {
+          display: none;
+        }
 
-    filter-conjunction > .or-chip {
-      font-family: var(--monospace);
-      color: white;
-      background: #f57c00;
-      padding: 1px 3px;
-      font-size: 8px;
-      font-weight: bold;
-      border-radius: 2px;
-      flex: none;
-      margin-right: 6px;
-    }
+        filter-conjunction op-chip.and-chip {
+          background: #009688;
+        }
 
-    filter-conjunction > .filter-chip {
-      flex: none;
-    }
+        filter-conjunction op-chip.or-chip {
+          background: #f57c00;
+        }
 
-    filter-conjunction > .filter-chip > .remove-filter {
+    filter-conjunction .add-filter-buttons {
       visibility: hidden;
-      font-size: 18px;
-      font-size: 18px;
-      appearance: none;
-      border: none;
-      background: initial;
-      cursor: pointer;
-      flex: none;
-      color: red;
-      opacity: 0.3;
-      filter: grayscale(1);
+      display: flex;
+      align-items: center;
     }
-    filter-conjunction> .filter-chip:hover > .remove-filter {
-      visibility: visible;
-    }
-    filter-conjunction > .filter-chip > .remove-filter:hover {
-      opacity: 1;
-      filter: grayscale(0);
-    }
-
-    filter-conjunction > .filter-chip > .remove-filter,
-    filter-conjunction > .add-filter {
-      visibility: hidden;
-      cursor: pointer;
-      opacity: 0.5;
-    }
-        filter-conjunction:hover > .add-filter {
+        filter-conjunction:hover .add-filter-buttons {
           visibility: visible;
         }
-        filter-conjunction > .add-filter:hover {
+        filter-conjunction .add-filter-buttons op-chip + op-chip {
+          margin-left: 2px;
+        }
+
+        filter-conjunction .add-filter-buttons op-chip {
+          opacity: 0.5;
+        }
+        filter-conjunction .add-filter-buttons op-chip:hover {
           opacity: 1;
         }
+

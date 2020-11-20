@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">
-  <path d="M 0 0 L 10 0 L 0 10 L 0 0" fill="#ffe082"/>
-  <path d="M 10 10 L 10 0 L 0 10 L 10 10" fill="#c8e6c9"/>
-  <circle cx="5" cy="5" r="3" fill="red"/>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 9 9">
+  <path d="M 9 0 L 0 6 L 0 0 Z" fill="#ef9a9a"/>
+  <path d="M 9 0 L 0 6 L 0 9 L 3 9 Z" fill="#ffcc80"/> 
+  <path d="M 9 0 L 3 9 L 9 9 Z" fill="#a5d6a7"/>
 </svg>

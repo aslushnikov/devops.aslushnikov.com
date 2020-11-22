@@ -127,6 +127,18 @@ class FlakinessDashboard {
         const tests = specInfo.tests.filter(test => this._applyFilterToTest(test));
         const flakyTests = tests.filter(isFlakyTest);
         const failingTests = tests.filter(isFailingTest);
+        const runsSummary = getTestsSummary(tests);
+        // Sometimes there are no runs if test was skipped.
+        // Consider it passed.
+        if (!runsSummary.length)
+          runsSummary.push('passed');
+        const runResultToImgNameMap = {
+          'passed': 'ok',
+          'timedOut': 'timeout',
+          'failed': 'fail',
+        };
+        const imgName = '/images/commit-' + runsSummary.map(result => runResultToImgNameMap[result]).sort().join('-') + '.svg';
+        console.log(imgName);
         let className = 'good';
         if (failingTests.length)
           className = 'bad';
@@ -139,6 +151,7 @@ class FlakinessDashboard {
           flakyTests,
           failingTests,
           className,
+          imgName,
         });
       }
       commitsInfo.reverse();
@@ -186,7 +199,7 @@ class FlakinessDashboard {
             </health-column>
             <results-column>
             ${specIdToCommitsInfo.get(spec.specId).map(info => html`
-                <commit-info onclick=${popover.onClickHandler(renderCommitInfo.bind(null, spec.specId, info))} class=${info.className}>${info.flakyTests.length + info.failingTests.length || ''}</commit-info>
+                <img style="width: 18px; height: 18px; padding: 1px; box-sizing: content-box;" src="${info.imgName}"/>
             `)}
           </table-row>
         `)}
@@ -245,6 +258,14 @@ function isHealthyTest(test) {
     return false;
   const run = test.runs[0];
   return !run.status || run.status === 'skipped' || run.status === 'passed';
+}
+
+function getTestsSummary(tests) {
+  const allRuns = [];
+  for (const test of tests)
+    allRuns.push(...test.runs);
+  const runs = allRuns.filter(run => run.status && run.status !== 'skipped');
+  return [...new Set(runs.map(run => run.status))];
 }
 
 function isFlakyTest(test) {

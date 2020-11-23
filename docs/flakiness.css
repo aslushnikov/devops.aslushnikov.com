@@ -14,6 +14,8 @@
 
   .flakiness .specname {
     margin-left: 1em;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .flakiness .healthstats {
@@ -66,6 +68,29 @@
       .flakiness commit-info:hover {
         cursor: pointer;
         filter: brightness(.8);
+      }
+
+  .flakiness .terminal {
+    background-color: black;
+    color: lightgrey;
+    overflow: auto;
+    font-family: var(--monospace);
+    white-space: pre;
+    padding: 1em;
+  }
+
+  .flakiness .stack-toggle {
+    user-select: none;
+    cursor: pointer;
+    padding: 0 2px;
+    margin: 0 2px;
+    background: #fafafa;
+    border: 1px solid grey;
+    font-size: 8px;
+    border-radius: 2px;
+  }
+      .flakiness .stack-toggle[selected] {
+        background: #e0e0e0;
       }
 
 .testruns {

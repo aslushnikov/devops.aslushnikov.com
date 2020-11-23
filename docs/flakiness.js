@@ -1,5 +1,5 @@
 import {html, svg} from './zhtml.js';
-import {humanReadableDate, browserLogoURL, browserLogo, commitURL} from './misc.js';
+import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
@@ -26,6 +26,8 @@ class FlakinessDashboard {
     this._shaToDetails = new Map();
     this._allParameters = new Map();
     this._commitsToBeHealthy = 20;
+    this._expandedSpecIds = new Set();
+    this._specIdToOpenedStack = new Map();
 
     for (const run of data.buildbotRuns) {
       const sha = run.metadata.commitSHA;
@@ -88,6 +90,13 @@ class FlakinessDashboard {
       }
     }
 
+    this._allSpecs = [...this._specIdToSpec.values()].sort((spec1, spec2) => {
+      if (spec1.file !== spec2.file)
+        return spec1.file < spec2.file ? -1 : 1;
+      return spec1.line - spec2.line;
+    });
+
+
     // Cleanup parameters: if parameter has only one value, then we can ignore it.
     for (const [key, value] of this._allParameters) {
       if (value.size === 1)
@@ -111,15 +120,10 @@ class FlakinessDashboard {
     return !orGroups.length || orGroups.some(Boolean);
   }
 
-  _render() {
-    const allSpecs = [...this._specIdToSpec.values()].sort((spec1, spec2) => {
-      if (spec1.file !== spec2.file)
-        return spec1.file < spec2.file ? -1 : 1;
-      return spec1.line - spec2.line;
-    });
-
+  _specIdToCommitInfoRespectingGlobalFiltering() {
+    // Build this map accounting for a global test filter.
     const specIdToCommitsInfo = new Map();
-    for (const spec of allSpecs) {
+    for (const spec of this._allSpecs) {
       const commits = [...this._specIdToShaToSpecInfo.get(spec.specId).keys()].map(sha => this._shaToDetails.get(sha)).sort((c1, c2) => c1.timestamp - c2.timestamp).slice(-this._commitsToBeHealthy);
       const commitsInfo = [];
       for (const commit of commits) {
@@ -138,7 +142,6 @@ class FlakinessDashboard {
           'failed': 'fail',
         };
         const imgName = '/images/commit-' + runsSummary.map(result => runResultToImgNameMap[result]).sort().join('-') + '.svg';
-        console.log(imgName);
         let className = 'good';
         if (failingTests.length)
           className = 'bad';
@@ -157,6 +160,19 @@ class FlakinessDashboard {
       commitsInfo.reverse();
       specIdToCommitsInfo.set(spec.specId, commitsInfo);
     }
+    return specIdToCommitsInfo;
+  }
+
+  _render() {
+    // Build this map accounting for a global test filter.
+    const specIdToCommitsInfo = this._specIdToCommitInfoRespectingGlobalFiltering();
+    // Get all specs that we will render.
+    // Do not render specs without failing commits.
+    const allSpecs = this._allSpecs.filter(spec => {
+      const commitsInfo = specIdToCommitsInfo.get(spec.specId);
+      const badCommits = commitsInfo.filter(info => info.flakyTests.length || info.failingTests.length);
+      return badCommits.length;
+    });
 
     const specIdToHealthSummary = new Map();
     const fileToSpecs = new Map();
@@ -172,6 +188,30 @@ class FlakinessDashboard {
         fileToSpecs.set(spec.file, specs);
       }
       specs.push(spec);
+    }
+
+    const specIdToUniqueStackInfos = new Map();
+    for (const spec of allSpecs) {
+      const uniqueStackInfos = new Map();
+      specIdToUniqueStackInfos.set(spec.specId, uniqueStackInfos);
+
+      for (const commitInfo of specIdToCommitsInfo.get(spec.specId)) {
+        for (const test of [...commitInfo.flakyTests, ...commitInfo.failingTests]) {
+          for (const run of test.runs.filter(run => !!run.error)) {
+            const stackId = normalizeStack(run.error.stack);
+            let stackInfos = uniqueStackInfos.get(stackId);
+            if (!stackInfos) {
+              stackInfos = [];
+              uniqueStackInfos.set(stackId, stackInfos);
+            }
+            stackInfos.push({
+              commitInfo,
+              test,
+              run,
+            });
+          }
+        }
+      }
     }
 
     const COLLAPSED_CHAR = '▶';
@@ -191,64 +231,50 @@ class FlakinessDashboard {
         <div class=specfile>${file}</div>
         ${specs.map(spec => html`
           <table-row>
-            <spec-column>
-              <div class=specname>${spec.line}: ${spec.title}</div>
+            <spec-column class=specname>
+              ${spec.line}: ${spec.title}
+              ${[...specIdToUniqueStackInfos.get(spec.specId)].map(([stackId, uniqueStackInfo], idx) => html`
+                <span class=stack-toggle selected=${stackId === this._specIdToOpenedStack.get(spec.specId)} onclick=${e => {
+                  if (this._specIdToOpenedStack.get(spec.specId) === stackId)
+                    this._specIdToOpenedStack.delete(spec.specId);
+                  else
+                    this._specIdToOpenedStack.set(spec.specId, stackId);
+                  this._render();
+                }}>Stack ${idx + 1}</span>
+              `)}
             </spec-column>
             <health-column>
-              <div class=healthstats onclick=${popover.onClickHandler(renderSpecInfo.bind(null, spec.specId))}>${specIdToHealthSummary.get(spec.specId)}</div>
+              <div class=healthstats>${specIdToHealthSummary.get(spec.specId)}</div>
             </health-column>
             <results-column>
             ${specIdToCommitsInfo.get(spec.specId).map(info => html`
                 <img style="width: 18px; height: 18px; padding: 1px; box-sizing: content-box;" src="${info.imgName}"/>
             `)}
           </table-row>
+          ${this._specIdToOpenedStack.has(spec.specId) && renderStack(spec.specId, this._specIdToOpenedStack.get(spec.specId))}
         `)}
       `)}
     `);
 
-    function renderSpecInfo(specId) {
-      const tests = [];
-      for (const info of specIdToCommitsInfo.get(specId))
-        tests.push(...info.flakyTests, ...info.failingTests);
+    function renderStack(specId, stackId) {
+      const infos = specIdToUniqueStackInfos.get(specId).get(stackId);
       return html`
-        <section class=testruns>
-          <h4>Unhappy Runs</h4>
-          ${renderTests(tests)}
-        </section>
+        <pre class=terminal>${highlightANSIText(infos[0].run.error.stack)}</pre>
       `;
     }
 
-    function renderCommitInfo(specId, commitInfo) {
-      return html`
-        <section class=testruns>
-          <div><a href="${commitURL('playwright', commitInfo.sha)}"><span class=sha>${commitInfo.sha.substring(0, 7)}</span></a>${commitInfo.message}</div>
-          <h4>Unhappy Runs</h4>
-          ${renderTests([...commitInfo.failingTests, ...commitInfo.flakyTests])}
-        </section>
-      `;
-    }
-
-    function renderTests(allTests) {
-      allTests.sort((t1, t2) => {
-        if (t1.name !== t2.name)
-          return t1.name < t2.name ? -1 : 1;
-        return 0;
-      });
-
-      return html`${allTests.map(test => renderOneTest(test))}`;
-    }
-
-    function renderOneTest(test) {
-      let info = null;
-      if (isFailingTest(test))
-        info = html`<test-info class=fail>fail</test-info>`;
-      else if (isFlakyTest(test))
-        info = html`<test-info class=flaky>flaky</test-info>`;
-      else
-        info = html`<test-info class=none>n/a</test-info>`;
-      return html`
-        <div><a href="${test.url}">${info}</a> ${test.name}</div>
-      `;
+    function normalizeStack(stack) {
+      // Sometimes stack traces are slightly different:
+      // 1. They might contain GUID's that did not match
+      // 2. They might contain numbers that did not match
+      // We want to "dedupe" these stacktraces.
+      return stack.split('\n')
+          // we care about stack only, so get all the lines that start with 'at '
+          .map(line => line.trim())
+          .filter(line => line.startsWith('at '))
+          .join('\n')
+          // replace all numbers with '<NUM>'
+          .replaceAll(/\b\d+\b/g, '<NUM>');
     }
   }
 }

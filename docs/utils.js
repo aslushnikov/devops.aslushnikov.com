@@ -46,27 +46,6 @@ export function preventTextSelectionOnDBLClick(element) {
   }, true);
 }
 
-export function humanReadableTimeInterval(diff) {
-  const intervals = [
-    [1000, 'second'],
-    [60, 'minute'],
-    [60, 'hour'],
-    [24, 'day'],
-    [7, 'week'],
-    [52, 'year'],
-  ];
-  let aggr = 1;
-  let time = 'Just Now';
-  for (let i = 0; i < intervals.length; ++i) {
-    if (diff < aggr * intervals[i][0])
-      break;
-    aggr = aggr * intervals[i][0];
-    time = intervals[i][1];
-  }
-  const fraction = Math.floor(diff / aggr);
-  return aggr === 1 ? 'Just Now' :  fraction + ' ' + time + (fraction > 1 ? 's' : '');
-}
-
 export function scrollIntoViewIfNeeded(element) {
   window.scrollIntoView(element, {
     block: 'center',
@@ -133,5 +112,4 @@ export class Throttler {
         });
   }
 }
-
 

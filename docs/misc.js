@@ -75,3 +75,39 @@ export function commitURL(repoName, sha) {
   return base + sha;
 }
 
+/**
+ *
+ * @param {string} text
+ */
+export function highlightANSIText(text) {
+  if (!text.includes('\u001b'))
+    return html`${text}`;
+  let color = null;
+  return html`${text.split('\u001b').map((segment, index) => {
+    if (index !== 0) {
+      const matches = /^[[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/.exec(segment);
+      if (matches && matches.length) {
+        const match = matches[0];
+        segment = segment.slice(match.length);
+        const COLORS = {
+          '[30m': 'black',
+          '[31m': 'red',
+          '[32m': 'green',
+          '[33m': 'yellow',
+          '[34m': 'blue',
+          '[35m': 'magenta',
+          '[36m': 'cyan',
+          '[37m': '#999',
+        };
+        if (match in COLORS)
+          color = COLORS[match];
+        else
+          color = null;
+      }
+    }
+    if (!color)
+      return html`${segment}`;
+    return html`<span style="color:${color}">${segment}</span>`;
+  })}`;
+}
+

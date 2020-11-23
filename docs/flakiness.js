@@ -3,8 +3,8 @@ import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSI
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 
 export async function fetchFlakiness() {
-  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
-  return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
+  return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
+  // return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
     return json;
   });
 }
@@ -27,7 +27,7 @@ class FlakinessDashboard {
     this._allParameters = new Map();
     this._commitsToBeHealthy = 20;
     this._expandedSpecIds = new Set();
-    this._specIdToOpenedStack = new Map();
+    this._specIdToOpenedStackId = new Map();
 
     for (const run of data.buildbotRuns) {
       const sha = run.metadata.commitSHA;
@@ -190,25 +190,39 @@ class FlakinessDashboard {
       specs.push(spec);
     }
 
-    const specIdToUniqueStackInfos = new Map();
+    // Compute stack signatures.
+    const specIdToStackIdToStackInfos = new Map();
+    const stackIdToSpecIdToSha = new Map();
     for (const spec of allSpecs) {
-      const uniqueStackInfos = new Map();
-      specIdToUniqueStackInfos.set(spec.specId, uniqueStackInfos);
+      const stackIdToStackInfos = new Map();
+      specIdToStackIdToStackInfos.set(spec.specId, stackIdToStackInfos);
 
       for (const commitInfo of specIdToCommitsInfo.get(spec.specId)) {
         for (const test of [...commitInfo.flakyTests, ...commitInfo.failingTests]) {
           for (const run of test.runs.filter(run => !!run.error)) {
-            const stackId = normalizeStack(run.error.stack);
-            let stackInfos = uniqueStackInfos.get(stackId);
+            const stackId = createStackSignature(run.error.stack);
+            let stackInfos = stackIdToStackInfos.get(stackId);
             if (!stackInfos) {
               stackInfos = [];
-              uniqueStackInfos.set(stackId, stackInfos);
+              stackIdToStackInfos.set(stackId, stackInfos);
             }
             stackInfos.push({
               commitInfo,
               test,
               run,
             });
+            let specIdToSha = stackIdToSpecIdToSha.get(stackId);
+            if (!specIdToSha) {
+              specIdToSha = new Map();
+              stackIdToSpecIdToSha.set(stackId, specIdToSha);
+            }
+
+            let shas = specIdToSha.get(spec.specId);
+            if (!shas) {
+              shas = new Set();
+              specIdToSha.set(spec.specId, shas);
+            }
+            shas.add(commitInfo.sha);
           }
         }
       }
@@ -233,14 +247,14 @@ class FlakinessDashboard {
           <table-row>
             <spec-column class=specname>
               ${spec.line}: ${spec.title}
-              ${[...specIdToUniqueStackInfos.get(spec.specId)].map(([stackId, uniqueStackInfo], idx) => html`
-                <span class=stack-toggle selected=${stackId === this._specIdToOpenedStack.get(spec.specId)} onclick=${e => {
-                  if (this._specIdToOpenedStack.get(spec.specId) === stackId)
-                    this._specIdToOpenedStack.delete(spec.specId);
+              ${[...specIdToStackIdToStackInfos.get(spec.specId)].map(([stackId, uniqueStackInfo], idx) => html`
+                <span class=stack-toggle selected=${stackId === this._specIdToOpenedStackId.get(spec.specId)} onclick=${e => {
+                  if (this._specIdToOpenedStackId.get(spec.specId) === stackId)
+                    this._specIdToOpenedStackId.delete(spec.specId);
                   else
-                    this._specIdToOpenedStack.set(spec.specId, stackId);
+                    this._specIdToOpenedStackId.set(spec.specId, stackId);
                   this._render();
-                }}>Stack ${idx + 1}</span>
+                }}>Stack ${specIdToStackIdToStackInfos.get(spec.specId).size > 1 ? idx + 1 : ''}</span>
               `)}
             </spec-column>
             <health-column>
@@ -248,22 +262,28 @@ class FlakinessDashboard {
             </health-column>
             <results-column>
             ${specIdToCommitsInfo.get(spec.specId).map(info => html`
-                <img style="width: 18px; height: 18px; padding: 1px; box-sizing: content-box;" src="${info.imgName}"/>
+                <!--
+                -->
+                <img
+                    onclick=${popover.onClickHandler(() => this._showCommitInfo(info.sha))}
+                    x-commit-info
+                    class="${stackIdToSpecIdToSha.get(this._specIdToOpenedStackId.get(spec.specId))?.get(spec.specId)?.has(info.sha) ? 'highlighted' : ''}"
+                    src="${info.imgName}"/>
             `)}
           </table-row>
-          ${this._specIdToOpenedStack.has(spec.specId) && renderStack(spec.specId, this._specIdToOpenedStack.get(spec.specId))}
+          ${this._specIdToOpenedStackId.has(spec.specId) && renderStack(spec.specId, this._specIdToOpenedStackId.get(spec.specId))}
         `)}
       `)}
     `);
 
     function renderStack(specId, stackId) {
-      const infos = specIdToUniqueStackInfos.get(specId).get(stackId);
+      const infos = specIdToStackIdToStackInfos.get(specId).get(stackId);
       return html`
         <pre class=terminal>${highlightANSIText(infos[0].run.error.stack)}</pre>
       `;
     }
 
-    function normalizeStack(stack) {
+    function createStackSignature(stack) {
       // Sometimes stack traces are slightly different:
       // 1. They might contain GUID's that did not match
       // 2. They might contain numbers that did not match
@@ -276,6 +296,14 @@ class FlakinessDashboard {
           // replace all numbers with '<NUM>'
           .replaceAll(/\b\d+\b/g, '<NUM>');
     }
+  }
+
+  _showCommitInfo(sha) {
+    return html`
+      <div>
+        <a class=sha href="${commitURL('playwright', sha)}" >${sha.substring(0, 7)}</a>${this._shaToDetails.get(sha).message}
+      </div>
+    `;
   }
 }
 

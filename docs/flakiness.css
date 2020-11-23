@@ -52,22 +52,21 @@
     flex: none;
   }
 
-  .flakiness commit-info {
-    flex-shrink: 0;
-    border: 1px solid white;
+  .flakiness [x-commit-info] {
+    width: 18px;
+    height: 18px;
+    margin: 1px;
     box-sizing: border-box;
-    width: 1em;
-    height: 1em;
-    padding: 2px;
-    box-sizing: content-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     user-select: none;
+    flex: none;
+    cursor: pointer;
   }
-      .flakiness commit-info:hover {
-        cursor: pointer;
-        filter: brightness(.8);
+      .flakiness [x-commit-info]:hover {
+        filter: brightness(0.8);
+      }
+      .flakiness [x-commit-info].highlighted {
+        border: 2px solid #757575;
+        border-radius: 2px;
       }
 
   .flakiness .terminal {

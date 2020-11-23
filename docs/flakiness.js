@@ -286,7 +286,7 @@ class FlakinessDashboard {
                   else
                     this._specIdToOpenedStackId.set(spec.specId, stackId);
                   this._render();
-                }}>Stack ${specIdToStackIdToStackInfos.get(spec.specId).size > 1 ? idx + 1 : ''}</span>
+                }}>Error ${specIdToStackIdToStackInfos.get(spec.specId).size > 1 ? idx + 1 : ''}</span>
               `)}
             </spec-column>
             <health-column>
@@ -323,7 +323,7 @@ class FlakinessDashboard {
       `;
       return html`
         <div class=terminal>
-          Stack Occurrence: ${select}
+          Error Occurrence: ${select}
           <hr>
           ${terminal}
         </div>

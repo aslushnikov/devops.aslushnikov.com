@@ -355,6 +355,35 @@ class FlakinessDashboard {
     const platforms = [...this._allParameters.get('platform')].sort();
     const browsers = [...this._allParameters.get('browserName')].sort();
 
+    const renderPlatformAndBrowserSummary = (browserName, platform) => {
+      const tests = browserToPlatformToTests.get(browserName, platform);
+      const count = new Map();
+      for (const test of tests) {
+        const x = count.get(test.name) || 0;
+        count.set(test.name, x + 1);
+      }
+      const rows = [...count].sort((a, b) => b[1] - a[1]);
+      return html`
+        <div style="display: flex;">
+          <div>
+            ${rows.map(([name, num]) => html`<div>${name}</div>`)}
+          </div>
+          <div style="margin-left: 1em;">
+            ${rows.map(([name, num]) => html`<div style="text-align: right">${num}</div>`)}
+          </div>
+        </div>
+      `;
+    };
+
+    function renderCell(browserName, platform) {
+      const count = browserToPlatformToTests.get(browserName, platform).length;
+      if (count === 0)
+        return html`<a-row>${MIDDLE_DOT}</a-row>`;
+      return html`
+        <a-row style="cursor: pointer" onclick=${popover.onClickHandler(renderPlatformAndBrowserSummary.bind(null, browserName, platform))}>${count}</a-row>
+      `;
+    }
+
     return html`
       <flakiness-summary>
         <a-column class=first-column>
@@ -365,7 +394,7 @@ class FlakinessDashboard {
         ${[...browsers].map(browserName => html`
           <a-column>
             <a-row class=first-row>${browserLogo(browserName, 18)}</a-row>
-            ${[...platforms].map(platform => html`<a-row>${browserToPlatformToTests.get(browserName, platform).length || MIDDLE_DOT}</a-row>`)}
+            ${[...platforms].map(platform => renderCell(browserName, platform))}
           </a-column>
         `)}
       </flakiness-summary>
@@ -375,7 +404,7 @@ class FlakinessDashboard {
   _showCommitInfo(sha) {
     return html`
       <div>
-        <a class=sha href="${commitURL('playwright', sha)}" >${sha.substring(0, 7)}</a>${this._shaToDetails.get(sha).message}
+        <a style="margin-right: 4px" class=sha href="${commitURL('playwright', sha)}" >${sha.substring(0, 7)}</a>${this._shaToDetails.get(sha).message}
       </div>
     `;
   }

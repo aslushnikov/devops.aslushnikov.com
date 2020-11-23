@@ -3,6 +3,8 @@ import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSI
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 import {Table} from './utils.js';
 
+const MIDDLE_DOT = '·';
+
 export async function fetchFlakiness() {
   return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
   // return fetch('/flakiness_data.json').then(r => r.json()).then(json => {
@@ -363,7 +365,7 @@ class FlakinessDashboard {
         ${[...browsers].map(browserName => html`
           <a-column>
             <a-row class=first-row>${browserLogo(browserName, 18)}</a-row>
-            ${[...platforms].map(platform => html`<a-row>${browserToPlatformToTests.get(browserName, platform).length}</a-row>`)}
+            ${[...platforms].map(platform => html`<a-row>${browserToPlatformToTests.get(browserName, platform).length || MIDDLE_DOT}</a-row>`)}
           </a-column>
         `)}
       </flakiness-summary>

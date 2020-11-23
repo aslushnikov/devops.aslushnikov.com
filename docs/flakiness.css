@@ -72,10 +72,10 @@
   .flakiness .terminal {
     padding: 1em;
     background-color: black;
+    color: lightgrey;
   }
 
   .flakiness .terminal-content {
-    color: lightgrey;
     overflow: auto;
     font-family: var(--monospace);
     white-space: pre;

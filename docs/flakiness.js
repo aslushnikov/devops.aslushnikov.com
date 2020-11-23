@@ -290,10 +290,11 @@ class FlakinessDashboard {
         </select>
       `;
       return html`
-        <p class=terminal>
-          ${select}
+        <div class=terminal>
+          Stack Occurrence: ${select}
+          <hr>
           ${terminal}
-        </p>
+        </div>
       `;
     }
 

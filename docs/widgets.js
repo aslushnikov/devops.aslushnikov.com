@@ -256,8 +256,7 @@ export class FilterConjunctionGroup extends HTMLElement {
       onchange: createEvent(),
     };
 
-    this._createFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onAddFilter()}>Create filter</a>`;
-    this._removeFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onResetFilter()}>Remove filter</a>`;
+    this._removeFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onResetFilter()}>Reset filter</a>`;
     this._addFilterButtons = html`
       <span class=add-filter-buttons>
         <op-chip onclick=${() => this._onAddFilter('and')} class=and-chip>and</op-chip>
@@ -268,25 +267,23 @@ export class FilterConjunctionGroup extends HTMLElement {
 
     this._filters = new Set();
 
-    this.append(this._createFilterButton);
+    this.append(this._removeFilterButton);
+    this._onAddFilter();
   }
 
   _onResetFilter() {
     for (const f of this._filters)
       f.remove();
     this._filters.clear();
+    this._onAddFilter();
     this._fireStateChanged();
   }
 
   _onAddFilter(operation = '') {
-    if (!this._removeFilterButton.isConnected)
-      this._createFilterButton.replaceWith(this._removeFilterButton);
-
     const filter = new FilterSelector(this._parameters);
     if (operation)
       filter.setOpChip(operation);
     this._filters.add(filter);
-    this._createFilterButton.remove();
 
     this.append(filter);
     filter.events.onchange(() => this._fireStateChanged());
@@ -308,12 +305,6 @@ export class FilterConjunctionGroup extends HTMLElement {
 
   _updateDecorations() {
     const filters = [...this._filters];
-
-    // Ensure the "create filter" or "remove filter" button.
-    if (filters.length && this._createFilterButton.isConnected)
-      this._createFilterButton.replaceWith(this._removeFilterButton);
-    else if (!filters.length && this._removeFilterButton.isConnected)
-      this._removeFilterButton.replaceWith(this._createFilterButton);
 
     // Hide boolean operation for the very first filter.
     if (filters.length) {

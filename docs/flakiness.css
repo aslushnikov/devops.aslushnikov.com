@@ -74,14 +74,18 @@
     background-color: black;
     color: lightgrey;
   }
+      .flakiness .terminal select {
+        background-color: inherit;
+        color: inherit;
+      }
 
-  .flakiness .terminal-content {
-    overflow: auto;
-    font-family: var(--monospace);
-    white-space: pre;
-    margin-top: 1em;
-    max-width: 1000px;
-  }
+      .flakiness .terminal .terminal-content {
+        overflow: auto;
+        font-family: var(--monospace);
+        white-space: pre;
+        margin-top: 1em;
+        max-width: 1000px;
+      }
 
   .flakiness .stack-toggle {
     user-select: none;
@@ -98,6 +102,7 @@
       }
 
 flakiness-summary {
+  margin: 1em;
   display: inline-block;
 }
     flakiness-summary a-row {

@@ -1,6 +1,7 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
+import {Table} from './utils.js';
 
 export async function fetchFlakiness() {
   return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main.json').then(r => r.json()).then(json => {
@@ -25,6 +26,7 @@ class FlakinessDashboard {
     this._specIdToShaToSpecInfo = new Map();
     this._shaToDetails = new Map();
     this._allParameters = new Map();
+
     this._commitsToBeHealthy = 20;
     this._expandedSpecIds = new Set();
     this._specIdToOpenedStackId = new Map();
@@ -95,7 +97,6 @@ class FlakinessDashboard {
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
     });
-
 
     // Cleanup parameters: if parameter has only one value, then we can ignore it.
     for (const [key, value] of this._allParameters) {
@@ -174,6 +175,15 @@ class FlakinessDashboard {
       return badCommits.length;
     });
 
+    const allTests = [];
+    for (const spec of allSpecs) {
+      const commitsInfo = specIdToCommitsInfo.get(spec.specId);
+      for (const commitInfo of commitsInfo) {
+        allTests.push(...commitInfo.flakyTests);
+        allTests.push(...commitInfo.failingTests);
+      }
+    }
+
     const specIdToHealthSummary = new Map();
     const fileToSpecs = new Map();
     for (const spec of allSpecs) {
@@ -234,7 +244,8 @@ class FlakinessDashboard {
 
     this.element.textContent = '';
     this.element.append(html`
-      <filter-column>${this._filterGroup}</filter-column>
+      <div>${this._filterGroup}</div>
+      ${this._renderSummary(allTests)}
       <table-row>
         <spec-column></spec-column>
         <health-column>Health</health-column>
@@ -311,6 +322,34 @@ class FlakinessDashboard {
           // replace all numbers with '<NUM>'
           .replaceAll(/\b\d+\b/g, '<NUM>');
     }
+  }
+
+  _renderSummary(tests) {
+    const browserToPlatformToTests = new Table(3);
+    for (const test of tests) {
+      const browserName = test.parameters.browserName;
+      const platform = test.parameters.platform;
+      browserToPlatformToTests.set(browserName, platform, test);
+    }
+
+    const platforms = [...this._allParameters.get('platform')].sort();
+    const browsers = [...this._allParameters.get('browserName')].sort();
+
+    return html`
+      <flakiness-summary>
+        <a-column class=first-column>
+          <a-row class=first-row>&nbsp;</a-row>
+          ${[...platforms].map(platform => html`<a-row>${platform}</a-row>`)}
+        </a-column>
+
+        ${[...browsers].map(browserName => html`
+          <a-column>
+            <a-row class=first-row>${browserLogo(browserName, 18)}</a-row>
+            ${[...platforms].map(platform => html`<a-row>${browserToPlatformToTests.get(browserName, platform).length}</a-row>`)}
+          </a-column>
+        `)}
+      </flakiness-summary>
+    `;
   }
 
   _showCommitInfo(sha) {

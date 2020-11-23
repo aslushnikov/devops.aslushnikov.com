@@ -113,3 +113,56 @@ export class Throttler {
   }
 }
 
+export class Table {
+  constructor(nesting) {
+    if (nesting < 2)
+      throw new Error(`ERROR: nesting must be >= 2, ${nesting} received`);
+    this._nesting = nesting;
+    this._data = new Map();
+  }
+
+  get(...args) {
+    if (args.length !== this._nesting - 1)
+      throw new Error(`not enough arguments! expected ${this._nesting}`);
+    let data = this._data;
+    for (const arg of args) {
+      data = data.get(arg);
+      if (!data)
+        return [];
+    }
+    return [...data];
+  }
+
+  delete(...args) {
+    const key = args.pop();
+    let data = this._data;
+    for (const arg of args) {
+      data = data.get(arg);
+      if (!data)
+        return;
+    }
+    data.delete(key);
+  }
+
+  set(...args) {
+    if (args.length !== this._nesting)
+      throw new Error(`not enough arguments! expected ${this._nesting}`);
+    let data = this._data;
+    const value = args.pop();
+    const key = args.pop();
+    for (const arg of args) {
+      let map = data.get(arg);
+      if (!map) {
+        map = new Map();
+        data.set(arg, map);
+      }
+      data = map;
+    }
+    let set = data.get(key);
+    if (!set) {
+      set = new Set();
+      data.set(key, set);
+    }
+    set.add(value);
+  }
+}

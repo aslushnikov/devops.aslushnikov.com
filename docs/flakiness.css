@@ -30,7 +30,7 @@
   .flakiness spec-column {
     display: flex;
     align-items: center;
-    width: 400px;
+    width: 500px;
     flex: none;
   }
 
@@ -97,26 +97,24 @@
         background: #e0e0e0;
       }
 
-.testruns {
-  min-width: 250px;
-}
-
-test-info {
-  padding: 0 2px;
-  color: #fff;
-  font-family: var(--monospace);
-  font-size: 9px;
-  border-radius: 2px;
-  margin: 0 2px;
-  width: 5ch;
+flakiness-summary {
   display: inline-block;
-  box-sizing: content-box;
-  text-align: center;
 }
-    test-info.flaky {
-      background-color: #ff9800;
+    flakiness-summary a-row {
+      display: block;
+      padding: 0 1em;
     }
+        flakiness-summary a-row.first-row {
+          padding-bottom: 4px;
+          margin-bottom: 4px;
+          border-bottom: 1px solid var(--border-color);
+        }
 
-    test-info.fail {
-      background-color: #f44336;
+    flakiness-summary a-column {
+      display: inline-block;
+      text-align: center;
     }
+        flakiness-summary a-column.first-column {
+          text-align: left;
+          border-right: 1px solid var(--border-color);
+        }

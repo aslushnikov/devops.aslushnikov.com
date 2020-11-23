@@ -103,6 +103,23 @@ class FlakinessDashboard {
       if (value.size === 1)
         this._allParameters.delete(key);
     }
+
+    this._commitsToBeHealthySelect = html`
+      <div>
+        Show Last <select oninput=${e => {
+          this._commitsToBeHealthy = parseInt(e.target.value, 10);
+          this._render();
+        }}>
+          ${[...Array(8)].map((_, index) => html`
+            <option>${index + 2}</option>
+          `)}
+          <option>10</option>
+          <option>15</option>
+          <option selected>20</option>
+          <option>30</option>
+        </select> Commits
+      </div>
+    `;
     this._filterGroup = new FilterConjunctionGroup(this._allParameters);
     this._filterGroup.events.onchange(() => this._render());
 
@@ -244,6 +261,7 @@ class FlakinessDashboard {
 
     this.element.textContent = '';
     this.element.append(html`
+      <div>${this._commitsToBeHealthySelect}</div>
       <div>${this._filterGroup}</div>
       ${this._renderSummary(allTests)}
       <table-row>

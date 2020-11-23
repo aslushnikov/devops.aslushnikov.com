@@ -102,7 +102,7 @@
       }
 
 flakiness-summary {
-  margin: 1em;
+  margin: 1em 0;
   display: inline-block;
 }
     flakiness-summary a-row {

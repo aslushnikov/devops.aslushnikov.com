@@ -119,6 +119,7 @@ class FlakinessDashboard {
           <option>15</option>
           <option selected>20</option>
           <option>30</option>
+          <option>50</option>
         </select> Commits
       </div>
     `;

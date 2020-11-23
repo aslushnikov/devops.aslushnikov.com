@@ -278,8 +278,22 @@ class FlakinessDashboard {
 
     function renderStack(specId, stackId) {
       const infos = specIdToStackIdToStackInfos.get(specId).get(stackId);
+      const terminal = html`<div class=terminal-content>${highlightANSIText(infos[0].run.error.stack)}</div>`;
+      const select = html`
+        <select oninput=${e => {
+          terminal.textContent = '';
+          terminal.append(highlightANSIText(e.target.selectedOptions[0].info.run.error.stack));
+        }}>
+          ${infos.map(info => html`
+            <option onzrender=${e => e.info = info}>[ ${info.test.name} ] ${info.commitInfo.message}</option>
+          `)}
+        </select>
+      `;
       return html`
-        <pre class=terminal>${highlightANSIText(infos[0].run.error.stack)}</pre>
+        <p class=terminal>
+          ${select}
+          ${terminal}
+        </p>
       `;
     }
 

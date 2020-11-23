@@ -70,12 +70,16 @@
       }
 
   .flakiness .terminal {
+    padding: 1em;
     background-color: black;
+  }
+
+  .flakiness .terminal-content {
     color: lightgrey;
     overflow: auto;
     font-family: var(--monospace);
     white-space: pre;
-    padding: 1em;
+    margin-top: 1em;
     max-width: 1000px;
   }
 

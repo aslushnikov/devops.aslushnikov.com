@@ -229,14 +229,30 @@ export class FilterSelector extends HTMLElement {
     }
   }
 
+  setEqChip(value) {
+    if (value !== 'equal' && value !== 'nonequal')
+      throw new Error('ERROR: unknown equal chip name - ' + value);
+    if (this._equals[0].dataset['value'] !== value) {
+      this._equals[0].replaceWith(this._equals[1]);
+      this._equals.reverse();
+    }
+  }
+
   isUndecided() {
     return this._valueElement.selectedIndex === 0;
+  }
+
+  setState(state) {
+    this._valueElement.value = state.elementValue;
+    this.setOpChip(state.op);
+    this.setEqChip(state.eq);
   }
 
   state() {
     if (!this._state && !this.isUndecided()) {
       const json = JSON.parse(this._valueElement.value);
       this._state = {
+        elementValue: this._valueElement.value,
         ...json,
         eq: this._equals[0].dataset['value'],
         op: this._chips[0].dataset['value'],
@@ -259,8 +275,8 @@ export class FilterConjunctionGroup extends HTMLElement {
     this._removeFilterButton = html`<a style="cursor: pointer; margin-right: 5px;" onclick=${() => this._onResetFilter()}>Reset filter</a>`;
     this._addFilterButtons = html`
       <span class=add-filter-buttons>
-        <op-chip onclick=${() => this._onAddFilter('and')} class=and-chip>and</op-chip>
-        <op-chip onclick=${() => this._onAddFilter('or')} class=or-chip>or</op-chip>
+        <op-chip onclick=${() => void this._onAddFilter('and')} class=and-chip>and</op-chip>
+        <op-chip onclick=${() => void this._onAddFilter('or')} class=or-chip>or</op-chip>
       </span>
     `;
     this._parameters = parameters;
@@ -289,6 +305,7 @@ export class FilterConjunctionGroup extends HTMLElement {
     filter.events.onchange(() => this._fireStateChanged());
     filter.events.onremove(() => this._onFilterRemoved(filter));
     this._fireStateChanged();
+    return filter;
   }
 
   _onFilterRemoved(filter) {
@@ -339,6 +356,22 @@ export class FilterConjunctionGroup extends HTMLElement {
       this.append(this._addFilterButtons);
   }
 
+  setState(andOrGroup) {
+    for (const f of this._filters)
+      f.remove();
+    this._filters.clear();
+    for (let i = 0; i < andOrGroup.length; ++i) {
+      const andGroup = andOrGroup[i];
+      for (let j = 0; j < andGroup.length; ++j) {
+        const s = andGroup[j];
+        const filter = this._onAddFilter();
+        filter.setState(s);
+        if (i !== 0 && j === 0)
+          filter.setOpChip('or');
+      }
+    }
+    this._fireStateChanged();
+  }
 
   state() {
     if (!this._state) {

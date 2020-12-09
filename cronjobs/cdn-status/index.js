@@ -25,6 +25,7 @@ const BLOB_NAMES = {
     'webkit-ubuntu-20.04',
     'webkit-mac-10.14',
     'webkit-mac-10.15',
+    'webkit-mac-11.0-arm64',
     'webkit-win64',
     'minibrowser-gtk-wpe',
     'minibrowser-mac-10.14',

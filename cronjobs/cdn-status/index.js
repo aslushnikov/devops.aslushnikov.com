@@ -10,6 +10,7 @@ const BLOB_NAMES = {
     'chromium-mac',
     'chromium-win32',
     'chromium-win64',
+    'chromium-mac-arm64',
   ],
   ffmpeg: [
     'ffmpeg-linux',

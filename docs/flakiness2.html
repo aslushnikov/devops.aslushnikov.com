@@ -1,0 +1,27 @@
+<meta charset='utf-8'>
+<title>DevOps - Playwright</title>
+<link rel="icon" href="/favicon.svg">
+<link rel=stylesheet href=./all.css>
+
+<style>
+  #content {
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+  }
+</style>
+
+<script type=module>
+  import {html} from './zhtml.js';
+  import {fetchFlakiness, renderFlakiness} from './flakiness2.js';
+  import {cronjobBadgesHeader} from './cronjobs.js';
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    document.body.append(html`
+      ${cronjobBadgesHeader()}
+      <section id=content>
+        ${renderFlakiness(await fetchFlakiness())}
+      </section>
+    `);
+  }, false);
+</script>

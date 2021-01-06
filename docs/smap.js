@@ -5,8 +5,14 @@ export class SMap {
     this[Symbol.iterator] = () => this._entries[Symbol.iterator]();
   }
 
-  map(callback) {
-    return this._entries.map(callback);
+  map(callback) { return this._entries.map(callback); }
+  filter(callback) { return this._entries.filter(callback); }
+  slice(from, to) { return this._entries.slice(from, to); }
+  get size() { return this._entries.length; }
+
+  has(selector) {
+    const entries = this.getAll(selector);
+    return entries.length > 0;
   }
 
   get(selector) {
@@ -28,7 +34,7 @@ export class SMap {
 
 class Index {
   constructor(entries, keys) {
-    this._keys = keys.slice();
+    this._keys = keys;//keys.slice();
     this._lastKey = this._keys.pop();
     this._data = new Map();
     for (const entry of entries) {

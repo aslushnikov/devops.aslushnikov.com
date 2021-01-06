@@ -5,6 +5,12 @@ import {SMap} from './smap.js';
 
 const MIDDLE_DOT = '·';
 
+const COLOR_YELLOW = '#ffcc80';
+const COLOR_GREEN = '#a5d6a7';
+const COLOR_RED = '#ef9a9a';
+const COLOR_VIOLET = '#ce93d8';
+const COLOR_GREY = '#eeeeee';
+
 export async function fetchFlakiness() {
   // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(json => {
   return fetch('/main_v2_filtered.json').then(r => r.json()).then(data => {
@@ -48,9 +54,9 @@ class FlakinessDashboard {
         line,
         column,
         sha,
-        timestamp: this._commits.get({sha}).timestamp,
+        commit: this._commits.get({sha}),
       }));
-      const lastCoordinate = commitCoordinates.reduce((last, coord) => last.timestamp < coord.timestamp ? coord : last);
+      const lastCoordinate = commitCoordinates.reduce((last, coord) => last.commit.timestamp < coord.commit.timestamp ? coord : last);
       return {
         specId,
         file,
@@ -72,9 +78,14 @@ class FlakinessDashboard {
           commit: this._commits.get({sha}),
           specId,
           spec: this._specs.get({specId}),
+          name: getTestName(test),
           browserName: test.parameters.browserName,
           platform: test.parameters.platform,
-          test,
+          parameters: test.parameters,
+          annotations: test.annotations,
+          runs: test.runs,
+          expectedStatus: test.expectedStatus,
+          category: getTestCategory(test),
         });
       }
     }
@@ -87,7 +98,7 @@ class FlakinessDashboard {
 
     this.element = html`<section class=flakiness></section>`;
 
-    this._lastCommits = 10;
+    this._lastCommits = 20;
     this._lastCommitsSelect = html`
       <div>
         Show Last <select oninput=${e => {
@@ -121,28 +132,93 @@ class FlakinessDashboard {
     const tests = new SMap(this._tests.filter(test => commits.has({sha: test.sha})));
     const specs = new SMap(this._specs.filter(spec => tests.has({specId: spec.specId})));
 
-    const filenames = [...new Set(specs.map(spec => spec.file))];
-
+    const filenames = specs.uniqueValues('file');
     console.timeEnd('filtering');
+
+    console.time('rendering');
     this.element.textContent = '';
     this.element.append(html`
       ${this._lastCommitsSelect}
       ${filenames.map(filename => html`
         <div>${filename}</div>
         ${specs.getAll({file: filename}).map(spec => html`
-          <div style="margin-left:1em;">${spec.title}:${spec.lastCoordinate.line}</div>
-          <hbox>
+          <hbox style="margin-left:1em;">
+            ${renderSpecTitle(spec)}
+            ${renderSpecAnnotations(spec)}
+            ${commits.map(commit => renderSpecCommit(spec, commit))}
           </hbox>
         `)}
       `)}
     `);
+    console.timeEnd('rendering');
 
-    function renderSpecCommit(specId, sha) {
-      for (const test of tests.getAll({specId, sha})) {
-        
-      }
+    function renderSpecTitle(spec) {
+      return html`
+        <div style="
+          width: 400px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        ">${spec.lastCoordinate.line}:${spec.title}</div>
+      `;
+    }
+
+    function renderSpecAnnotations(spec) {
+      const annotations = tests.getAll({specId: spec.specId}).map(test => test.annotations).flat();
+      const types = new SMap(annotations).uniqueValues('type').sort();
+      return html`
+        <div style="
+          width: 120px;
+        ">
+          ${types.map(renderAnnotation)}
+        </div>
+      `;
+    }
+
+    function renderAnnotation(annotationType) {
+      const bgcolors = {
+        'slow': 'grey',
+        'flaky': COLOR_VIOLET,
+        'fail': COLOR_RED,
+        'fixme': 'black',
+        'skip': COLOR_YELLOW,
+      };
+      const colors = {
+        'skip': 'black',
+        'fail': 'black',
+      };
+      return html`
+        <span style="
+            background-color: ${bgcolors[annotationType] || 'blue'};
+            color: ${colors[annotationType] || 'white'};
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            font-size: 8px;
+            margin: 0 2px;
+            width: 5ch;
+            box-sizing: content-box;
+            text-align: center;
+            flex: none;
+          ">${annotationType}</span>
+      `;
+    }
+
+    function renderSpecCommit(spec, commit) {
+      const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
+      let color = COLOR_GREY;
+      if (categories.has('bad'))
+        color = COLOR_RED;
+      else if (categories.has('flaky'))
+        color = COLOR_VIOLET;
+      else if (categories.size || spec.commitCoordinates.has({sha: commit.sha}))
+        color = COLOR_GREEN;
+
       return svg`
-        <svg width="12px" height="12px"
+        <svg style="margin: 1px; " width="14px" height="14px" viewbox="0 0 14 14">
+          <rect x=0 y=0 width=14 height=14 fill="${color}"/>
+        </svg>
       `;
     }
   }
@@ -166,7 +242,20 @@ function getTestsSummary(tests) {
 function isFlakyTest(test) {
   if (test.runs.length === 1)
     return false;
+  if (!test.annotations.some(annotation => annotation.type === 'flaky'))
+    return false;
   return test.runs.some(run => run.status === test.expectedStatus);
+}
+
+function getTestCategory(test) {
+  const hasGoodRun = test.runs.some(run => run.status === test.expectedStatus);
+  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus);
+  const hasFlakyAnnotation = test.annotations.some(annotation => annotation.type === 'flaky');
+  if (hasFlakyAnnotation && hasGoodRun && hasBadRun)
+    return 'flaky';
+  if (hasBadRun)
+    return 'bad';
+  return 'good';
 }
 
 function getTestName(test) {
@@ -179,6 +268,3 @@ function getTestName(test) {
   }).join(' / ');
 }
 
-function isFailingTest(test) {
-  return !test.runs.some(run => run.status === 'skipped' || run.status === test.expectedStatus);
-}

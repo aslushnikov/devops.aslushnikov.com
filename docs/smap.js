@@ -15,20 +15,29 @@ export class SMap {
     return entries.length > 0;
   }
 
+  uniqueValues(key) {
+    const index = this._ensureIndex([key]);
+    return [...index._data.keys()];
+  }
+
   get(selector) {
     const entries = this.getAll(selector);
     return entries.length ? entries[0] : null;
   }
 
-  getAll(selector) {
-    const keys = Object.keys(selector).sort();
+  _ensureIndex(keys) {
+    keys.sort();
     const indexId = JSON.stringify(keys);
     let index = this._indexes.get(indexId);
     if (!index) {
       index = new Index(this._entries, keys);
       this._indexes.set(indexId, index);
     }
-    return index.getAll(selector);
+    return index;
+  }
+
+  getAll(selector) {
+    return this._ensureIndex(Object.keys(selector)).getAll(selector);
   }
 }
 

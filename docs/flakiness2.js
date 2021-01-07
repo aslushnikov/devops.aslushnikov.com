@@ -1,7 +1,9 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
+import {cronjobBadgesHeader} from './cronjobs.js';
 import {SMap} from './smap.js';
+import {split} from './split.js';
 
 const MIDDLE_DOT = '·';
 
@@ -12,14 +14,14 @@ const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 
 export async function fetchFlakiness() {
-  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(json => {
+  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(data => {
   return fetch('/main_v2_filtered.json').then(r => r.json()).then(data => {
     //TODO: default data should filter out tests that are SKIP-only.
     // Since we don't do it up there, we filter it on our side.
     for (const spec of data.specs) {
       // Filter out tests that were skipped.
       spec.problematicTests = spec.problematicTests.filter(({sha, test}) => test.annotations.length !== 1 || test.annotations[0].type !== 'skip');
-      // Filter out tests that have a single run with status - these didn't run because they were sharded away.
+      // Filter out tests that have a single run without status: they didn't run because they were sharded away.
       spec.problematicTests = spec.problematicTests.filter(({sha, test}) => test.runs.length !== 1 || !!test.runs[0].status);
     }
     data.specs = data.specs.filter(spec => spec.problematicTests.length);
@@ -27,10 +29,13 @@ export async function fetchFlakiness() {
   });
 }
 
+const cronjobsHeader = cronjobBadgesHeader();
+
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-export function renderFlakiness(data) {
+export async function renderFlakiness() {
+  const data = await fetchFlakiness();
   const dashboard = new FlakinessDashboard(data);
   return dashboard.element;
 }
@@ -96,7 +101,28 @@ class FlakinessDashboard {
     console.log(`specs: ${this._specs.size}`);
     console.log(`tests: ${this._tests.size}`);
 
-    this.element = html`<section class=flakiness></section>`;
+    const fullWidth = "position:absolute; left: 0; top: 0; right: 0; bottom: 0;";
+    this._mainElement = html`<section style="overflow: auto;${fullWidth}"></section>`;
+    this._sideElement = html`<section style="padding: 1em; overflow: auto;${fullWidth}"></section>`;
+
+    this._splitView = split.bottom({
+      main: this._mainElement,
+      sidebar: html`
+        ${this._sideElement}
+        <button style="position: absolute;
+                      right: -5px;
+                      top: -5px;
+                      appearance: none;
+                      background: white;
+                      border: 5px solid #eee;
+                      cursor: pointer;"
+                onclick=${e => split.hideSidebar(this._splitView)}>✖ close</button>
+      `,
+      size: 300,
+      hidden: true,
+    });
+
+    this.element = this._splitView;
 
     this._lastCommits = 20;
     this._lastCommitsSelect = html`
@@ -124,8 +150,9 @@ class FlakinessDashboard {
     this._render();
   }
 
-
   _render() {
+    const self = this;
+
     console.time('filtering');
 
     const commits = new SMap(this._commits.slice(0, this._lastCommits));
@@ -136,19 +163,22 @@ class FlakinessDashboard {
     console.timeEnd('filtering');
 
     console.time('rendering');
-    this.element.textContent = '';
-    this.element.append(html`
-      ${this._lastCommitsSelect}
-      ${filenames.map(filename => html`
-        <div>${filename}</div>
-        ${specs.getAll({file: filename}).map(spec => html`
-          <hbox style="margin-left:1em;">
-            ${renderSpecTitle(spec)}
-            ${renderSpecAnnotations(spec)}
-            ${commits.map(commit => renderSpecCommit(spec, commit))}
-          </hbox>
+    this._mainElement.textContent = '';
+    this._mainElement.append(html`
+      ${cronjobsHeader}
+      <div style="padding: 1em;">
+        ${this._lastCommitsSelect}
+        ${filenames.map(filename => html`
+          <div>${filename}</div>
+          ${specs.getAll({file: filename}).map(spec => html`
+            <hbox style="margin-left:1em;">
+              ${renderSpecTitle(spec)}
+              ${renderSpecAnnotations(spec)}
+              ${commits.map(commit => renderSpecCommit(spec, commit))}
+            </hbox>
+          `)}
         `)}
-      `)}
+      </div>
     `);
     console.timeEnd('rendering');
 
@@ -164,7 +194,7 @@ class FlakinessDashboard {
     }
 
     function renderSpecAnnotations(spec) {
-      const annotations = tests.getAll({specId: spec.specId}).map(test => test.annotations).flat();
+      const annotations = tests.getAll({specId: spec.specId, sha: spec.lastCoordinate.commit.sha}).map(test => test.annotations).flat();
       const types = new SMap(annotations).uniqueValues('type').sort();
       return html`
         <div style="
@@ -216,10 +246,59 @@ class FlakinessDashboard {
         color = COLOR_GREEN;
 
       return svg`
-        <svg style="margin: 1px; " width="14px" height="14px" viewbox="0 0 14 14">
+        <svg style="flex: none; margin: 1px; " width="14px" height="14px"
+             onclick=${event => renderSidebarSpecCommit.call(self, spec, commit)}
+             viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
         </svg>
       `;
+    }
+
+    function renderSidebarSpecCommit(spec, commit) {
+      this._sideElement.textContent = '';
+      const runColors = {
+        'passed': COLOR_GREEN,
+        'failed': COLOR_RED,
+        'timedOut': COLOR_YELLOW,
+        'skipped': COLOR_GREY,
+      };
+      this._sideElement.append(html`
+        <div style="margin-bottom: 1em;">
+          <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
+        </div>
+        <hbox>
+          <div style="margin-left: 1em; width: 320px; text-align: center;">test parameters</div>
+          <div style="width: 100px; text-align: center;">runs</div>
+          <div style="width: 100px; text-align: center;">expected</div>
+        </hbox>
+        ${tests.getAll({sha: commit.sha, specId: spec.specId}).map(test => html`
+          <hbox>
+            <div style="
+              width: 200px;
+              margin-left: 1em;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            ">${test.name}</div>
+            <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
+            <div style="width: 100px; text-align: center;">
+              ${test.runs.map(run => svg`
+                <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
+                  <circle cx=5 cy=5 r=5 fill="${runColors[run.status] || 'blue'}">
+                </svg>
+              `)}
+            </div>
+            <div style="width: 100px; text-align: center;">
+              ${svg`
+                <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
+                  <circle cx=5 cy=5 r=5 fill="${runColors[test.expectedStatus] || 'blue'}">
+                </svg>
+              `}
+            </div>
+          </hbox>
+        `)}
+      `);
+      split.showSidebar(this._splitView);
     }
   }
 }
@@ -249,7 +328,7 @@ function isFlakyTest(test) {
 
 function getTestCategory(test) {
   const hasGoodRun = test.runs.some(run => run.status === test.expectedStatus);
-  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus);
+  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus && run.status !== 'skipped');
   const hasFlakyAnnotation = test.annotations.some(annotation => annotation.type === 'flaky');
   if (hasFlakyAnnotation && hasGoodRun && hasBadRun)
     return 'flaky';

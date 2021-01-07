@@ -12,6 +12,7 @@ const COLOR_GREEN = '#a5d6a7';
 const COLOR_RED = '#ef9a9a';
 const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
+const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
 
 export async function fetchFlakiness() {
   // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(data => {
@@ -43,6 +44,9 @@ export async function renderFlakiness() {
 class FlakinessDashboard {
   constructor(data) {
     console.time('Parsing data');
+
+    this._fileContents = new Map();
+
     // All commits are sorted from newest to oldest.
     this._commits = new SMap(data.commits.map(({author, email, message, sha, timestamp}) => ({
       author,
@@ -101,14 +105,24 @@ class FlakinessDashboard {
     console.log(`specs: ${this._specs.size}`);
     console.log(`tests: ${this._tests.size}`);
 
-    const fullWidth = "position:absolute; left: 0; top: 0; right: 0; bottom: 0;";
-    this._mainElement = html`<section style="overflow: auto;${fullWidth}"></section>`;
-    this._sideElement = html`<section style="padding: 1em; overflow: auto;${fullWidth}"></section>`;
+    this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
+    this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
+    this._codeElement = html`<section style="
+          white-space: pre;
+          overflow: auto;
+          font-family: var(--monospace);
+          ${STYLE_FILL}
+          "></section>`;
 
     this._splitView = split.bottom({
       main: this._mainElement,
       sidebar: html`
-        ${this._sideElement}
+        ${split.right({
+          main: this._sideElement,
+          sidebar: this._codeElement,
+          hidden: false,
+          size: 555,
+        })}
         <button style="position: absolute;
                       right: -5px;
                       top: -5px;
@@ -255,6 +269,7 @@ class FlakinessDashboard {
     }
 
     function renderSidebarSpecCommit(spec, commit) {
+      this._renderCode(commit, spec);
       this._sideElement.textContent = '';
       const runColors = {
         'passed': COLOR_GREEN,
@@ -263,43 +278,75 @@ class FlakinessDashboard {
         'skipped': COLOR_GREY,
       };
       this._sideElement.append(html`
-        <div style="margin-bottom: 1em;">
-          <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
-        </div>
-        <hbox>
-          <div style="margin-left: 1em; width: 320px; text-align: center;">test parameters</div>
-          <div style="width: 100px; text-align: center;">runs</div>
-          <div style="width: 100px; text-align: center;">expected</div>
-        </hbox>
-        ${tests.getAll({sha: commit.sha, specId: spec.specId}).map(test => html`
+        <vbox>
+          <div style="margin-bottom: 1em;">
+            <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
+          </div>
           <hbox>
-            <div style="
-              width: 200px;
-              margin-left: 1em;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            ">${test.name}</div>
-            <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
-            <div style="width: 100px; text-align: center;">
-              ${test.runs.map(run => svg`
-                <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
-                  <circle cx=5 cy=5 r=5 fill="${runColors[run.status] || 'blue'}">
-                </svg>
-              `)}
-            </div>
-            <div style="width: 100px; text-align: center;">
-              ${svg`
-                <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
-                  <circle cx=5 cy=5 r=5 fill="${runColors[test.expectedStatus] || 'blue'}">
-                </svg>
-              `}
-            </div>
+            <div style="margin-left: 1em; width: 320px; text-align: center;">test parameters</div>
+            <div style="width: 100px; text-align: center;">runs</div>
+            <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
-        `)}
+          ${tests.getAll({sha: commit.sha, specId: spec.specId}).map(test => html`
+            <hbox>
+              <div style="
+                width: 200px;
+                margin-left: 1em;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              ">${test.name}</div>
+              <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
+              <div style="width: 100px; text-align: center;">
+                ${test.runs.map(run => svg`
+                  <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
+                    <circle cx=5 cy=5 r=5 fill="${runColors[run.status] || 'blue'}">
+                  </svg>
+                `)}
+              </div>
+              <div style="width: 100px; text-align: center;">
+                ${svg`
+                  <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
+                    <circle cx=5 cy=5 r=5 fill="${runColors[test.expectedStatus] || 'blue'}">
+                  </svg>
+                `}
+              </div>
+            </hbox>
+          `)}
+        </vbox>
       `);
       split.showSidebar(this._splitView);
     }
+  }
+
+  _getFileContent(sha, file) {
+    const key = JSON.stringify({sha, file});
+    let resultPromise = this._fileContents.get(key);
+    if (!resultPromise) {
+      resultPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${file}`).then(r => r.text());
+      this._fileContents.set(key, resultPromise);
+    }
+    return resultPromise;
+  }
+
+  _renderCode(commit, spec) {
+    let element = html`<div></div>`;
+    this._codeElement.textContent = '';
+
+    const loadingElement = html`<div></div>`;
+    setTimeout(() => loadingElement.textContent = 'Loading...', 777);
+    this._codeElement.append(loadingElement);
+
+    const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
+    let textPromise = this._fileContents.get(cacheKey);
+    if (!textPromise) {
+      textPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${commit.sha}/test/${spec.file}`).then(r => r.text());
+      this._fileContents.set(cacheKey, textPromise);
+    }
+
+    textPromise.then(text => {
+      this._codeElement.textContent = text;
+    });
   }
 }
 

@@ -25,17 +25,20 @@ export const split = {
 };
 
 function splitElement(sidebar, main, size, hidden, sidebarPosition) {
+  const mainPane = html`<main-pane>${main}</main-pane>`;
+  const resizer = html`<split-resizer></split-resizer>`;
+  const sidePane = html`<side-pane>${sidebar}</side-pane>`;
   const element = html`
-    <split-element class="foo ${sidebarPositionToCSSClass[sidebarPosition]} ${sidebarPositionToCSSOrientation[sidebarPosition]}" >
-      <side-pane>${sidebar}</side-pane>
-      <split-resizer></split-resizer>
-      <main-pane>${main}</main-pane>
+    <split-element class="foo ${sidebarPositionToCSSClass[sidebarPosition]} ${sidebarPositionToCSSOrientation[sidebarPosition]}">
+      ${sidePane}
+      ${resizer}
+      ${mainPane}
     </split-element>
   `;
   if (!hidden)
     element.setAttribute('sidebar-shown', true);
 
-  setupResizer(element.$('side-pane'), element.$('split-resizer'), sidebarPosition, size);
+  setupResizer(sidePane, resizer, sidebarPosition, size);
   return element;
 }
 

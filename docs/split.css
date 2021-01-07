@@ -1,0 +1,72 @@
+split-element {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+    split-element.sidebar-left {
+      flex-direction: row;
+    }
+
+    split-element.sidebar-right {
+      flex-direction: row-reverse;
+    }
+
+    split-element.sidebar-top {
+      flex-direction: column;
+    }
+
+    split-element.sidebar-bottom {
+      flex-direction: column-reverse;
+    }
+
+    split-element > split-resizer {
+      display: none;
+      flex: none;
+      background: #eee;
+    }
+    split-element[sidebar-shown] > split-resizer {
+      display: block;
+    }
+
+        split-element.horizontal > split-resizer {
+          height: 100%;
+          width: 5px;
+          cursor: col-resize;
+        }
+
+        split-element.vertical > split-resizer {
+          width: 100%;
+          height: 5px;
+          cursor: row-resize;
+        }
+
+    split-element > main-pane {
+      display: block;
+      flex: auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    split-element > side-pane {
+      display: none;
+      flex: none;
+      position: relative;
+      overflow: hidden;
+    }
+    split-element[sidebar-shown] > side-pane {
+      display: block;
+    }
+
+        split-element.horizontal > side-pane {
+          width: var(--size);
+          height: 100%;
+        }
+
+        split-element.vertical > side-pane {
+          width: 100%;
+          height: var(--size);
+        }
+

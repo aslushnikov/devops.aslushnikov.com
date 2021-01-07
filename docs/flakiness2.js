@@ -124,12 +124,14 @@ class FlakinessDashboard {
           size: 555,
         })}
         <button style="position: absolute;
-                      right: -5px;
-                      top: -5px;
-                      appearance: none;
-                      background: white;
-                      border: 5px solid #eee;
-                      cursor: pointer;"
+                       right: -5px;
+                       top: 0;
+                       appearance: none;
+                       background: white;
+                       border: 5px solid #eee;
+                       cursor: pointer;
+                       transform: translate(0, -100%);
+                       z-index: 10000;"
                 onclick=${e => split.hideSidebar(this._splitView)}>✖ close</button>
       `,
       size: 300,

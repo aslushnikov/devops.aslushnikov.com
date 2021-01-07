@@ -4,6 +4,7 @@ import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widge
 import {cronjobBadgesHeader} from './cronjobs.js';
 import {SMap} from './smap.js';
 import {split} from './split.js';
+import {highlightText, preloadHighlighter} from './codehighlight.js';
 
 const MIDDLE_DOT = '·';
 
@@ -121,7 +122,7 @@ class FlakinessDashboard {
           main: this._sideElement,
           sidebar: this._codeElement,
           hidden: false,
-          size: 555,
+          size: 700,
         })}
         <button style="position: absolute;
                        right: -5px;
@@ -346,8 +347,35 @@ class FlakinessDashboard {
       this._fileContents.set(cacheKey, textPromise);
     }
 
-    textPromise.then(text => {
-      this._codeElement.textContent = text;
+    preloadHighlighter('text/typescript');
+
+    textPromise.then(async text => {
+      const lines = await highlightText(text, 'text/typescript');
+      this._codeElement.textContent = ''
+      const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
+      const STYLE_SELECTED = 'background-color: #fff9c4;';
+      const gutter = html`
+        <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid ${COLOR_GREY}">
+          ${lines.map((line, index) => html`<div>${index + 1}</div>`)}
+        </div>
+      `;
+      let selectedLine;
+      const code = html`
+        <div style="overflow: auto; padding-left: 4px;">
+          ${lines.map((line, index) => html`
+            <div x-line-number=${index + 1} style=${index + 1 === coords.line ? STYLE_SELECTED : undefined}>
+              ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
+            </div>
+          `)}
+        </div>
+      `;
+      this._codeElement.append(html`
+        <div style="display: flex;">
+          ${gutter}
+          ${code}
+        </div>
+      `);
+      code.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView();
     });
   }
 }

@@ -1,0 +1,15 @@
+.cm-js-keyword { color: hsl(310deg 86% 36%); }
+.cm-js-number { color: hsl(248deg 100% 41%); }
+
+.cm-js-comment {
+  color: hsl(120deg 100% 23%);
+  font-style: italic;
+}
+
+.cm-js-string { color: hsl(1deg 80% 43%); }
+.cm-js-string-2 { color: hsl(1deg 99% 39%); }
+.cm-js-atom { color: hsl(310deg 86% 36%); }
+.cm-js-def { color: hsl(240deg 73% 38%); }
+.cm-js-operator { color: hsl(27deg 100% 30%); }
+.cm-js-meta { color: hsl(27deg 100% 30%); }
+.cm-js-variable-2 { color: hsl(240deg 73% 38%); }

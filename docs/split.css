@@ -25,7 +25,7 @@ split-element {
     split-element > split-resizer {
       display: none;
       flex: none;
-      background: #eee;
+      background: var(--border-color);
     }
     split-element[sidebar-shown] > split-resizer {
       display: block;

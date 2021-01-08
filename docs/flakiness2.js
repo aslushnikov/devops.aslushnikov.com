@@ -46,7 +46,9 @@ class FlakinessDashboard {
   constructor(data) {
     console.time('Parsing data');
 
-    this._fileContents = new Map();
+    this._fileContentsCache = new Map();
+
+    this._selectedCommit = null;
 
     // All commits are sorted from newest to oldest.
     this._commits = new SMap(data.commits.map(({author, email, message, sha, timestamp}) => ({
@@ -108,12 +110,7 @@ class FlakinessDashboard {
 
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
-    this._codeElement = html`<section style="
-          white-space: pre;
-          overflow: auto;
-          font-family: var(--monospace);
-          ${STYLE_FILL}
-          "></section>`;
+    this._codeElement = html`<section style="${STYLE_FILL}"></section>`;
 
     this._splitView = split.bottom({
       main: this._mainElement,
@@ -129,7 +126,7 @@ class FlakinessDashboard {
                        top: 0;
                        appearance: none;
                        background: white;
-                       border: 5px solid #eee;
+                       border: 5px solid var(--border-color);
                        cursor: pointer;
                        transform: translate(0, -100%);
                        z-index: 10000;"
@@ -272,7 +269,7 @@ class FlakinessDashboard {
     }
 
     function renderSidebarSpecCommit(spec, commit) {
-      this._renderCode(commit, spec);
+      renderCode.call(self, commit, spec);
       this._sideElement.textContent = '';
       const runColors = {
         'passed': COLOR_GREEN,
@@ -320,63 +317,77 @@ class FlakinessDashboard {
       `);
       split.showSidebar(this._splitView);
     }
-  }
 
-  _getFileContent(sha, file) {
-    const key = JSON.stringify({sha, file});
-    let resultPromise = this._fileContents.get(key);
-    if (!resultPromise) {
-      resultPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${file}`).then(r => r.text());
-      this._fileContents.set(key, resultPromise);
-    }
-    return resultPromise;
-  }
+    function renderCode(commit, spec) {
+      this._codeElement.textContent = '';
 
-  _renderCode(commit, spec) {
-    let element = html`<div></div>`;
-    this._codeElement.textContent = '';
-
-    const loadingElement = html`<div></div>`;
-    setTimeout(() => loadingElement.textContent = 'Loading...', 777);
-    this._codeElement.append(loadingElement);
-
-    const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
-    let textPromise = this._fileContents.get(cacheKey);
-    if (!textPromise) {
-      textPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${commit.sha}/test/${spec.file}`).then(r => r.text());
-      this._fileContents.set(cacheKey, textPromise);
-    }
-
-    preloadHighlighter('text/typescript');
-
-    textPromise.then(async text => {
-      const lines = await highlightText(text, 'text/typescript');
-      this._codeElement.textContent = ''
-      const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
-      const STYLE_SELECTED = 'background-color: #fff9c4;';
-      const gutter = html`
-        <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid ${COLOR_GREY}">
-          ${lines.map((line, index) => html`<div>${index + 1}</div>`)}
-        </div>
-      `;
-      let selectedLine;
-      const code = html`
-        <div style="overflow: auto; padding-left: 4px;">
-          ${lines.map((line, index) => html`
-            <div x-line-number=${index + 1} style=${index + 1 === coords.line ? STYLE_SELECTED : undefined}>
-              ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
-            </div>
-          `)}
-        </div>
-      `;
+      const editorElement = html`<section></section>`;
       this._codeElement.append(html`
-        <div style="display: flex;">
-          ${gutter}
-          ${code}
-        </div>
+        <vbox style="${STYLE_FILL}">
+          <div>
+            <span style="
+              margin: 10px 4px -2px 10px;
+              padding: 2px 10px;
+              border-top-left-radius: 10px;
+              border-top-right-radius: 11px;
+              border: 2px solid var(--border-color);
+              display: inline-block;
+            ">${spec.file}</span>
+          </div>
+          ${editorElement}
+        </vbox>
       `);
-      code.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView();
-    });
+
+      const loadingElement = html`<div></div>`;
+      setTimeout(() => loadingElement.textContent = 'Loading...', 777);
+      editorElement.append(loadingElement);
+
+      const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
+      let textPromise = this._fileContentsCache.get(cacheKey);
+      if (!textPromise) {
+        textPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${commit.sha}/test/${spec.file}`).then(r => r.text());
+        this._fileContentsCache.set(cacheKey, textPromise);
+      }
+
+      preloadHighlighter('text/typescript');
+
+      textPromise.then(async text => {
+        const lines = await highlightText(text, 'text/typescript');
+        const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
+        const STYLE_SELECTED = 'background-color: #fff9c4;';
+        const gutter = html`
+          <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid ${COLOR_GREY}">
+            ${lines.map((line, index) => html`<div>${index + 1}</div>`)}
+          </div>
+        `;
+        let selectedLine;
+        const code = html`
+          <div style="padding-left: 4px;">
+            ${lines.map((line, index) => html`
+              <div x-line-number=${index + 1} style=${index + 1 === coords.line ? STYLE_SELECTED : undefined}>
+                ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
+              </div>
+            `)}
+          </div>
+        `;
+        editorElement.replaceWith(html`
+          <div style="display: flex;
+                      white-space: pre;
+                      overflow: auto;
+                      font-family: var(--monospace);
+                      margin: 0 10px 10px 10px;
+                      border: 2px solid var(--border-color);
+                      border-top-right-radius: 10px;
+                      border-bottom-right-radius: 10px;
+                      border-bottom-left-radius: 10px;
+          ">
+            ${gutter}
+            ${code}
+          </div>
+        `);
+        code.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
+      });
+    }
   }
 }
 

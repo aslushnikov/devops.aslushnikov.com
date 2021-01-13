@@ -6,7 +6,8 @@ import {SMap} from './smap.js';
 import {split} from './split.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
 
-const MIDDLE_DOT = '·';
+const CHAR_MIDDLE_DOT = '·';
+const CHAR_BULLSEYE = '◎';
 
 const COLOR_YELLOW = '#ffcc80';
 const COLOR_GREEN = '#a5d6a7';
@@ -321,18 +322,26 @@ class FlakinessDashboard {
     function renderCode(commit, spec) {
       this._codeElement.textContent = '';
 
+      const gutter = html`<div></div>`;
+      const coords = spec.commitCoordinates.get({sha: commit.sha});
       const editorElement = html`<section></section>`;
       this._codeElement.append(html`
         <div>
-          <span style="
+          <span onclick=${() => scrollToCoords()} style="
             margin: 0px 4px -2px 0px;
             padding: 2px 10px;
+            cursor: pointer;
             display: inline-block;
             background-color: var(--border-color);
-          ">${spec.file}</span>
+          ">${spec.file}${coords ? ':' + coords.line : undefined}</span>
         </div>
         ${editorElement}
       `);
+
+      const scrollToCoords = () => {
+        if (coords)
+          gutter.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
+      };
 
       const loadingElement = html`<div></div>`;
       setTimeout(() => loadingElement.textContent = 'Loading...', 777);
@@ -350,22 +359,20 @@ class FlakinessDashboard {
       textPromise.then(async text => {
         const lines = await highlightText(text, 'text/typescript');
         const digits = (lines.length + '').length;
-        const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
         const STYLE_SELECTED = 'background-color: #fff9c4;';
-        const gutter = html`
-          <div>
-          <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid ${COLOR_GREY}">
+        gutter.append(html`
+          <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid var(--border-color)">
             ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}
           </div>
-          </div>
-        `;
+        `);
         const code = html`
           <div style="flex: auto">
           <div>
           ${lines.map((line, index) => html`
             <div style="
               display: flex;
-              ${index + 1 === coords.line ? STYLE_SELECTED : ''}
+              padding-left: 4px;
+              ${coords && index + 1 === coords.line ? STYLE_SELECTED : ''}
             ">
               ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
             </div>
@@ -384,7 +391,8 @@ class FlakinessDashboard {
             ${code}
           </div>
         `);
-        gutter.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
+
+        scrollToCoords();
       });
     }
   }

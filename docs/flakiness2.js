@@ -371,7 +371,7 @@ class FlakinessDashboard {
           ${lines.map((line, index) => html`
             <div style="
               display: flex;
-              padding-left: 4px;
+              padding-left: 1em;
               ${coords && index + 1 === coords.line ? STYLE_SELECTED : ''}
             ">
               ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}

@@ -1,6 +1,6 @@
 import {} from './third-party/codemirror/runmode-standalone.js';
 
-const importedModules = new Set();
+const importedModules = new Map();
 
 export async function preloadHighlighter(mimeType) {
   if (!mimeType)
@@ -11,10 +11,12 @@ export async function preloadHighlighter(mimeType) {
   const modes = new Set();
   collectDeps(descriptor.fileName, modes);
   for (const mode of modes) {
-    if (importedModules.has(mode))
-      continue;
-    importedModules.add(mode);
-    await import('./third-party/codemirror/' + mode);
+    let promise = importedModules.get(mode);
+    if (!promise) {
+      promise = import('./third-party/codemirror/' + mode);
+      importedModules.set(mode, promise);
+    }
+    await promise;
   }
 
   function collectDeps(fileName, modes) {

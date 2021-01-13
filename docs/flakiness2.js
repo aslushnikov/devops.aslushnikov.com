@@ -353,38 +353,38 @@ class FlakinessDashboard {
         const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
         const STYLE_SELECTED = 'background-color: #fff9c4;';
         const gutter = html`
+          <div>
           <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid ${COLOR_GREY}">
-            ${lines.map((line, index) => html`<div>${index + 1}</div>`)}
+            ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}
+          </div>
           </div>
         `;
         const code = html`
+          <div style="flex: auto">
+          <div>
           ${lines.map((line, index) => html`
-            <div x-line-number=${index + 1} style="
+            <div style="
               display: flex;
               ${index + 1 === coords.line ? STYLE_SELECTED : ''}
             ">
-              <span style="
-                flex: none;
-                width: ${digits}ch;
-                box-sizing: content-box;
-                padding: 0 1em 0 1em;
-                text-align: right;
-                border-right: 1px solid ${COLOR_GREY}
-              ">${index + 1}</span>
               ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
             </div>
           `)}
+          </div>
+          </div>
         `;
         editorElement.replaceWith(html`
-          <div style="white-space: pre;
+          <div style="display: flex;
+                      white-space: pre;
                       overflow: auto;
                       font-family: var(--monospace);
                       border-top: 1px solid var(--border-color);
           ">
+            ${gutter}
             ${code}
           </div>
         `);
-        code.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
+        gutter.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
       });
     }
   }

@@ -110,7 +110,7 @@ class FlakinessDashboard {
 
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
-    this._codeElement = html`<section style="${STYLE_FILL}"></section>`;
+    this._codeElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
 
     this._splitView = split.bottom({
       main: this._mainElement,
@@ -323,19 +323,15 @@ class FlakinessDashboard {
 
       const editorElement = html`<section></section>`;
       this._codeElement.append(html`
-        <vbox style="${STYLE_FILL}">
-          <div>
-            <span style="
-              margin: 10px 4px -2px 10px;
-              padding: 2px 10px;
-              border-top-left-radius: 10px;
-              border-top-right-radius: 11px;
-              border: 2px solid var(--border-color);
-              display: inline-block;
-            ">${spec.file}</span>
-          </div>
-          ${editorElement}
-        </vbox>
+        <div>
+          <span style="
+            margin: 0px 4px -2px 0px;
+            padding: 2px 10px;
+            display: inline-block;
+            background-color: var(--border-color);
+          ">${spec.file}</span>
+        </div>
+        ${editorElement}
       `);
 
       const loadingElement = html`<div></div>`;
@@ -353,6 +349,7 @@ class FlakinessDashboard {
 
       textPromise.then(async text => {
         const lines = await highlightText(text, 'text/typescript');
+        const digits = (lines.length + '').length;
         const coords = spec.commitCoordinates.get({sha: commit.sha}) || {line: -1};
         const STYLE_SELECTED = 'background-color: #fff9c4;';
         const gutter = html`
@@ -360,28 +357,30 @@ class FlakinessDashboard {
             ${lines.map((line, index) => html`<div>${index + 1}</div>`)}
           </div>
         `;
-        let selectedLine;
         const code = html`
-          <div style="padding-left: 4px;">
-            ${lines.map((line, index) => html`
-              <div x-line-number=${index + 1} style=${index + 1 === coords.line ? STYLE_SELECTED : undefined}>
-                ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
-              </div>
-            `)}
-          </div>
+          ${lines.map((line, index) => html`
+            <div x-line-number=${index + 1} style="
+              display: flex;
+              ${index + 1 === coords.line ? STYLE_SELECTED : ''}
+            ">
+              <span style="
+                flex: none;
+                width: ${digits}ch;
+                box-sizing: content-box;
+                padding: 0 1em 0 1em;
+                text-align: right;
+                border-right: 1px solid ${COLOR_GREY}
+              ">${index + 1}</span>
+              ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
+            </div>
+          `)}
         `;
         editorElement.replaceWith(html`
-          <div style="display: flex;
-                      white-space: pre;
+          <div style="white-space: pre;
                       overflow: auto;
                       font-family: var(--monospace);
-                      margin: 0 10px 10px 10px;
-                      border: 2px solid var(--border-color);
-                      border-top-right-radius: 10px;
-                      border-bottom-right-radius: 10px;
-                      border-bottom-left-radius: 10px;
+                      border-top: 1px solid var(--border-color);
           ">
-            ${gutter}
             ${code}
           </div>
         `);

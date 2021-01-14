@@ -1,4 +1,7 @@
 
+.selected-commit {
+  outline: 2px solid black;
+}
 
 .flakiness {
 }

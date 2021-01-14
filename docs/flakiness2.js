@@ -10,28 +10,14 @@ import {highlightText, preloadHighlighter} from './codehighlight.js';
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
 
+const COMMIT_RECT_SIZE = 16;
+
 const COLOR_YELLOW = '#ffcc80';
 const COLOR_GREEN = '#a5d6a7';
 const COLOR_RED = '#ef9a9a';
 const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
-
-async function fetchFlakiness() {
-  // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(data => {
-  return fetch('/main_v2_filtered.json').then(r => r.json()).then(data => {
-    //TODO: default data should filter out tests that are SKIP-only.
-    // Since we don't do it up there, we filter it on our side.
-    for (const spec of data.specs) {
-      // Filter out tests that were skipped.
-      spec.problematicTests = spec.problematicTests.filter(({sha, test}) => test.annotations.length !== 1 || test.annotations[0].type !== 'skip');
-      // Filter out tests that have a single run without status: they didn't run because they were sharded away.
-      spec.problematicTests = spec.problematicTests.filter(({sha, test}) => test.runs.length !== 1 || !!test.runs[0].status);
-    }
-    data.specs = data.specs.filter(spec => spec.problematicTests.length);
-    return data;
-  });
-}
 
 const cronjobsHeader = cronjobBadgesHeader();
 
@@ -60,8 +46,8 @@ class CommitData {
       align-items: center;
       justify-content: center;
       flex: none;
-      width: 14px;
-      height: 14px;
+      width: ${COMMIT_RECT_SIZE};
+      height: ${COMMIT_RECT_SIZE};
       margin: 1px;
     ">${svgPie({ratio: 0})}</span>`;
     this._loadingPromise = null;
@@ -118,8 +104,14 @@ class CommitData {
         for (const test of spec.tests || []) {
           if (test.runs.length === 1 && !test.runs[0].status)
             continue;
+          // Overwrite test platform parameter with a more specific information from
+          // build run.
+          test.parameters.platform = report.metadata.osName + ' ' + report.metadata.osVersion;
+          if (test.parameters.platform.toUpperCase().startsWith('MINGW'))
+            test.parameters.platform = 'Windows';
           tests.push({
             specId,
+            url: report.metadata.runURL,
             spec: specObject,
             sha: this._sha,
             name: getTestName(test),
@@ -221,17 +213,20 @@ class DashboardData {
     for (const commit of commits)
       commit.data.ensureLoaded();
 
-    const tests = new SMap(commits.map(commit => commit.data.tests().filter(Boolean)).flat());
-    const specIdToSpec = new Map();
-    const faultySpecIds = new Set();
-    for (const test of tests) {
-      if (!specIdToSpec.has(test.spec.specId))
-        specIdToSpec.set(test.spec.specId, test.spec);
-      if (test.category !== 'good')
-        faultySpecIds.add(test.spec.specId);
-    }
-
-    const specs = new SMap([...faultySpecIds].map(specId => specIdToSpec.get(specId)));
+    const faultySpecIds = new SMap(commits.map(commit => [
+      ...commit.data.tests().getAll({category: 'bad'}),
+      ...commit.data.tests().getAll({category: 'flaky'}),
+    ]).flat()).uniqueValues('specId');
+    const tests = new SMap(commits.map(commit => {
+      return faultySpecIds.map(specId => commit.data.tests().getAll({specId})).flat();
+    }).flat());
+    const specs = new SMap(faultySpecIds.map(specId => {
+      for (const commit of commits) {
+        let result = commit.data.specs().get({specId});
+        if (result)
+          return result;
+      }
+    }));
     const filenames = specs.uniqueValues('file');
 
     console.time('rendering');
@@ -246,7 +241,10 @@ class DashboardData {
           ${commits.map(commit => commit.data.loadingIndicator())}
         </hbox>
         ${filenames.map(filename => html`
-          <div>${filename}</div>
+          <div style="
+            border-top: 1px solid var(--border-color);
+            margin-top: 2px;
+          ">${filename}</div>
           ${specs.getAll({file: filename}).map(spec => html`
             <hbox style="margin-left:1em;">
               ${renderSpecTitle(spec)}
@@ -325,7 +323,7 @@ class DashboardData {
       const clazz = spec.specId === self._selectedCommit?.specId && commit.sha === self._selectedCommit?.sha ? 'selected-commit' : undefined;
 
       const result = svg`
-        <svg class=${clazz} style="flex: none; margin: 1px;" width="14px" height="14px"
+        <svg class=${clazz} style="flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
              onclick=${event => renderSidebarSpecCommit.call(self, event.target.closest('svg'), spec, commit)}
              viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
@@ -364,7 +362,18 @@ class DashboardData {
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
-          ${tests.getAll({sha: commit.sha, specId: spec.specId}).map(test => html`
+          ${tests.getAll({sha: commit.sha, specId: spec.specId}).sort((t1, t2) => {
+            const categoryScore = {
+              'bad': 0,
+              'flaky': 1,
+              'good': 2,
+            };
+            if (t1.category !== t2.category)
+              return categoryScore[t1.category] - categoryScore[t2.category];
+            if (t1.name !== t2.name)
+              return t1.name < t2.name ? -1 : 1;
+            return 0;
+          }).map(test => html`
             <hbox>
               <div style="
                 width: 200px;
@@ -526,7 +535,7 @@ function getTestName(test) {
   }).join(' / ');
 }
 
-function svgPie({ratio, color = COLOR_GREEN, size = 14}) {
+function svgPie({ratio, color = COLOR_GREEN, size = COMMIT_RECT_SIZE}) {
   const r = 50;
   const cx = r;
   const cy = r;

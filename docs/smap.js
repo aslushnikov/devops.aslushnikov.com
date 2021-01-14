@@ -1,5 +1,5 @@
 export class SMap {
-  constructor(entries) {
+  constructor(entries = []) {
     this._entries = entries;
     this._indexes = new Map();
     this[Symbol.iterator] = () => this._entries[Symbol.iterator]();
@@ -72,7 +72,7 @@ class Index {
     for (const key of this._keys) {
       data = data.get(selector[key]);
       if (!data)
-        throw new Error(`no computed index for selector - selector is missing key "${key}"`);
+        return [];
     }
     return data.get(selector[this._lastKey]) || [];
   }

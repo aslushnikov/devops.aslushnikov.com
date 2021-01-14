@@ -143,7 +143,6 @@ class CommitData {
     this._tests = new SMap(tests);
     this._onLoadCallback.call(null);
   }
-
 }
 
 class DashboardData {
@@ -169,6 +168,8 @@ class DashboardData {
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
     this._codeElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
+
+    this._selectedCommit = null;
 
     this._splitView = split.bottom({
       main: this._mainElement,
@@ -321,16 +322,30 @@ class DashboardData {
       else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;
 
-      return svg`
-        <svg style="flex: none; margin: 1px; " width="14px" height="14px"
-             onclick=${event => renderSidebarSpecCommit.call(self, spec, commit)}
+      const clazz = spec.specId === self._selectedCommit?.specId && commit.sha === self._selectedCommit?.sha ? 'selected-commit' : undefined;
+
+      const result = svg`
+        <svg class=${clazz} style="flex: none; margin: 1px;" width="14px" height="14px"
+             onclick=${event => renderSidebarSpecCommit.call(self, event.target.closest('svg'), spec, commit)}
              viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
         </svg>
       `;
+      if (clazz)
+        self._selectedCommit.svgElement = result;
+      return result;
     }
 
-    function renderSidebarSpecCommit(spec, commit) {
+    function renderSidebarSpecCommit(svgElement, spec, commit) {
+      if (this._selectedCommit)
+        this._selectedCommit.svgElement.classList.remove('selected-commit');
+      this._selectedCommit = {
+        specId: spec.specId,
+        sha: commit.sha,
+        svgElement,
+      };
+      this._selectedCommit.svgElement.classList.add('selected-commit');
+
       renderCode.call(self, commit, spec);
       this._sideElement.textContent = '';
       const runColors = {
@@ -378,6 +393,8 @@ class DashboardData {
         </vbox>
       `);
       split.showSidebar(this._splitView);
+
+      svgElement.scrollIntoViewIfNeeded();
     }
 
     function renderCode(commit, spec) {

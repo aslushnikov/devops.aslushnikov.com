@@ -163,6 +163,12 @@ class DashboardData {
 
     this._selectedCommit = null;
 
+    const doCloseSidebar = () => {
+      split.hideSidebar(this._splitView);
+      this._selectedCommit = null;
+      this._render();
+    };
+
     this._splitView = split.bottom({
       main: this._mainElement,
       sidebar: html`
@@ -181,7 +187,7 @@ class DashboardData {
                        cursor: pointer;
                        transform: translate(0, -100%);
                        z-index: 10000;"
-                onclick=${e => split.hideSidebar(this._splitView)}>✖ close</button>
+                onclick=${doCloseSidebar}>✖ close</button>
       `,
       size: 300,
       hidden: true,
@@ -229,33 +235,37 @@ class DashboardData {
     }));
     const filenames = specs.uniqueValues('file');
 
-    console.time('rendering');
-    this._mainElement.textContent = '';
-    this._mainElement.append(html`
-      ${cronjobsHeader}
-      <div style="padding: 1em;">
-        <hbox>
-          <div style="width: 520px; margin-right: 1em;">
-            Showing last ${this._lastCommitsSelect} commits
-          </div>
-          ${commits.map(commit => commit.data.loadingIndicator())}
-        </hbox>
-        ${filenames.map(filename => html`
-          <div style="
-            border-top: 1px solid var(--border-color);
-            margin-top: 2px;
-          ">${filename}</div>
-          ${specs.getAll({file: filename}).map(spec => html`
-            <hbox style="margin-left:1em;">
-              ${renderSpecTitle(spec)}
-              ${renderSpecAnnotations(spec)}
-              ${commits.map(commit => renderSpecCommit(spec, commit))}
-            </hbox>
+    renderMainElement.call(self);
+
+    function renderMainElement() {
+      console.time('rendering');
+      this._mainElement.textContent = '';
+      this._mainElement.append(html`
+        ${cronjobsHeader}
+        <div style="padding: 1em;">
+          <hbox>
+            <div style="width: 520px; margin-right: 1em;">
+              Showing last ${this._lastCommitsSelect} commits
+            </div>
+            ${commits.map(commit => commit.data.loadingIndicator())}
+          </hbox>
+          ${filenames.map(filename => html`
+            <div style="
+              border-top: 1px solid var(--border-color);
+              margin-top: 2px;
+            ">${filename}</div>
+            ${specs.getAll({file: filename}).map(spec => html`
+              <hbox style="margin-left:1em;">
+                ${renderSpecTitle(spec)}
+                ${renderSpecAnnotations(spec)}
+                ${commits.map(commit => renderSpecCommit(spec, commit))}
+              </hbox>
+            `)}
           `)}
-        `)}
-      </div>
-    `);
-    console.timeEnd('rendering');
+        </div>
+      `);
+      console.timeEnd('rendering');
+    }
 
     function renderSpecTitle(spec) {
       return html`
@@ -322,27 +332,21 @@ class DashboardData {
 
       const clazz = spec.specId === self._selectedCommit?.specId && commit.sha === self._selectedCommit?.sha ? 'selected-commit' : undefined;
 
-      const result = svg`
+      return svg`
         <svg class=${clazz} style="flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
-             onclick=${event => renderSidebarSpecCommit.call(self, event.target.closest('svg'), spec, commit)}
+             onclick=${event => renderSidebarSpecCommit.call(self, spec, commit)}
              viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
         </svg>
       `;
-      if (clazz)
-        self._selectedCommit.svgElement = result;
-      return result;
     }
 
-    function renderSidebarSpecCommit(svgElement, spec, commit) {
-      if (this._selectedCommit)
-        this._selectedCommit.svgElement.classList.remove('selected-commit');
+    function renderSidebarSpecCommit(spec, commit) {
       this._selectedCommit = {
         specId: spec.specId,
         sha: commit.sha,
-        svgElement,
       };
-      this._selectedCommit.svgElement.classList.add('selected-commit');
+      renderMainElement.call(self);
 
       renderCode.call(self, commit, spec);
       this._sideElement.textContent = '';
@@ -358,7 +362,7 @@ class DashboardData {
             <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
           </div>
           <hbox>
-            <div style="margin-left: 1em; width: 320px; text-align: center;">test parameters</div>
+            <div style="margin-left: 1em; width: 420px; text-align: center;">test parameters</div>
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
@@ -376,12 +380,12 @@ class DashboardData {
           }).map(test => html`
             <hbox>
               <div style="
-                width: 200px;
+                width: 300px;
                 margin-left: 1em;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-              ">${test.name}</div>
+              "><a href="${test.url}">${test.name}</a></div>
               <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
               <div style="width: 100px; text-align: center;">
                 ${test.runs.map(run => svg`
@@ -402,8 +406,6 @@ class DashboardData {
         </vbox>
       `);
       split.showSidebar(this._splitView);
-
-      svgElement.scrollIntoViewIfNeeded();
     }
 
     function renderCode(commit, spec) {

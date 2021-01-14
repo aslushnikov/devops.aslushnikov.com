@@ -9,6 +9,7 @@ import {highlightText, preloadHighlighter} from './codehighlight.js';
 
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
+const CHAR_WARNING = '⚠';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -80,7 +81,10 @@ class CommitData {
       .then(text => ({json: JSON.parse(text)}))
       .catch(error => ({error}));
     if (error) {
-      this._progressIndicator.textContent = `⚠`;
+      this._progressIndicator.textContent = '';
+      this._progressIndicator.append(html`
+        <span style="cursor: help;" title="${error}">${CHAR_WARNING}</span>
+      `);
       return;
     }
     this._progressIndicator.textContent = '';
@@ -244,8 +248,14 @@ class DashboardData {
         ${cronjobsHeader}
         <div style="padding: 1em;">
           <hbox>
-            <div style="width: 520px; margin-right: 1em;">
+            ${renderStats()}
+            <div>
               Showing last ${this._lastCommitsSelect} commits
+            </div>
+          </hbox>
+          <hbox>
+            <div style="width: 520px; margin-right: 1em;">
+            <h3>Showing ${specs.size} specs</h3>
             </div>
             ${commits.map(commit => commit.data.loadingIndicator())}
           </hbox>
@@ -265,6 +275,39 @@ class DashboardData {
         </div>
       `);
       console.timeEnd('rendering');
+    }
+
+    function renderStats() {
+      const platforms = tests.uniqueValues('platform').sort();
+      const browserNames = tests.uniqueValues('browserName').sort();
+
+      const faultySpecCount = (browserName, platform) => new SMap([
+        ...tests.getAll({category: 'bad', browserName, platform}),
+        ...tests.getAll({category: 'flaky', browserName, platform}),
+      ]).uniqueValues('specId').length;
+
+      return html`
+        <div style="
+          display: grid;
+          grid-template-rows: ${'auto '.repeat(platforms.length + 1).trim()};
+          grid-template-columns: ${'auto '.repeat(browserNames.length + 1).trim()};
+          border: 1px solid var(--border-color);
+        ">
+          <div style="
+              border-right: 1px solid var(--border-color);
+              border-bottom: 1px solid var(--border-color);
+            "></div>
+          ${browserNames.map(browserName => html`
+            <div style="padding: 4px 1em; border-bottom: 1px solid var(--border-color);">${browserLogo(browserName, 18)}</div>
+          `)}
+          ${platforms.map(platform => html`
+            <div style="padding: 0 1em; border-right: 1px solid var(--border-color);">${platform}</div>
+            ${browserNames.map(browserName => html`
+              <div style="text-align: center; padding: 0 1em">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</div>
+            `)}
+          `)}
+        </div>
+      `;
     }
 
     function renderSpecTitle(spec) {

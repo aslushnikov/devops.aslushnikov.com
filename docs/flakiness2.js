@@ -4,6 +4,7 @@ import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widge
 import {cronjobBadgesHeader} from './cronjobs.js';
 import {SMap} from './smap.js';
 import {split} from './split.js';
+import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
 
 const CHAR_MIDDLE_DOT = '·';
@@ -16,7 +17,7 @@ const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
 
-export async function fetchFlakiness() {
+async function fetchFlakiness() {
   // return fetch('https://folioflakinessdashboard.blob.core.windows.net/dashboards/main_v2.json').then(r => r.json()).then(data => {
   return fetch('/main_v2_filtered.json').then(r => r.json()).then(data => {
     //TODO: default data should filter out tests that are SKIP-only.
@@ -37,78 +38,134 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-export async function renderFlakiness() {
-  const data = await fetchFlakiness();
-  const dashboard = new FlakinessDashboard(data);
-  return dashboard.element;
+async function downloadLastCommitsData(count, progress) {
+  let loaded = 0;
+  return await Promise.all(commits.slice(0, count).map(async commit => {
+    const r = await fetch(`https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${commit.sha}.json`);
+    let reports = [];
+    if (r.ok)
+      reports = await r.json();
+    ++loaded;
+    progress(loaded);
+    return reports;
+  }).flat());
 }
 
-class FlakinessDashboard {
-  constructor(data) {
-    console.time('Parsing data');
+class CommitData {
+  constructor(sha, onLoadCallback) {
+    this._sha = sha;
 
-    this._fileContentsCache = new Map();
+    this._progressIndicator = html`<span style="
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      width: 14px;
+      height: 14px;
+      margin: 1px;
+    ">${svgPie({ratio: 0})}</span>`;
+    this._loadingPromise = null;
+    this._onLoadCallback = onLoadCallback;
 
-    this._selectedCommit = null;
+    this._specs = new SMap();
+    this._tests = new SMap();
+  }
 
-    // All commits are sorted from newest to oldest.
-    this._commits = new SMap(data.commits.map(({author, email, message, sha, timestamp}) => ({
-      author,
-      email,
-      message,
-      sha,
-      //TODO: convert timestamp to number upstream.
-      timestamp: +timestamp,
-    })).sort((c1, c2) => c2.timestamp - c1.timestamp));
+  specs() { return this._specs; }
+  tests() { return this._tests; }
+  loadingIndicator() { return this._progressIndicator; }
+
+  async ensureLoaded() {
+    if (!this._loadingPromise)
+      this._loadingPromise = this._loadData();
+    await this._loadingPromise;
+  }
+
+  _onLoadProgress(received, total, isComplete) {
+    this._progressIndicator.textContent = '';
+    // Experimentally it turns out that compression ratio is ~19 for JSON reports.
+    const COMPRESSION_RATIO = 19;
+    const ratio = isComplete ? 1 : received / total / COMPRESSION_RATIO;
+    this._progressIndicator.append(svgPie({ratio}));
+  }
+
+  async _loadData() {
+    const {json, error} = await fetchProgress(`https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${this._sha}.json`, this._onLoadProgress.bind(this))
+      .then(text => ({json: JSON.parse(text)}))
+      .catch(error => ({error}));
+    if (error) {
+      this._progressIndicator.textContent = `⚠`;
+      return;
+    }
+    this._progressIndicator.textContent = '';
 
     // All specs are sorted by filename/line/column location.
-    this._specs = new SMap(data.specs.map(({file, specId, title, commitCoordinates}) => {
-      commitCoordinates = commitCoordinates.map(({line, column, sha}) => ({
-        line,
-        column,
-        sha,
-        commit: this._commits.get({sha}),
-      }));
-      const lastCoordinate = commitCoordinates.reduce((last, coord) => last.commit.timestamp < coord.commit.timestamp ? coord : last);
-      return {
-        specId,
-        file,
-        title,
-        lastCoordinate,
-        commitCoordinates: new SMap(commitCoordinates),
-      };
-    }).sort((s1, s2) => {
-      if (s1.file !== s2.file)
-        return s1.file < s2.file ? -1 : 1;
-      return s1.lastCoordinate.line - s2.lastCoordinate.line || s1.lastCoordinate.column - s2.lastCoordinate.column;
-    }));
-
-    let tests = [];
-    for (const {specId, problematicTests} of data.specs) {
-      for (const {sha, test} of problematicTests) {
-        tests.push({
-          sha,
-          commit: this._commits.get({sha}),
+    // const specs = json.map(report => flattenSpecs(report)).flat();
+    const specs = [];
+    const tests = [];
+    for (const report of json) {
+      for (const spec of flattenSpecs(report)) {
+        const specId = spec.file + '---' + spec.title;
+        const specObject = {
           specId,
-          spec: this._specs.get({specId}),
-          name: getTestName(test),
-          browserName: test.parameters.browserName,
-          platform: test.parameters.platform,
-          parameters: test.parameters,
-          annotations: test.annotations,
-          runs: test.runs,
-          expectedStatus: test.expectedStatus,
-          category: getTestCategory(test),
-        });
+          sha: this._sha,
+          file: spec.file,
+          title: spec.title,
+          line: spec.line,
+          column: spec.column,
+        };
+        specs.push(specObject);
+        for (const test of spec.tests || []) {
+          if (test.runs.length === 1 && !test.runs[0].status)
+            continue;
+          tests.push({
+            specId,
+            spec: specObject,
+            sha: this._sha,
+            name: getTestName(test),
+            browserName: test.parameters.browserName,
+            platform: test.parameters.platform,
+            parameters: test.parameters,
+            annotations: test.annotations,
+            runs: test.runs,
+            expectedStatus: test.expectedStatus,
+            category: getTestCategory(test),
+          });
+        }
       }
     }
+    specs.sort((s1, s2) => {
+      if (s1.file !== s2.file)
+        return s1.file < s2.file ? -1 : 1;
+      return s1.line - s2.line || s1.column - s2.column;
+    });
+    this._specs = new SMap(specs);
     this._tests = new SMap(tests);
+    this._onLoadCallback.call(null);
+  }
 
-    console.timeEnd('Parsing data');
-    console.log(`commits: ${this._commits.size}`);
-    console.log(`specs: ${this._specs.size}`);
-    console.log(`tests: ${this._tests.size}`);
+}
 
+class DashboardData {
+  static async create() {
+    const commits = await rateLimitedFetch('https://api.github.com/repos/microsoft/playwright/commits?per_page=100').then(text => JSON.parse(text)).then(commits => commits.map(c => {
+      c.commit.committer.date = +new Date(c.commit.committer.date);
+      return c;
+    }).sort((c1, c2) => c2.commit.committer.date - c1.commit.committer.date));
+    return new DashboardData(commits);
+  }
+
+  constructor(commits) {
+    this._commits = commits.map(c => ({
+      sha: c.sha,
+      author: c.commit.author.name,
+      email: c.commit.author.email,
+      message: c.commit.message,
+      timestamp: c.commit.committer.date,
+      data: new CommitData(c.sha, () => this._render()),
+    }));
+
+    this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
     this._codeElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
@@ -136,53 +193,57 @@ class FlakinessDashboard {
       size: 300,
       hidden: true,
     });
-
     this.element = this._splitView;
 
     this._lastCommits = 20;
     this._lastCommitsSelect = html`
-      <div>
-        Show Last <select oninput=${e => {
-          this._lastCommits = parseInt(e.target.value, 10);
-          this._render();
-        }}>
-          ${[...Array(8)].map((_, index) => html`
-            <option>${index + 2}</option>
-          `)}
-          <option>10</option>
-          <option>15</option>
-          <option selected>20</option>
-          <option>30</option>
-          <option>50</option>
-        </select> Commits
-      </div>
+      <select oninput=${e => {
+        this._lastCommits = parseInt(e.target.value, 10);
+        this._render();
+      }}>
+        ${[...Array(8)].map((_, index) => html`
+          <option>${index + 2}</option>
+        `)}
+        <option>10</option>
+        <option>15</option>
+        <option selected>20</option>
+        <option>30</option>
+        <option>50</option>
+      </select>
     `;
-    /*
-    this._filterGroup = new FilterConjunctionGroup(this._allParameters);
-    this._filterGroup.events.onchange(() => this._render());
-    */
-
     this._render();
   }
 
   _render() {
     const self = this;
+    const commits = this._commits.slice(0, this._lastCommits);
+    for (const commit of commits)
+      commit.data.ensureLoaded();
 
-    console.time('filtering');
+    const tests = new SMap(commits.map(commit => commit.data.tests().filter(Boolean)).flat());
+    const specIdToSpec = new Map();
+    const faultySpecIds = new Set();
+    for (const test of tests) {
+      if (!specIdToSpec.has(test.spec.specId))
+        specIdToSpec.set(test.spec.specId, test.spec);
+      if (test.category !== 'good')
+        faultySpecIds.add(test.spec.specId);
+    }
 
-    const commits = new SMap(this._commits.slice(0, this._lastCommits));
-    const tests = new SMap(this._tests.filter(test => commits.has({sha: test.sha})));
-    const specs = new SMap(this._specs.filter(spec => tests.has({specId: spec.specId})));
-
+    const specs = new SMap([...faultySpecIds].map(specId => specIdToSpec.get(specId)));
     const filenames = specs.uniqueValues('file');
-    console.timeEnd('filtering');
 
     console.time('rendering');
     this._mainElement.textContent = '';
     this._mainElement.append(html`
       ${cronjobsHeader}
       <div style="padding: 1em;">
-        ${this._lastCommitsSelect}
+        <hbox>
+          <div style="width: 520px; margin-right: 1em;">
+            Showing last ${this._lastCommitsSelect} commits
+          </div>
+          ${commits.map(commit => commit.data.loadingIndicator())}
+        </hbox>
         ${filenames.map(filename => html`
           <div>${filename}</div>
           ${specs.getAll({file: filename}).map(spec => html`
@@ -204,12 +265,12 @@ class FlakinessDashboard {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        ">${spec.lastCoordinate.line}:${spec.title}</div>
+        ">${spec.line}:${spec.title}</div>
       `;
     }
 
     function renderSpecAnnotations(spec) {
-      const annotations = tests.getAll({specId: spec.specId, sha: spec.lastCoordinate.commit.sha}).map(test => test.annotations).flat();
+      const annotations = tests.getAll({specId: spec.specId, sha: spec.sha}).map(test => test.annotations).flat();
       const types = new SMap(annotations).uniqueValues('type').sort();
       return html`
         <div style="
@@ -257,7 +318,7 @@ class FlakinessDashboard {
         color = COLOR_RED;
       else if (categories.has('flaky'))
         color = COLOR_VIOLET;
-      else if (categories.size || spec.commitCoordinates.has({sha: commit.sha}))
+      else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;
 
       return svg`
@@ -321,9 +382,11 @@ class FlakinessDashboard {
 
     function renderCode(commit, spec) {
       this._codeElement.textContent = '';
+      spec = commit.data.specs().get({specId: spec.specId});
+      if (!spec)
+        return;
 
       const gutter = html`<div></div>`;
-      const coords = spec.commitCoordinates.get({sha: commit.sha});
       const editorElement = html`<section></section>`;
       this._codeElement.append(html`
         <div>
@@ -333,14 +396,13 @@ class FlakinessDashboard {
             cursor: pointer;
             display: inline-block;
             background-color: var(--border-color);
-          ">${spec.file}${coords ? ':' + coords.line : undefined}</span>
+          ">${spec.file}:${spec.line}</span>
         </div>
         ${editorElement}
       `);
 
       const scrollToCoords = () => {
-        if (coords)
-          gutter.$(`[x-line-number="${coords.line}"]`)?.scrollIntoView({block: 'center'});
+        gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
       };
 
       const loadingElement = html`<div></div>`;
@@ -372,7 +434,7 @@ class FlakinessDashboard {
             <div style="
               display: flex;
               padding-left: 1em;
-              ${coords && index + 1 === coords.line ? STYLE_SELECTED : ''}
+              ${index + 1 === spec.line ? STYLE_SELECTED : ''}
             ">
               ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
             </div>
@@ -396,6 +458,11 @@ class FlakinessDashboard {
       });
     }
   }
+}
+
+export async function renderFlakiness() {
+  const data = await DashboardData.create();
+  return data.element;
 }
 
 function isHealthyTest(test) {
@@ -423,7 +490,7 @@ function isFlakyTest(test) {
 
 function getTestCategory(test) {
   const hasGoodRun = test.runs.some(run => run.status === test.expectedStatus);
-  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus && run.status !== 'skipped');
+  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus && run.status && run.status !== 'skipped');
   const hasFlakyAnnotation = test.annotations.some(annotation => annotation.type === 'flaky');
   if (hasFlakyAnnotation && hasGoodRun && hasBadRun)
     return 'flaky';
@@ -440,5 +507,40 @@ function getTestName(test) {
       return key;
     return `${key}=${value}`;
   }).join(' / ');
+}
+
+function svgPie({ratio, color = COLOR_GREEN, size = 14}) {
+  const r = 50;
+  const cx = r;
+  const cy = r;
+  if (Math.abs(1 - ratio) < 1e-5) {
+    return svg`
+      <svg width=${size} height=${size} viewbox="0 0 ${2 * r} ${2 * r}">
+        <circle cx=${cx} cy=${cy} fill="${color}" r="${r}"/>
+      </svg>
+    `;
+  }
+  const rotation = -Math.PI / 2;
+  const ax1 = cx + r * Math.cos(0 + rotation);
+  const ay1 = cy + r * Math.sin(0 + rotation);
+  const ax2 = cx + r * Math.cos(2 * Math.PI * ratio + rotation);
+  const ay2 = cy + r * Math.sin(2 * Math.PI * ratio + rotation);
+  const largeArcFlag = ratio < 0.5 ? "0" : "1";
+  return svg`
+    <svg width=${size} height=${size} viewbox="0 0 ${2 * r} ${2 * r}">
+      <path fill="${color}" d="M ${cx} ${cy} L ${ax1} ${ay1} A ${r} ${r} 0 ${largeArcFlag} 1 ${ax2} ${ay2} L ${cx} ${cy}"/>
+      <circle cx=${cx} cy=${cy} stroke="${color}" stroke-width="2px" fill="none" r="${r}"/>
+    </svg>
+  `;
+}
+
+function flattenSpecs(suite, result = []) {
+  if (suite.suites) {
+    for (const child of suite.suites)
+      flattenSpecs(child, result);
+  }
+  for (const spec of suite.specs || [])
+    result.push(spec);
+  return result;
 }
 

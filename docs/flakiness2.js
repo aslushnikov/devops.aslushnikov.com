@@ -236,8 +236,11 @@ class DashboardData {
         if (result)
           return result;
       }
+    }).sort((spec1, spec2) => {
+      if (spec1.file !== spec2.file)
+        return spec1.file < spec2.file ? -1 : 1;
+      return spec1.line - spec2.line;
     }));
-    const filenames = specs.uniqueValues('file');
 
     renderMainElement.call(self);
 
@@ -254,23 +257,16 @@ class DashboardData {
             </div>
           </hbox>
           <hbox>
-            <div style="width: 520px; margin-right: 1em;">
+            <div style="width: 600px; margin-right: 1em;">
             <h3>Showing ${specs.size} specs</h3>
             </div>
             ${commits.map(commit => commit.data.loadingIndicator())}
           </hbox>
-          ${filenames.map(filename => html`
-            <div style="
-              border-top: 1px solid var(--border-color);
-              margin-top: 2px;
-            ">${filename}</div>
-            ${specs.getAll({file: filename}).map(spec => html`
-              <hbox style="margin-left:1em;">
-                ${renderSpecTitle(spec)}
-                ${renderSpecAnnotations(spec)}
-                ${commits.map(commit => renderSpecCommit(spec, commit))}
-              </hbox>
-            `)}
+          ${specs.map(spec => html`
+            <hbox>
+              ${renderSpecTitle(spec)}
+              ${commits.map(commit => renderSpecCommit(spec, commit))}
+            </hbox>
           `)}
         </div>
       `);
@@ -279,7 +275,7 @@ class DashboardData {
 
     function renderStats() {
       const platforms = tests.uniqueValues('platform').sort();
-      const browserNames = tests.uniqueValues('browserName').sort();
+      const browserNames = tests.uniqueValues('browserName').filter(Boolean).sort();
 
       const faultySpecCount = (browserName, platform) => new SMap([
         ...tests.getAll({category: 'bad', browserName, platform}),
@@ -312,25 +308,25 @@ class DashboardData {
 
     function renderSpecTitle(spec) {
       return html`
-        <div style="
-          width: 400px;
+        <hbox style="
+          width: 600px;
+          margin-right: 1em;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        ">${spec.line}:${spec.title}</div>
+          align-items: baseline;
+        ">
+          <span style="color: grey; font-size: 10px;font-family: var(--monospace);">[${spec.file}:${spec.line}]</span><span style="margin-left: 1ex; overflow: hidden; text-overflow: ellipsis;">${spec.title}</span>
+          <spacer></spacer>
+          ${renderSpecAnnotations(spec)}
+        </hbox>
       `;
     }
 
     function renderSpecAnnotations(spec) {
       const annotations = tests.getAll({specId: spec.specId, sha: spec.sha}).map(test => test.annotations).flat();
       const types = new SMap(annotations).uniqueValues('type').sort();
-      return html`
-        <div style="
-          width: 120px;
-        ">
-          ${types.map(renderAnnotation)}
-        </div>
-      `;
+      return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
     }
 
     function renderAnnotation(annotationType) {
@@ -364,8 +360,9 @@ class DashboardData {
     }
 
     function renderSpecCommit(spec, commit) {
-      const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
       let color = COLOR_GREY;
+
+      const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
       if (categories.has('bad'))
         color = COLOR_RED;
       else if (categories.has('flaky'))
@@ -405,7 +402,7 @@ class DashboardData {
             <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
           </div>
           <hbox>
-            <div style="margin-left: 1em; width: 420px; text-align: center;">test parameters</div>
+            <div style="margin-left: 1em; width: 520px; text-align: center;">test parameters</div>
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>

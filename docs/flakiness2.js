@@ -234,12 +234,19 @@ class DashboardData {
     const specIdToHealth = new Map();
     for (const specId of faultySpecIds) {
       let good = 0;
-      for (const commit of commits) {
+      let firstBadIndex = -1;
+      for (let i = 0; i < commits.length; ++i) {
+        const commit = commits[i];
         const isGood = tests.getAll({specId, sha: commit.sha}).every(test => test.category === 'good');
         if (isGood)
           ++good;
+        else if (firstBadIndex === -1)
+          firstBadIndex = i;
       }
-      specIdToHealth.set(specId, Math.round(good / commits.length * 100));
+      specIdToHealth.set(specId, {
+        goodCommits: good,
+        firstBadIndex,
+      });
     }
 
     const specs = new SMap(faultySpecIds.map(specId => {
@@ -251,8 +258,10 @@ class DashboardData {
     }).sort((spec1, spec2) => {
       const h1 = specIdToHealth.get(spec1.specId);
       const h2 = specIdToHealth.get(spec2.specId);
-      if (h1 !== h2)
-        return h1 - h2;
+      if (h1.goodCommits !== h2.goodCommits)
+        return h1.goodCommits - h2.goodCommits;
+      if (h1.firstBadIndex !== h2.firstBadIndex)
+        return h1.firstBadIndex - h2.firstBadIndex;
       if (spec1.file !== spec2.file)
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;

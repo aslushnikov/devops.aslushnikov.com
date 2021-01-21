@@ -190,6 +190,7 @@ class DashboardData {
       this._render();
     };
 
+    this._tabstrip = new TabStrip();
     this._splitView = split.bottom({
       main: this._mainElement,
       sidebar: html`
@@ -212,10 +213,11 @@ class DashboardData {
       `,
       size: 300,
       hidden: true,
+      extraDragElement: this._tabstrip.tabstripElement(),
     });
     this.element = this._splitView;
 
-    this._lastCommits = 20;
+    this._lastCommits = 2;
     this._lastCommitsSelect = html`
       <select oninput=${e => {
         this._lastCommits = parseInt(e.target.value, 10);
@@ -283,8 +285,6 @@ class DashboardData {
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
     }));
-
-    const tabstrip = new TabStrip();
 
     renderMainElement.call(self);
 
@@ -463,7 +463,7 @@ class DashboardData {
               return t1.name < t2.name ? -1 : 1;
             return 0;
           }).map(test => html`
-            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab(test)}>
+            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab.call(self, test)}>
               <div style="
                 width: 300px;
                 margin-left: 1em;
@@ -486,13 +486,13 @@ class DashboardData {
     }
 
     function addTestTab(test) {
-      let tab = tabstrip.tabWithName(test.name);
+      let tab = this._tabstrip.tabWithName(test.name);
       if (tab) {
-        tabstrip.selectTab(tab);
+        this._tabstrip.selectTab(tab);
         return;
       }
 
-      tabstrip.addTab({
+      this._tabstrip.addTab({
         name: test.name,
         selected: true,
         closable: true,
@@ -515,7 +515,7 @@ class DashboardData {
 
     function renderTestRun(test, run, index) {
       return html`
-        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, 12)} Run #${index + 1} - ${run.status}</h3>
+        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, 12)} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
         ${run.error && html`
           <pre style="
             background-color: #333;
@@ -538,8 +538,8 @@ class DashboardData {
       };
 
       const editorElement = html`<section style="${STYLE_FILL}; overflow: auto;"></section>`;
-      tabstrip.removeAllTabs();
-      tabstrip.addTab({
+      this._tabstrip.removeAllTabs();
+      this._tabstrip.addTab({
         name: `${spec.file}:${spec.line}`,
         contentElement: editorElement,
         selected: true,
@@ -547,7 +547,7 @@ class DashboardData {
       });
 
       this._secondSideElement.textContent = '';
-      this._secondSideElement.append(tabstrip.element);
+      this._secondSideElement.append(this._tabstrip.element);
 
       const editorSourceLoadingElement = html`<div></div>`;
       setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
@@ -702,6 +702,7 @@ class TabStrip {
       <div style="
           background-color: var(--border-color);
           border-bottom: 1px solid var(--border-color);
+          cursor: row-resize;
           flex: none;
       "></div>
     `;
@@ -731,9 +732,14 @@ class TabStrip {
     this._content.textContent = '';
   }
 
+  tabstripElement() {
+    return this._strip;
+  }
+
   addTab({name, contentElement, selected = false, onSelected = () => {}, closable = false}) {
     const tab = html`
       <span class=hover-lighten style="
+        user-select: none;
         padding: 2px 10px;
         cursor: pointer;
         display: inline-block;

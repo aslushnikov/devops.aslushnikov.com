@@ -25,6 +25,27 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
+const useMockdata = true;
+const URLs = {
+  dashboardURL(sha) {
+    if (useMockdata)
+      return `/mockdata/${sha}.json`;
+    return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${sha}.json`;
+  },
+
+  commitsURL() {
+    if (useMockdata)
+      return `/mockdata/commits.json`;
+    return 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
+  },
+
+  sourceURL(sha, testFile) {
+    if (useMockdata)
+      return `/mockdata/page-basic.spec.ts`;
+    return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${testFile}`;
+  },
+};
+
 class CommitData {
   constructor(sha, onLoadCallback) {
     this._sha = sha;
@@ -64,7 +85,7 @@ class CommitData {
   }
 
   async _loadData() {
-    const {json, error} = await fetchProgress(`https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${this._sha}.json`, this._onLoadProgress.bind(this))
+    const {json, error} = await fetchProgress(URLs.dashboardURL(this._sha), this._onLoadProgress.bind(this))
       .then(text => ({json: JSON.parse(text)}))
       .catch(error => ({error}));
     if (error) {
@@ -130,7 +151,7 @@ class CommitData {
 
 class DashboardData {
   static async create() {
-    const commits = await rateLimitedFetch('https://api.github.com/repos/microsoft/playwright/commits?per_page=100').then(text => JSON.parse(text)).then(commits => commits.map(c => {
+    const commits = await rateLimitedFetch(URLs.commitsURL()).then(text => JSON.parse(text)).then(commits => commits.map(c => {
       c.commit.committer.date = +new Date(c.commit.committer.date);
       return c;
     }).sort((c1, c2) => c2.commit.committer.date - c1.commit.committer.date));
@@ -492,7 +513,7 @@ class DashboardData {
       const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
       let textPromise = this._fileContentsCache.get(cacheKey);
       if (!textPromise) {
-        textPromise = fetch(`https://raw.githubusercontent.com/microsoft/playwright/${commit.sha}/test/${spec.file}`).then(r => r.text());
+        textPromise = fetch(URLs.sourceURL(commit.sha, spec.file)).then(r => r.text());
         this._fileContentsCache.set(cacheKey, textPromise);
       }
 

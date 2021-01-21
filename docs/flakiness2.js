@@ -25,19 +25,6 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-async function downloadLastCommitsData(count, progress) {
-  let loaded = 0;
-  return await Promise.all(commits.slice(0, count).map(async commit => {
-    const r = await fetch(`https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${commit.sha}.json`);
-    let reports = [];
-    if (r.ok)
-      reports = await r.json();
-    ++loaded;
-    progress(loaded);
-    return reports;
-  }).flat());
-}
-
 class CommitData {
   constructor(sha, onLoadCallback) {
     this._sha = sha;

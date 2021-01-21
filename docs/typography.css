@@ -92,11 +92,11 @@ spacer {
 }
 
 .hover-darken:hover {
-  filter: brightness(0.85);
+  filter: brightness(85%);
 }
 
 .hover-lighten:hover {
-  filter: brightness(1.15);
+  filter: brightness(105%);
 }
 
 

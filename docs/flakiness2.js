@@ -436,11 +436,16 @@ class DashboardData {
       this._sideElement.textContent = '';
       this._sideElement.append(html`
         <vbox>
-          <div style="margin-bottom: 1em;">
+          <div style="
+              margin-bottom: 1em;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+          ">
             <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
           </div>
-          <hbox>
-            <div style="margin-left: 1em; width: 520px; text-align: center;">test parameters</div>
+          <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
+            <div style="margin-left: 1em; width: 420px; text-align: center;">test parameters</div>
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
@@ -452,6 +457,8 @@ class DashboardData {
             };
             if (t1.category !== t2.category)
               return categoryScore[t1.category] - categoryScore[t2.category];
+            if (t1.annotations.length !== t2.annotations.length)
+              return t2.annotations.length - t1.annotations.length;
             if (t1.name !== t2.name)
               return t1.name < t2.name ? -1 : 1;
             return 0;

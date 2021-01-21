@@ -16,15 +16,15 @@ const sidebarPositionToCSSOrientation = {
 };
 
 export const split = {
-  left: ({sidebar, main, size, hidden = false}) => splitElement(sidebar, main, size, hidden, 'left'),
-  right: ({sidebar, main, size, hidden = false}) => splitElement(sidebar, main, size, hidden, 'right'),
-  top: ({sidebar, main, size, hidden = false}) => splitElement(sidebar, main, size, hidden, 'top'),
-  bottom: ({sidebar, main, size, hidden = false}) => splitElement(sidebar, main, size, hidden, 'bottom'),
+  left: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'left', extraDragElement),
+  right: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'right', extraDragElement),
+  top: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'top', extraDragElement),
+  bottom: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'bottom', extraDragElement),
   hideSidebar: (splitElement) => splitElement.removeAttribute('sidebar-shown'),
   showSidebar: (splitElement) => splitElement.setAttribute('sidebar-shown', true),
 };
 
-function splitElement(sidebar, main, size, hidden, sidebarPosition) {
+function splitElement(sidebar, main, size, hidden, sidebarPosition, extraDragElement) {
   const mainPane = html`<main-pane>${main}</main-pane>`;
   const resizer = html`<split-resizer></split-resizer>`;
   const sidePane = html`<side-pane>${sidebar}</side-pane>`;
@@ -38,11 +38,13 @@ function splitElement(sidebar, main, size, hidden, sidebarPosition) {
   if (!hidden)
     element.setAttribute('sidebar-shown', true);
 
-  setupResizer(sidePane, resizer, sidebarPosition, size);
+  setupResizer(sidePane, resizer, extraDragElement, sidebarPosition, size);
   return element;
 }
 
-function setupResizer(sideElement, resizerElement, sidebarPosition, initialSize) {
+const extraResizerIndex = Symbol('SplitElement.setupExtraResizer');
+
+function setupResizer(sideElement, resizerElement, extraDragElement, sidebarPosition, initialSize) {
   sideElement.style.setProperty('--size', initialSize);
 
   const domEvents = [];
@@ -71,7 +73,11 @@ function setupResizer(sideElement, resizerElement, sidebarPosition, initialSize)
     initialSize += delta;
     disposeAll(domEvents);
     domEvents.push(onDOMEvent(resizerElement, 'mousedown', initialize));
+    if (extraDragElement)
+      domEvents.push(onDOMEvent(extraDragElement, 'mousedown', initialize));
   };
 
   domEvents.push(onDOMEvent(resizerElement, 'mousedown', initialize));
+  if (extraDragElement)
+    domEvents.push(onDOMEvent(extraDragElement, 'mousedown', initialize));
 }

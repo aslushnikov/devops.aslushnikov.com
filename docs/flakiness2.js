@@ -1,5 +1,6 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
+import {consumeDOMEvent} from './utils.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 import {cronjobBadgesHeader} from './cronjobs.js';
 import {SMap} from './smap.js';
@@ -10,6 +11,7 @@ import {highlightText, preloadHighlighter} from './codehighlight.js';
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
 const CHAR_WARNING = '⚠';
+const CHAR_CROSS = '✖';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -19,6 +21,13 @@ const COLOR_RED = '#ef9a9a';
 const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
+
+const testRunColors = {
+  'passed': COLOR_GREEN,
+  'failed': COLOR_RED,
+  'timedOut': COLOR_YELLOW,
+  'skipped': COLOR_GREY,
+};
 
 const cronjobsHeader = cronjobBadgesHeader();
 
@@ -171,7 +180,7 @@ class DashboardData {
     this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
-    this._codeElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
+    this._secondSideElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
 
     this._selectedCommit = null;
 
@@ -186,7 +195,7 @@ class DashboardData {
       sidebar: html`
         ${split.right({
           main: this._sideElement,
-          sidebar: this._codeElement,
+          sidebar: this._secondSideElement,
           hidden: false,
           size: 700,
         })}
@@ -199,14 +208,14 @@ class DashboardData {
                        cursor: pointer;
                        transform: translate(0, -100%);
                        z-index: 10000;"
-                onclick=${doCloseSidebar}>✖ close</button>
+                onclick=${doCloseSidebar}>${CHAR_CROSS} close</button>
       `,
       size: 300,
       hidden: true,
     });
     this.element = this._splitView;
 
-    this._lastCommits = 20;
+    this._lastCommits = 2;
     this._lastCommitsSelect = html`
       <select oninput=${e => {
         this._lastCommits = parseInt(e.target.value, 10);
@@ -274,6 +283,8 @@ class DashboardData {
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
     }));
+
+    const tabstrip = new TabStrip();
 
     renderMainElement.call(self);
 
@@ -406,7 +417,7 @@ class DashboardData {
       const clazz = spec.specId === self._selectedCommit?.specId && commit.sha === self._selectedCommit?.sha ? 'selected-commit' : undefined;
 
       return svg`
-        <svg class=${clazz} style="flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
+        <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
              onclick=${event => renderSidebarSpecCommit.call(self, spec, commit)}
              viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
@@ -421,14 +432,8 @@ class DashboardData {
       };
       renderMainElement.call(self);
 
-      renderCode.call(self, commit, spec);
+      renderSecondSidebar.call(self, commit, spec);
       this._sideElement.textContent = '';
-      const runColors = {
-        'passed': COLOR_GREEN,
-        'failed': COLOR_RED,
-        'timedOut': COLOR_YELLOW,
-        'skipped': COLOR_GREY,
-      };
       this._sideElement.append(html`
         <vbox>
           <div style="margin-bottom: 1em;">
@@ -451,28 +456,20 @@ class DashboardData {
               return t1.name < t2.name ? -1 : 1;
             return 0;
           }).map(test => html`
-            <hbox>
+            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab(test)}>
               <div style="
                 width: 300px;
                 margin-left: 1em;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-              "><a href="${test.url}">${test.name}</a></div>
+              "><span>${test.name}</span><a href="${test.url}"></a></div>
               <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
               <div style="width: 100px; text-align: center;">
-                ${test.runs.map(run => svg`
-                  <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
-                    <circle cx=5 cy=5 r=5 fill="${runColors[run.status] || 'blue'}">
-                  </svg>
-                `)}
+                ${test.runs.map(run => renderTestStatus(run.status))}
               </div>
               <div style="width: 100px; text-align: center;">
-                ${svg`
-                  <svg style="margin: 1px;" width=10 height=10 viewbox="0 0 10 10">
-                    <circle cx=5 cy=5 r=5 fill="${runColors[test.expectedStatus] || 'blue'}">
-                  </svg>
-                `}
+                ${renderTestStatus(test.expectedStatus)}
               </div>
             </hbox>
           `)}
@@ -481,34 +478,72 @@ class DashboardData {
       split.showSidebar(this._splitView);
     }
 
-    function renderCode(commit, spec) {
-      this._codeElement.textContent = '';
+    function addTestTab(test) {
+      let tab = tabstrip.tabWithName(test.name);
+      if (tab) {
+        tabstrip.selectTab(tab);
+        return;
+      }
+
+      tabstrip.addTab({
+        name: test.name,
+        selected: true,
+        closable: true,
+        contentElement: html`
+          <section style="
+            display: flex;
+            flex-direction: column;
+            flex: auto;
+            padding: 1em;
+            white-space: pre;
+            font-family: var(--monospace);
+            overflow: auto;
+          ">
+            ${test.runs.map((run, index) => renderTestRun(test, run, index))}
+          </section>
+        `,
+      });
+    }
+
+    function renderTestRun(test, run, index) {
+      return html`
+        <h2>${renderTestStatus(run.status, 14)} Run #${index + 1} - ${run.status}</h2>
+        ${run.error && html`
+          <pre style="
+            background-color: #333;
+            color: #eee;
+            padding: 1em;
+            overflow: auto;
+          ">${highlightANSIText(run.error.stack)}</pre>
+        `}
+      `;
+    }
+
+    function renderSecondSidebar(commit, spec) {
       spec = commit.data.specs().get({specId: spec.specId});
       if (!spec)
         return;
 
       const gutter = html`<div></div>`;
-      const editorElement = html`<section></section>`;
-      this._codeElement.append(html`
-        <div>
-          <span onclick=${() => scrollToCoords()} style="
-            margin: 0px 4px -2px 0px;
-            padding: 2px 10px;
-            cursor: pointer;
-            display: inline-block;
-            background-color: var(--border-color);
-          ">${spec.file}:${spec.line}</span>
-        </div>
-        ${editorElement}
-      `);
-
       const scrollToCoords = () => {
         gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
       };
 
-      const loadingElement = html`<div></div>`;
-      setTimeout(() => loadingElement.textContent = 'Loading...', 777);
-      editorElement.append(loadingElement);
+      const editorElement = html`<section style="${STYLE_FILL}; overflow: auto;"></section>`;
+      tabstrip.removeAllTabs();
+      tabstrip.addTab({
+        name: `${spec.file}:${spec.line}`,
+        contentElement: editorElement,
+        selected: true,
+        onSelected: scrollToCoords,
+      });
+
+      this._secondSideElement.textContent = '';
+      this._secondSideElement.append(tabstrip.element);
+
+      const editorSourceLoadingElement = html`<div></div>`;
+      setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
+      editorElement.append(editorSourceLoadingElement);
 
       const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
       let textPromise = this._fileContentsCache.get(cacheKey);
@@ -543,12 +578,12 @@ class DashboardData {
           </div>
           </div>
         `;
-        editorElement.replaceWith(html`
+        editorElement.textContent = '';
+        editorElement.append(html`
           <div style="display: flex;
                       white-space: pre;
                       overflow: auto;
                       font-family: var(--monospace);
-                      border-top: 1px solid var(--border-color);
           ">
             ${gutter}
             ${code}
@@ -635,6 +670,14 @@ function svgPie({ratio, color = COLOR_GREEN, size = COMMIT_RECT_SIZE}) {
   `;
 }
 
+function renderTestStatus(status, size=10) {
+  return svg`
+    <svg style="margin: 1px;" width=${size} height=${size} viewbox="0 0 10 10">
+      <circle cx=5 cy=5 r=5 fill="${testRunColors[status] || 'blue'}">
+    </svg>
+  `;
+}
+
 function flattenSpecs(suite, result = []) {
   if (suite.suites) {
     for (const child of suite.suites)
@@ -645,3 +688,104 @@ function flattenSpecs(suite, result = []) {
   return result;
 }
 
+class TabStrip {
+  constructor() {
+    this._strip = html`
+      <div style="
+          background-color: var(--border-color);
+          border-bottom: 1px solid var(--border-color);
+          flex: none;
+      "></div>
+    `;
+    this._content = html`
+      <div style="
+        flex: auto;
+        position: relative;
+        overflow: auto;
+      "></div>
+    `;
+    this.element = html`<section style="
+      display: flex;
+      flex-direction: column;
+      ${STYLE_FILL}
+    ">
+      ${this._strip}
+      ${this._content}
+    </section>`;
+
+    this._selectedTab = null;
+    this._tabs = new Map();
+  }
+
+  removeAllTabs() {
+    this._tabs.clear();
+    this._strip.textContent = '';
+    this._content.textContent = '';
+  }
+
+  addTab({name, contentElement, selected = false, onSelected = () => {}, closable = false}) {
+    const tab = html`
+      <span class=hover-lighten style="
+        padding: 0px 10px;
+        cursor: pointer;
+        display: inline-block;
+        background-color: ${selected ? 'white' : 'none'};
+      ">${name}</span>
+    `;
+    if (closable) {
+      tab.append(html`
+        <span onclick=${event => {this.removeTab(tab); consumeDOMEvent(event); }}> ${CHAR_CROSS} </span>
+      `);
+    }
+    tab.onclick = this._onTabClicked.bind(this, tab);
+    this._tabs.set(tab, {
+      name, contentElement, onSelected, closable
+    });
+    this._strip.append(tab);
+    if (selected)
+      this.selectTab(tab);
+    return tab;
+  }
+
+  removeTab(tab) {
+    if (tab === this._selectedTab) {
+      if (tab.nextSibling) {
+        this.selectTab(tab.nextSibling);
+      } else if (tab.previousSibling) {
+        this.selectTab(tab.previousSibling);
+      } else {
+        this._selectedTab = null;
+        this._content.textContent = '';
+      }
+    }
+    tab.remove();
+    this._tabs.delete(tab);
+  }
+
+  _onTabClicked(tab, event) {
+    this.selectTab(tab);
+    this._tabs.get(tab).onSelected.call(null);
+  }
+
+  selectTab(tab) {
+    if (this._selectedTab === tab)
+      return;
+    if (this._selectedTab)
+      this._selectedTab.style.setProperty('background-color', 'var(--border-color)');
+    this._selectedTab = tab;
+    if (this._selectedTab)
+      this._selectedTab.style.setProperty('background-color', 'white');
+    this._content.textContent = '';
+    this._content.append(this._tabs.get(tab).contentElement);
+    this._tabs.get(tab).onSelected.call(null);
+  }
+
+  tabWithName(name) {
+    const result = [...this._tabs.entries()].find(([tab, info]) => info.name === name);
+    return result ? result[0]: null;
+  }
+
+  setText(tab, text) {
+    tab.textContent = text;
+  }
+}

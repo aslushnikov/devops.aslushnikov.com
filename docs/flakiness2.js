@@ -215,7 +215,7 @@ class DashboardData {
     });
     this.element = this._splitView;
 
-    this._lastCommits = 2;
+    this._lastCommits = 20;
     this._lastCommitsSelect = html`
       <select oninput=${e => {
         this._lastCommits = parseInt(e.target.value, 10);
@@ -360,7 +360,7 @@ class DashboardData {
           white-space: nowrap;
           align-items: baseline;
         ">
-          <span style="color: grey; font-size: 10px;font-family: var(--monospace);">[${spec.file}:${spec.line}]</span><span style="margin-left: 1ex; overflow: hidden; text-overflow: ellipsis;">${spec.title}</span>
+          <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
           <spacer></spacer>
           ${renderSpecAnnotations(spec)}
         </hbox>
@@ -499,6 +499,7 @@ class DashboardData {
             font-family: var(--monospace);
             overflow: auto;
           ">
+            <h2>${test.name}</h2>
             ${test.runs.map((run, index) => renderTestRun(test, run, index))}
           </section>
         `,
@@ -507,7 +508,7 @@ class DashboardData {
 
     function renderTestRun(test, run, index) {
       return html`
-        <h2>${renderTestStatus(run.status, 14)} Run #${index + 1} - ${run.status}</h2>
+        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, 12)} Run #${index + 1} - ${run.status}</h3>
         ${run.error && html`
           <pre style="
             background-color: #333;
@@ -726,7 +727,7 @@ class TabStrip {
   addTab({name, contentElement, selected = false, onSelected = () => {}, closable = false}) {
     const tab = html`
       <span class=hover-lighten style="
-        padding: 0px 10px;
+        padding: 2px 10px;
         cursor: pointer;
         display: inline-block;
         background-color: ${selected ? 'white' : 'none'};

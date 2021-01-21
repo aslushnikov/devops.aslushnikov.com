@@ -194,7 +194,7 @@ class DashboardData {
                        right: -5px;
                        top: 0;
                        appearance: none;
-                       background: white;
+                       background-color: var(--border-color);
                        border: 5px solid var(--border-color);
                        cursor: pointer;
                        transform: translate(0, -100%);

@@ -21,6 +21,7 @@ const COLOR_RED = '#ef9a9a';
 const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
+const STYLE_NO_TEXT_OVERFLOW = `border-bottom: 1px solid var(--border-color);`;
 
 const testRunColors = {
   'passed': COLOR_GREEN,
@@ -435,51 +436,55 @@ class DashboardData {
       renderSecondSidebar.call(self, commit, spec);
       this._sideElement.textContent = '';
       this._sideElement.append(html`
-        <vbox>
+        <vbox style="${STYLE_FILL}; overflow: hidden;">
           <div style="
-              margin-bottom: 1em;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
+              flex: none;
+              background-color: var(--border-color);
+              padding: 2px 1em;
+              border-bottom: 1px solid var(--border-color);
           ">
             <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
           </div>
-          <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
-            <div style="margin-left: 1em; width: 420px; text-align: center;">test parameters</div>
-            <div style="width: 100px; text-align: center;">runs</div>
-            <div style="width: 100px; text-align: center;">expected</div>
-          </hbox>
-          ${tests.getAll({sha: commit.sha, specId: spec.specId}).sort((t1, t2) => {
-            const categoryScore = {
-              'bad': 0,
-              'flaky': 1,
-              'good': 2,
-            };
-            if (t1.category !== t2.category)
-              return categoryScore[t1.category] - categoryScore[t2.category];
-            if (t1.annotations.length !== t2.annotations.length)
-              return t2.annotations.length - t1.annotations.length;
-            if (t1.name !== t2.name)
-              return t1.name < t2.name ? -1 : 1;
-            return 0;
-          }).map(test => html`
-            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab.call(self, test)}>
-              <div style="
-                width: 300px;
-                margin-left: 1em;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-              "><span>${test.name}</span><a href="${test.url}"></a></div>
-              <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
-              <div style="width: 100px; text-align: center;">
-                ${test.runs.map(run => renderTestStatus(run.status))}
-              </div>
-              <div style="width: 100px; text-align: center;">
-                ${renderTestStatus(test.expectedStatus)}
-              </div>
+          <div style="flex: auto; overflow: auto; padding: 1em;">
+            <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
+              <div style="width: 420px; text-align: center;">test parameters</div>
+              <div style="width: 100px; text-align: center;">runs</div>
+              <div style="width: 100px; text-align: center;">expected</div>
             </hbox>
-          `)}
+            ${tests.getAll({sha: commit.sha, specId: spec.specId}).sort((t1, t2) => {
+              const categoryScore = {
+                'bad': 0,
+                'flaky': 1,
+                'good': 2,
+              };
+              if (t1.category !== t2.category)
+                return categoryScore[t1.category] - categoryScore[t2.category];
+              if (t1.annotations.length !== t2.annotations.length)
+                return t2.annotations.length - t1.annotations.length;
+              if (t1.name !== t2.name)
+                return t1.name < t2.name ? -1 : 1;
+              return 0;
+            }).map(test => html`
+              <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab.call(self, test)}>
+                <div style="
+                  width: 300px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                "><span>${test.name}</span><a href="${test.url}"></a></div>
+                <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
+                <div style="width: 100px; text-align: center;">
+                  ${test.runs.map(run => renderTestStatus(run.status))}
+                </div>
+                <div style="width: 100px; text-align: center;">
+                  ${renderTestStatus(test.expectedStatus)}
+                </div>
+              </hbox>
+            `)}
+          </div>
         </vbox>
       `);
       split.showSidebar(this._splitView);
@@ -701,7 +706,6 @@ class TabStrip {
     this._strip = html`
       <div style="
           background-color: var(--border-color);
-          border-bottom: 1px solid var(--border-color);
           cursor: row-resize;
           flex: none;
       "></div>

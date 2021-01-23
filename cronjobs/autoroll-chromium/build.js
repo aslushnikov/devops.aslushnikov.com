@@ -15,7 +15,7 @@ const fs = require('fs');
 
   try {
     await fs.promises.writeFile(pw.filepath('browser_patches/chromium/BUILD_NUMBER'), '' + roll.chromiumRevision);
-    await misc.spawnWithLogOrDie('browser_patches/chromium/build.sh', { cwd: pw.checkoutPath() });
+    await misc.spawnWithLogOrDie('browser_patches/chromium/build.sh', '--mirror', { cwd: pw.checkoutPath() });
     roll.steps.build = 'ok';
   } catch (e) {
     roll.steps.build = 'fail';

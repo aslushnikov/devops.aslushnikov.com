@@ -191,7 +191,39 @@ class DashboardData {
       this._render();
     };
 
+    this._editorTab = {
+      titleElement: html`<span></span>`,
+      contentElement: html`<section style="${STYLE_FILL}; overflow: auto;"></section>`,
+    };
+    this._testTab = {
+      titleElement: html`<span></span>`,
+      contentElement: html`
+          <section style="
+            display: flex;
+            flex-direction: column;
+            flex: auto;
+            padding: 1em;
+            white-space: pre;
+            font-family: var(--monospace);
+            overflow: auto;
+          "></section>
+      `,
+    };
     this._tabstrip = new TabStrip();
+    this._tabstrip.addTab({
+      tabId: 'editor-tab',
+      titleElement: this._editorTab.titleElement,
+      contentElement: this._editorTab.contentElement,
+      selected: true,
+    });
+    this._tabstrip.addTab({
+      tabId: 'test-tab',
+      titleElement: this._testTab.titleElement,
+      contentElement: this._testTab.contentElement,
+      selected: false,
+    });
+
+
     this._splitView = split.bottom({
       main: this._mainElement,
       sidebar: html`
@@ -419,19 +451,24 @@ class DashboardData {
 
       return svg`
         <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
-             onclick=${event => renderSidebarSpecCommit.call(self, spec, commit)}
+             onclick=${event => selectSpecCommit.call(self, spec, commit)}
              viewbox="0 0 14 14">
           <rect x=0 y=0 width=14 height=14 fill="${color}"/>
         </svg>
       `;
     }
 
-    function renderSidebarSpecCommit(spec, commit) {
+    function selectSpecCommit(spec, commit) {
       this._selectedCommit = {
         specId: spec.specId,
         sha: commit.sha,
+        testName: this._selectedCommit?.testName,
       };
       renderMainElement.call(self);
+
+      if (this._selectedCommit.testName) {
+        renderTestTab.call(this, tests.get({specId: spec.specId, sha: commit.sha, name: this._selectedCommit.testName}));
+      }
 
       renderSecondSidebar.call(self, commit, spec);
       this._sideElement.textContent = '';
@@ -468,7 +505,7 @@ class DashboardData {
                 return t1.name < t2.name ? -1 : 1;
               return 0;
             }).map(test => html`
-              <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => addTestTab.call(self, test)}>
+              <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => selectTest.call(self, test)}>
                 <div style="
                   width: 300px;
                   overflow: hidden;
@@ -490,32 +527,26 @@ class DashboardData {
       split.showSidebar(this._splitView);
     }
 
-    function addTestTab(test) {
-      let tab = this._tabstrip.tabWithName(test.name);
-      if (tab) {
-        this._tabstrip.selectTab(tab);
+    function selectTest(test) {
+      this._tabstrip.selectTab('test-tab');
+      if (this._selectedCommit)
+        this._selectedCommit.testName = test.name;
+      renderTestTab.call(this, test);
+    }
+
+    function renderTestTab(test) {
+      if (!test) {
+        this._testTab.contentElement.textContent = '';
+        this._testTab.contentElement.append(html`<h3>No Data</h3>`);
         return;
       }
 
-      this._tabstrip.addTab({
-        name: test.name,
-        selected: true,
-        closable: true,
-        contentElement: html`
-          <section style="
-            display: flex;
-            flex-direction: column;
-            flex: auto;
-            padding: 1em;
-            white-space: pre;
-            font-family: var(--monospace);
-            overflow: auto;
-          ">
-            <h2>${test.name}</h2>
-            ${test.runs.map((run, index) => renderTestRun(test, run, index))}
-          </section>
-        `,
-      });
+      this._testTab.titleElement.textContent = test.name;
+      this._testTab.contentElement.textContent = '';
+      this._testTab.contentElement.append(html`
+        <h2>${test.name}</h2>
+        ${test.runs.map((run, index) => renderTestRun(test, run, index))}
+      `);
     }
 
     function renderTestRun(test, run, index) {
@@ -542,21 +573,16 @@ class DashboardData {
         gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
       };
 
-      const editorElement = html`<section style="${STYLE_FILL}; overflow: auto;"></section>`;
-      this._tabstrip.removeAllTabs();
-      this._tabstrip.addTab({
-        name: `${spec.file}:${spec.line}`,
-        contentElement: editorElement,
-        selected: true,
-        onSelected: scrollToCoords,
-      });
+      this._editorTab.titleElement.textContent = `${spec.file}:${spec.line}`;
 
       this._secondSideElement.textContent = '';
       this._secondSideElement.append(this._tabstrip.element);
 
       const editorSourceLoadingElement = html`<div></div>`;
       setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
-      editorElement.append(editorSourceLoadingElement);
+
+      this._editorTab.contentElement.textContent = '';
+      this._editorTab.contentElement.append(editorSourceLoadingElement);
 
       const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
       let textPromise = this._fileContentsCache.get(cacheKey);
@@ -591,8 +617,8 @@ class DashboardData {
           </div>
           </div>
         `;
-        editorElement.textContent = '';
-        editorElement.append(html`
+        this._editorTab.contentElement.textContent = '';
+        this._editorTab.contentElement.append(html`
           <div style="display: flex;
                       white-space: pre;
                       overflow: auto;
@@ -726,84 +752,45 @@ class TabStrip {
       ${this._content}
     </section>`;
 
-    this._selectedTab = null;
+    this._selectedTabId = '';
     this._tabs = new Map();
-  }
-
-  removeAllTabs() {
-    this._tabs.clear();
-    this._strip.textContent = '';
-    this._content.textContent = '';
   }
 
   tabstripElement() {
     return this._strip;
   }
 
-  addTab({name, contentElement, selected = false, onSelected = () => {}, closable = false}) {
-    const tab = html`
+  addTab({tabId, titleElement, contentElement, selected = false}) {
+    const tabElement = html`
       <span class=hover-lighten style="
         user-select: none;
         padding: 2px 10px;
         cursor: pointer;
         display: inline-block;
         background-color: ${selected ? 'white' : 'none'};
-      ">${name}</span>
+      ">${titleElement}</span>
     `;
-    if (closable) {
-      tab.append(html`
-        <span onclick=${event => {this.removeTab(tab); consumeDOMEvent(event); }}> ${CHAR_CROSS} </span>
-      `);
-    }
-    tab.onclick = this._onTabClicked.bind(this, tab);
-    this._tabs.set(tab, {
-      name, contentElement, onSelected, closable
-    });
-    this._strip.append(tab);
+    tabElement.onclick = this._onTabClicked.bind(this, tabId);
+    this._tabs.set(tabId, {titleElement, contentElement, tabElement});
+    this._strip.append(tabElement);
     if (selected)
-      this.selectTab(tab);
-    return tab;
+      this.selectTab(tabId);
   }
 
-  removeTab(tab) {
-    if (tab === this._selectedTab) {
-      if (tab.nextSibling) {
-        this.selectTab(tab.nextSibling);
-      } else if (tab.previousSibling) {
-        this.selectTab(tab.previousSibling);
-      } else {
-        this._selectedTab = null;
-        this._content.textContent = '';
-      }
-    }
-    tab.remove();
-    this._tabs.delete(tab);
+  _onTabClicked(tabId, event) {
+    this.selectTab(tabId);
   }
 
-  _onTabClicked(tab, event) {
-    this.selectTab(tab);
-    this._tabs.get(tab).onSelected.call(null);
-  }
-
-  selectTab(tab) {
-    if (this._selectedTab === tab)
+  selectTab(tabId) {
+    if (this._selectedTabId === tabId)
       return;
-    if (this._selectedTab)
-      this._selectedTab.style.setProperty('background-color', 'var(--border-color)');
-    this._selectedTab = tab;
-    if (this._selectedTab)
-      this._selectedTab.style.setProperty('background-color', 'white');
+    if (this._selectedTabId)
+      this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'var(--border-color)');
+    this._selectedTabId = tabId;
     this._content.textContent = '';
-    this._content.append(this._tabs.get(tab).contentElement);
-    this._tabs.get(tab).onSelected.call(null);
-  }
-
-  tabWithName(name) {
-    const result = [...this._tabs.entries()].find(([tab, info]) => info.name === name);
-    return result ? result[0]: null;
-  }
-
-  setText(tab, text) {
-    tab.textContent = text;
+    if (this._selectedTabId) {
+      this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'white');
+      this._content.append(this._tabs.get(this._selectedTabId).contentElement);
+    }
   }
 }

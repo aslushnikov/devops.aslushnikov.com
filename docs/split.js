@@ -29,7 +29,7 @@ function splitElement(sidebar, main, size, hidden, sidebarPosition, extraDragEle
   const resizer = html`<split-resizer></split-resizer>`;
   const sidePane = html`<side-pane>${sidebar}</side-pane>`;
   const element = html`
-    <split-element class="foo ${sidebarPositionToCSSClass[sidebarPosition]} ${sidebarPositionToCSSOrientation[sidebarPosition]}">
+    <split-element class="${sidebarPositionToCSSClass[sidebarPosition]} ${sidebarPositionToCSSOrientation[sidebarPosition]}">
       ${sidePane}
       ${resizer}
       ${mainPane}

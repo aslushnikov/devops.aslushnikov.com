@@ -666,8 +666,7 @@ function isFlakyTest(test) {
 function getTestCategory(test) {
   const hasGoodRun = test.runs.some(run => run.status === test.expectedStatus);
   const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus && run.status && run.status !== 'skipped');
-  const hasFlakyAnnotation = test.annotations.some(annotation => annotation.type === 'flaky');
-  if (hasFlakyAnnotation && hasGoodRun && hasBadRun)
+  if (hasGoodRun && hasBadRun)
     return 'flaky';
   if (hasBadRun)
     return 'bad';

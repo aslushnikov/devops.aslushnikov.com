@@ -516,13 +516,14 @@ class DashboardData {
               <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => selectTest.call(self, test)}>
                 <div style="
                   width: 300px;
+                  padding-left: 1ex;
                   overflow: hidden;
                   text-overflow: ellipsis;
                   white-space: nowrap;
                 "><span>${test.name}</span><a href="${test.url}"></a></div>
                 <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
                 <div style="width: 100px; text-align: center;">
-                  ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 1 : 0}))}
+                  ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}
                 </div>
                 <div style="width: 100px; text-align: center;">
                   ${renderTestStatus(test.expectedStatus)}
@@ -556,7 +557,7 @@ class DashboardData {
       this._testTab.titleElement.textContent = '';
       this._testTab.titleElement.append(html`
         <hbox>
-          <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 1 : 0}))}</span>
+          <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}</span>
           ${test.name}
         </hbox>
       `);
@@ -646,7 +647,6 @@ class DashboardData {
             ${code}
           </div>
         `);
-
         scrollToCoords();
       });
     }

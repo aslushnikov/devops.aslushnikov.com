@@ -16,21 +16,24 @@ const sidebarPositionToCSSOrientation = {
 };
 
 export const split = {
-  left: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'left', extraDragElement),
-  right: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'right', extraDragElement),
-  top: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'top', extraDragElement),
-  bottom: ({sidebar, main, size, hidden = false, extraDragElement}) => splitElement(sidebar, main, size, hidden, 'bottom', extraDragElement),
+  left: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'left' ),
+  right: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'right'),
+  top: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'top'),
+  bottom: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'bottom'),
   hideSidebar: (splitElement) => splitElement.removeAttribute('sidebar-shown'),
   showSidebar: (splitElement) => splitElement.setAttribute('sidebar-shown', true),
+  registerResizer: (splitElement, resizerElement) => registerResizer(splitElement, resizerElement),
 };
 
-function splitElement(sidebar, main, size, hidden, sidebarPosition, extraDragElement) {
+const MetaInfoSymbol = Symbol('Split.Meta');
+
+function splitElement(sidebar, main, size, hidden, sidebarPosition) {
   const mainPane = html`<main-pane>${main}</main-pane>`;
   const resizer = html`<split-resizer></split-resizer>`;
-  const sidePane = html`<side-pane>${sidebar}</side-pane>`;
+  const sideElement = html`<side-pane>${sidebar}</side-pane>`;
   const element = html`
     <split-element class="${sidebarPositionToCSSClass[sidebarPosition]} ${sidebarPositionToCSSOrientation[sidebarPosition]}">
-      ${sidePane}
+      ${sideElement}
       ${resizer}
       ${mainPane}
     </split-element>
@@ -38,18 +41,23 @@ function splitElement(sidebar, main, size, hidden, sidebarPosition, extraDragEle
   if (!hidden)
     element.setAttribute('sidebar-shown', true);
 
-  setupResizer(sidePane, resizer, extraDragElement, sidebarPosition, size);
+  sideElement.style.setProperty('--size', size);
+  element[MetaInfoSymbol] = {
+    sideElement,
+    sidebarPosition,
+    size,
+  };
+  registerResizer(element, resizer);
   return element;
 }
 
-const extraResizerIndex = Symbol('SplitElement.setupExtraResizer');
-
-function setupResizer(sideElement, resizerElement, extraDragElement, sidebarPosition, initialSize) {
-  sideElement.style.setProperty('--size', initialSize);
-
+function registerResizer(splitElement, resizerElement) {
+  const info = splitElement[MetaInfoSymbol];
+  if (!info)
+    throw new Error('ERROR: given element is not a splitElement');
   const domEvents = [];
-  const axis = sidebarPosition === 'left' || sidebarPosition === 'right' ? 'pageX' : 'pageY';
-  const coeff = sidebarPosition === 'bottom' || sidebarPosition === 'right' ? -1 : 1;
+  const axis = info.sidebarPosition === 'left' || info.sidebarPosition === 'right' ? 'pageX' : 'pageY';
+  const coeff = info.sidebarPosition === 'bottom' || info.sidebarPosition === 'right' ? -1 : 1;
   let initialCoordinate = 0;
 
   const initialize = event => {
@@ -66,18 +74,15 @@ function setupResizer(sideElement, resizerElement, extraDragElement, sidebarPosi
   const update = (event, commit) => {
     consumeDOMEvent(event);
     const delta = (event[axis] - initialCoordinate) * coeff;
-    sideElement.style.setProperty('--size', (initialSize + delta) + 'px');
+    info.sideElement.style.setProperty('--size', (info.size + delta) + 'px');
     if (!commit)
       return;
 
-    initialSize += delta;
+    info.size += delta;
     disposeAll(domEvents);
     domEvents.push(onDOMEvent(resizerElement, 'mousedown', initialize));
-    if (extraDragElement)
-      domEvents.push(onDOMEvent(extraDragElement, 'mousedown', initialize));
   };
 
   domEvents.push(onDOMEvent(resizerElement, 'mousedown', initialize));
-  if (extraDragElement)
-    domEvents.push(onDOMEvent(extraDragElement, 'mousedown', initialize));
 }
+

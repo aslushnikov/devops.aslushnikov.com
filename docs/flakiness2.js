@@ -246,9 +246,9 @@ class DashboardData {
       `,
       size: 300,
       hidden: true,
-      extraDragElement: this._tabstrip.tabstripElement(),
     });
     this.element = this._splitView;
+    split.registerResizer(this._splitView, this._tabstrip.tabstripElement());
 
     this._lastCommits = 2;
     this._lastCommitsSelect = html`
@@ -474,17 +474,25 @@ class DashboardData {
       this._sideElement.textContent = '';
       this._sideElement.append(html`
         <vbox style="${STYLE_FILL}; overflow: hidden;">
-          <div style="
+          <hbox onzrender=${e => split.registerResizer(this._splitView, e)} style="
               white-space: nowrap;
               overflow: hidden;
+              cursor: row-resize;
               text-overflow: ellipsis;
               flex: none;
               background-color: var(--border-color);
               padding: 2px 1em;
               border-bottom: 1px solid var(--border-color);
           ">
-            <a href="${commitURL('playwright', commit.sha)}" class=sha>${commit.sha.substring(0, 7)}</a> ${commit.message}
-          </div>
+            <vbox style="flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
+              <div>spec:</div>
+              <div>commit:</div>
+            </vbox>
+            <vbox style="overflow: hidden;">
+              <a style="text-overflow: ellipsis; overflow: hidden;" href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a>
+              <a style="text-overflow: ellipsis; overflow: hidden;" href="${commitURL('playwright', commit.sha)}"><span class=sha>${commit.sha.substring(0, 7)}</span> ${commit.message}</a>
+            </vbox>
+          </hbox>
           <div style="flex: auto; overflow: auto; padding: 1em;">
             <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
               <div style="width: 420px; text-align: center;">test parameters</div>

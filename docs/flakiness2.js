@@ -250,20 +250,15 @@ class DashboardData {
     this.element = this._splitView;
     split.registerResizer(this._splitView, this._tabstrip.tabstripElement());
 
-    this._lastCommits = 2;
+    this._lastCommits = 20;
     this._lastCommitsSelect = html`
       <select oninput=${e => {
         this._lastCommits = parseInt(e.target.value, 10);
         this._render();
       }}>
-        ${[...Array(8)].map((_, index) => html`
-          <option>${index + 2}</option>
+        ${[10,15,20,30,50].map(value => html`
+          <option value=${value} selected=${value === this._lastCommits}>${value}</option>
         `)}
-        <option>10</option>
-        <option>15</option>
-        <option selected>20</option>
-        <option>30</option>
-        <option>50</option>
       </select>
     `;
     this._render();

@@ -514,7 +514,7 @@ class DashboardData {
                 "><span>${test.name}</span><a href="${test.url}"></a></div>
                 <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
                 <div style="width: 100px; text-align: center;">
-                  ${test.runs.map(run => renderTestStatus(run.status))}
+                  ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 1 : 0}))}
                 </div>
                 <div style="width: 100px; text-align: center;">
                   ${renderTestStatus(test.expectedStatus)}
@@ -536,12 +536,22 @@ class DashboardData {
 
     function renderTestTab(test) {
       if (!test) {
+        this._testTab.titleElement.textContent = this._selectedCommit.testName;
         this._testTab.contentElement.textContent = '';
-        this._testTab.contentElement.append(html`<h3>No Data</h3>`);
+        this._testTab.contentElement.append(html`
+          <h2>${this._selectedCommit.testName}</h2>
+          <h3>No Data</h3>
+        `);
         return;
       }
 
-      this._testTab.titleElement.textContent = test.name;
+      this._testTab.titleElement.textContent = '';
+      this._testTab.titleElement.append(html`
+        <hbox>
+          <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 1 : 0}))}</span>
+          ${test.name}
+        </hbox>
+      `);
       this._testTab.contentElement.textContent = '';
       this._testTab.contentElement.append(html`
         <h2>${test.name}</h2>
@@ -551,7 +561,7 @@ class DashboardData {
 
     function renderTestRun(test, run, index) {
       return html`
-        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, 12)} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
+        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
         ${run.error && html`
           <pre style="
             background-color: #333;
@@ -708,9 +718,9 @@ function svgPie({ratio, color = COLOR_GREEN, size = COMMIT_RECT_SIZE}) {
   `;
 }
 
-function renderTestStatus(status, size=10) {
+function renderTestStatus(status, {size=10, marginRight=0} = {}) {
   return svg`
-    <svg style="margin: 1px;" width=${size} height=${size} viewbox="0 0 10 10">
+    <svg style="margin-right: ${marginRight}px;" width=${size} height=${size} viewbox="0 0 10 10">
       <circle cx=5 cy=5 r=5 fill="${testRunColors[status] || 'blue'}">
     </svg>
   `;
@@ -733,6 +743,7 @@ class TabStrip {
           background-color: var(--border-color);
           cursor: row-resize;
           flex: none;
+          display: flex;
       "></div>
     `;
     this._content = html`
@@ -763,9 +774,11 @@ class TabStrip {
     const tabElement = html`
       <span class=hover-lighten style="
         user-select: none;
-        padding: 2px 10px;
+        padding: 2px 1em;
         cursor: pointer;
         display: inline-block;
+        white-space: pre;
+        flex: none;
         background-color: ${selected ? 'white' : 'none'};
       ">${titleElement}</span>
     `;

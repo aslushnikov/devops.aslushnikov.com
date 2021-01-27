@@ -8,6 +8,8 @@ import {split} from './split.js';
 import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
 
+const USE_MOCK_DATA = false;
+
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
 const CHAR_WARNING = '⚠';
@@ -35,7 +37,6 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-const USE_MOCK_DATA = false;
 const URLs = {
   dashboardURL(sha) {
     if (USE_MOCK_DATA)
@@ -174,13 +175,17 @@ class DashboardData {
   }
 
   constructor(commits) {
-    this._commits = commits.map(c => ({
+    this._commits = commits.map((c, index) => ({
       sha: c.sha,
       author: c.commit.author.name,
       email: c.commit.author.email,
       message: c.commit.message,
       timestamp: c.commit.committer.date,
-      data: new CommitData(c.sha, () => this._render()),
+      data: new CommitData(c.sha, () => { 
+        // Only commits that we plan to render affect rendering.
+        if (index < this._lastCommits)
+          this._render();
+      }),
     }));
 
     this._fileContentsCache = new Map();
@@ -346,14 +351,11 @@ class DashboardData {
         ${cronjobsHeader}
         <div style="padding: 1em;">
           <hbox>
-            ${renderStats()}
-          </hbox>
-          <hbox>
-            <div style="width: 600px; margin-right: 1em;">
             <h3>${specs.size} problematic specs (over last ${this._lastCommitsSelect} commits)</h3>
-            </div>
-            ${commits.map(commit => commit.data.loadingIndicator())}
           </hbox>
+          <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+            ${renderStats()}
+          </vbox>
           ${specs.map(spec => html`
             <hbox>
               ${renderSpecTitle(spec)}
@@ -375,6 +377,7 @@ class DashboardData {
       ]).uniqueValues('specId').length;
 
       return html`
+        <hbox>
         <div style="
           display: grid;
           grid-template-rows: ${'auto '.repeat(platforms.length + 1).trim()};
@@ -395,6 +398,7 @@ class DashboardData {
             `)}
           `)}
         </div>
+        </hbox>
       `;
     }
 

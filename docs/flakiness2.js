@@ -268,7 +268,7 @@ class DashboardData {
     `;
     this._commitLoadingElement = html`
       <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
-        <h3>Loaded <span></span> of ${this._lastCommitsSelect} commits</h3>
+        <h3>Processed <span></span> of ${this._lastCommitsSelect} commits</h3>
       </div>
     `;
     this._render();

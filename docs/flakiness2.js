@@ -35,22 +35,22 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-const useMockdata = false;
+const USE_MOCK_DATA = true;
 const URLs = {
   dashboardURL(sha) {
-    if (useMockdata)
+    if (USE_MOCK_DATA)
       return `/mockdata/${sha}.json`;
     return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${sha}.json`;
   },
 
   commitsURL() {
-    if (useMockdata)
+    if (USE_MOCK_DATA)
       return `/mockdata/commits.json`;
     return 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
   },
 
   sourceURL(sha, testFile) {
-    if (useMockdata)
+    if (USE_MOCK_DATA)
       return `/mockdata/page-basic.spec.ts`;
     return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${testFile}`;
   },
@@ -74,8 +74,10 @@ class CommitData {
 
     this._specs = new SMap();
     this._tests = new SMap();
+    this._isLoaded = false;
   }
 
+  isLoaded() { return this._isLoaded; }
   specs() { return this._specs; }
   tests() { return this._tests; }
   loadingIndicator() { return this._progressIndicator; }
@@ -103,6 +105,8 @@ class CommitData {
       this._progressIndicator.append(html`
         <span style="cursor: help;" title="${error}">${CHAR_WARNING}</span>
       `);
+      this._isLoaded = true;
+      this._onLoadCallback.call(null);
       return;
     }
     this._progressIndicator.textContent = '';
@@ -155,6 +159,7 @@ class CommitData {
     });
     this._specs = new SMap(specs);
     this._tests = new SMap(tests);
+    this._isLoaded = true;
     this._onLoadCallback.call(null);
   }
 }
@@ -261,6 +266,11 @@ class DashboardData {
         `)}
       </select>
     `;
+    this._commitLoadingElement = html`
+      <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
+        <h3>Loaded <span></span> of ${this._lastCommitsSelect} commits</h3>
+      </div>
+    `;
     this._render();
   }
 
@@ -269,6 +279,16 @@ class DashboardData {
     const commits = this._commits.slice(0, this._lastCommits);
     for (const commit of commits)
       commit.data.ensureLoaded();
+    const loadedCommits = commits.filter(commit => commit.data.isLoaded());
+    if (loadedCommits.length < commits.length) {
+      split.hideSidebar(this._splitView);
+      if (!this._commitLoadingElement.isConnected) {
+        this._mainElement.textContent = '';
+        this._mainElement.append(this._commitLoadingElement);
+      }
+      this._commitLoadingElement.$('span').textContent = loadedCommits.length;
+      return;
+    }
 
     const faultySpecIds = new SMap(commits.map(commit => [
       ...commit.data.tests().getAll({category: 'bad'}),
@@ -418,6 +438,7 @@ class DashboardData {
             background-color: ${bgcolors[annotationType] || 'blue'};
             color: ${colors[annotationType] || 'white'};
             display: inline-flex;
+            user-select: none;
             align-items: center;
             justify-content: center;
             border-radius: 2px;
@@ -484,8 +505,8 @@ class DashboardData {
               <div>commit:</div>
             </vbox>
             <vbox style="overflow: hidden;">
-              <a style="text-overflow: ellipsis; overflow: hidden;" href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a>
-              <a style="text-overflow: ellipsis; overflow: hidden;" href="${commitURL('playwright', commit.sha)}"><span class=sha>${commit.sha.substring(0, 7)}</span> ${commit.message}</a>
+              <div><a style="text-overflow: ellipsis; overflow: hidden;" href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a></div>
+              <div><a style="text-overflow: ellipsis; overflow: hidden;" href="${commitURL('playwright', commit.sha)}"><span class=sha>${commit.sha.substring(0, 7)}</span> ${commit.message}</a></div>
             </vbox>
           </hbox>
           <div style="flex: auto; overflow: auto; padding: 1em;">
@@ -696,7 +717,7 @@ function getTestName(test) {
   }).join(' / ');
 }
 
-function svgPie({ratio, color = COLOR_GREEN, size = COMMIT_RECT_SIZE}) {
+function svgPie({ratio, color = '#bbb', size = COMMIT_RECT_SIZE}) {
   const r = 50;
   const cx = r;
   const cy = r;

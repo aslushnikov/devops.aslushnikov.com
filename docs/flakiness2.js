@@ -35,7 +35,7 @@ const cronjobsHeader = cronjobBadgesHeader();
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 const URLs = {
   dashboardURL(sha) {
     if (USE_MOCK_DATA)

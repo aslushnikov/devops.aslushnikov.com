@@ -272,6 +272,16 @@ class DashboardData {
       </select>
     `;
     this._commitLoadingElement = null;
+
+    this._showFlaky = true;
+    this._showFlakyElement = html`
+      <span style="display: inline-flex; align-items: center;">
+        <input checked=${this._showFlaky} oninput=${e => {
+          this._showFlaky = e.target.checked;
+          this._render();
+        }} id=show-flaky-input-checkbox type=checkbox><label for=show-flaky-input-checkbox>Show flaky</label>
+      </span>
+    `;
     this._render();
   }
 
@@ -300,7 +310,7 @@ class DashboardData {
 
     const faultySpecIds = new SMap(commits.map(commit => [
       ...commit.data.tests().getAll({category: 'bad'}),
-      ...commit.data.tests().getAll({category: 'flaky'}),
+      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
     ]).flat()).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
       return faultySpecIds.map(specId => commit.data.tests().getAll({specId})).flat();
@@ -350,9 +360,15 @@ class DashboardData {
       this._mainElement.append(html`
         ${cronjobsHeader}
         <div style="padding: 1em;">
-          <hbox>
+          <vbox>
+            <h3>Settings</h3>
+            <div>
+              ${this._showFlakyElement}
+            </div>
+          </vbox>
+          <vbox>
             <h3>${specs.size} problematic specs (over last ${this._lastCommitsSelect} commits)</h3>
-          </hbox>
+          </vbox>
           <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
             ${renderStats()}
           </vbox>
@@ -462,7 +478,7 @@ class DashboardData {
       const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
       if (categories.has('bad'))
         color = COLOR_RED;
-      else if (categories.has('flaky'))
+      else if (categories.has('flaky') && self._showFlaky)
         color = COLOR_VIOLET;
       else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;

@@ -261,16 +261,12 @@ class DashboardData {
         this._lastCommits = parseInt(e.target.value, 10);
         this._render();
       }}>
-        ${[10,15,20,30,50].map(value => html`
+        ${[2,5,10,15,20,30,50].map(value => html`
           <option value=${value} selected=${value === this._lastCommits}>${value}</option>
         `)}
       </select>
     `;
-    this._commitLoadingElement = html`
-      <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
-        <h3>Processed <span></span> of ${this._lastCommitsSelect} commits</h3>
-      </div>
-    `;
+    this._commitLoadingElement = null;
     this._render();
   }
 
@@ -282,12 +278,19 @@ class DashboardData {
     const loadedCommits = commits.filter(commit => commit.data.isLoaded());
     if (loadedCommits.length < commits.length) {
       split.hideSidebar(this._splitView);
-      if (!this._commitLoadingElement.isConnected) {
+      if (!this._commitLoadingElement || !this._commitLoadingElement.isConnected) {
+        this._commitLoadingElement = html`
+          <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
+            <h3>Processed <span></span> of ${this._lastCommitsSelect} commits</h3>
+          </div>
+        `;
         this._mainElement.textContent = '';
         this._mainElement.append(this._commitLoadingElement);
       }
       this._commitLoadingElement.$('span').textContent = loadedCommits.length;
       return;
+    } else {
+      this._commitLoadingElement = null;
     }
 
     const faultySpecIds = new SMap(commits.map(commit => [
@@ -344,13 +347,10 @@ class DashboardData {
         <div style="padding: 1em;">
           <hbox>
             ${renderStats()}
-            <div>
-              Showing last ${this._lastCommitsSelect} commits
-            </div>
           </hbox>
           <hbox>
             <div style="width: 600px; margin-right: 1em;">
-            <h3>Showing ${specs.size} specs</h3>
+            <h3>${specs.size} problematic specs (over last ${this._lastCommitsSelect} commits)</h3>
             </div>
             ${commits.map(commit => commit.data.loadingIndicator())}
           </hbox>

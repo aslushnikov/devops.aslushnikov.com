@@ -6,7 +6,7 @@ import {SMap} from './smap.js';
 import {split} from './split.js';
 import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
-import {URLState, newURL} from './urlstate.js';
+import {URLState, newURL, amendURL} from './urlstate.js';
 
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
@@ -54,7 +54,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const commits = parseInt(state.commits || '20', 10);
     dashboard.setLastCommits(commits);
-    dashboard.setBrowserNameFilter(state.browser);
+    dashboard.setBrowserNameFilter(state.browser === 'any' ? undefined : state.browser);
 
     dashboard.render();
   }));
@@ -172,7 +172,7 @@ class CommitData {
             spec: specObject,
             sha: this._sha,
             name: getTestName(test),
-            browserName: test.parameters.browserName,
+            browserName: test.parameters.browserName || 'N/A',
             platform: test.parameters.platform,
             parameters: test.parameters,
             annotations: test.annotations,
@@ -297,7 +297,7 @@ class DashboardData {
 
     this._browserNameFilter = undefined;
 
-    this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>`;
+    this._showFlaky = false;
     this._lastCommits = 0;
     this.setLastCommits(20);
   }
@@ -313,7 +313,7 @@ class DashboardData {
   }
 
   setShowFlaky(value) {
-    this._showFlakyElement.checked = value;
+    this._showFlaky = value;
   }
 
   setBrowserNameFilter(value) {
@@ -337,12 +337,15 @@ class DashboardData {
       return;
     }
 
+    const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat().map(browserName => browserName || 'N/A'))].sort();
+    const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
+
     const faultySpecIds = new SMap(commits.map(commit => [
-      ...commit.data.tests().getAll({category: 'bad'}),
-      ...(this._showFlakyElement.checked ? commit.data.tests().getAll({category: 'flaky'}) : []),
+      ...commit.data.tests().getAll({category: 'bad', browserName: this._browserNameFilter}),
+      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky', browserName: this._browserNameFilter}) : []),
     ]).flat()).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({specId, browserName: this._browserNameFilter})).flat();
+      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId })).flat();
     }).flat());
 
     const specIdToHealth = new Map();
@@ -385,8 +388,6 @@ class DashboardData {
 
     function renderMainElement() {
       console.time('rendering');
-      const platforms = tests.uniqueValues('platform').sort();
-      const browserNames = tests.uniqueValues('browserName').filter(Boolean).sort();
 
       this._mainElement.textContent = '';
       this._mainElement.append(html`
@@ -400,9 +401,18 @@ class DashboardData {
                   `)}
                 </select> commits
               </span>
-              <span style="display: inline-flex; align-items: center;">
-                ${this._showFlakyElement}
-                <label for=${this._showFlakyElement.id}>Show flaky</label>
+              <span style="margin-right: 1em; display: inline-flex; align-items: center;">
+                <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
+                <label for=show-flaky-input-checkbox>Show flaky</label>
+              </span>
+              <span style="margin-right: 1em;">
+                browser:
+                <select oninput=${e => urlState.amend({browser: e.target.value})}>
+                    <option selected=${this._browserNameFilter === undefined}} value="any">any</option>
+                  ${allBrowserNames.map(browserName => html`
+                    <option selected=${this._browserNameFilter === browserName} value="${browserName}">${browserName}</option>
+                  `)}
+                </select>
               </span>
             </hbox>
           </hbox>
@@ -424,9 +434,6 @@ class DashboardData {
     }
 
     function renderStats() {
-      const platforms = tests.uniqueValues('platform').sort();
-      const browserNames = tests.uniqueValues('browserName').filter(Boolean).sort();
-
       const faultySpecCount = (browserName, platform) => new SMap([
         ...tests.getAll({category: 'bad', browserName, platform}),
         ...tests.getAll({category: 'flaky', browserName, platform}),
@@ -436,20 +443,20 @@ class DashboardData {
         <hbox>
         <div style="
           display: grid;
-          grid-template-rows: ${'auto '.repeat(platforms.length + 1).trim()};
-          grid-template-columns: ${'auto '.repeat(browserNames.length + 1).trim()};
+          grid-template-rows: ${'auto '.repeat(allPlatforms.length + 1).trim()};
+          grid-template-columns: ${'auto '.repeat(allBrowserNames.length + 1).trim()};
           border: 1px solid var(--border-color);
         ">
           <div style="
               border-right: 1px solid var(--border-color);
               border-bottom: 1px solid var(--border-color);
             "></div>
-          ${browserNames.map(browserName => html`
-            <div style="padding: 4px 1em; border-bottom: 1px solid var(--border-color);">${browserLogo(browserName, 18)}</div>
+          ${allBrowserNames.map(browserName => html`
+            <div style="padding: 4px 1em; border-bottom: 1px solid var(--border-color);"><a href="${amendURL({browser: browserName === self._browserNameFilter ? 'any' : browserName})}">${browserLogo(browserName, 18)}</a></div>
           `)}
-          ${platforms.map(platform => html`
+          ${allPlatforms.map(platform => html`
             <div style="padding: 0 1em; border-right: 1px solid var(--border-color);">${platform}</div>
-            ${browserNames.map(browserName => html`
+            ${allBrowserNames.map(browserName => html`
               <div style="text-align: center; padding: 0 1em">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</div>
             `)}
           `)}
@@ -522,7 +529,7 @@ class DashboardData {
       const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
       if (categories.has('bad'))
         color = COLOR_RED;
-      else if (categories.has('flaky') && self._showFlakyElement.checked)
+      else if (categories.has('flaky') && self._showFlaky)
         color = COLOR_VIOLET;
       else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;

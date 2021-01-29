@@ -166,3 +166,12 @@ export class Table {
     set.add(value);
   }
 }
+
+export class ZWidget extends HTMLElement {
+  connectedCallback() {
+    if (this.onconnected)
+      this.onconnected(this);
+  }
+  disconnectedCallback() { if (this.ondisconnected) this.ondisconnected(this); }
+}
+customElements.define('z-widget', ZWidget);

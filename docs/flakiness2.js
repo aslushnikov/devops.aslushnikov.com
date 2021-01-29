@@ -230,9 +230,12 @@ class DashboardData {
       this.render();
     };
 
+    let editorTabScrollTop = 0;
     this._editorTab = {
       titleElement: html`<span></span>`,
-      contentElement: html`<section style="${STYLE_FILL}; overflow: auto;"></section>`,
+      contentElement: html`<z-widget
+          onconnected=${w => w.scrollTop = editorTabScrollTop}
+          onscroll=${e => editorTabScrollTop = e.target.scrollTop} style="${STYLE_FILL}; overflow: auto;"></z-widget>`,
     };
     this._testTab = {
       titleElement: html`<span></span>`,

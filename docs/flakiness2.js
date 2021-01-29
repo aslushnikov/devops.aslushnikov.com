@@ -1,14 +1,12 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
-import {consumeDOMEvent} from './utils.js';
+import {CriticalSection, consumeDOMEvent} from './utils.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
-import {cronjobBadgesHeader} from './cronjobs.js';
 import {SMap} from './smap.js';
 import {split} from './split.js';
 import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
-
-const USE_MOCK_DATA = false;
+import {URLState, newURL} from './urlstate.js';
 
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
@@ -32,33 +30,59 @@ const testRunColors = {
   'skipped': COLOR_GREY,
 };
 
-const cronjobsHeader = cronjobBadgesHeader();
-
 const popover = new Popover(document);
 document.documentElement.addEventListener('click', () => popover.hide(), false);
 
-const URLs = {
+const urlState = new URLState();
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const criticalSection = new CriticalSection();
+  let dashboard = null;
+
+  urlState.startListening(() => criticalSection.run('nav', async () => {
+    const state = urlState.state();
+
+    const useMockData = StringToBool(state.mockdata || 'false');
+    if (!dashboard || useMockData !== dashboard.mockData()) {
+      document.body.textContent = '';
+      dashboard = await DashboardData.create(useMockData);
+      document.body.append(dashboard.element);
+    }
+
+    const showFlaky = StringToBool(state.show_flaky || 'true');
+    dashboard.setShowFlaky(showFlaky);
+  }));
+}, false);
+
+class DataURL {
+  constructor(useMockData = false) {
+    this._useMockData = useMockData;
+  }
+
+  mockData() { return this._useMockData; }
+
   dashboardURL(sha) {
-    if (USE_MOCK_DATA)
+    if (this._useMockData)
       return `/mockdata/${sha}.json`;
     return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${sha}.json`;
-  },
+  }
 
   commitsURL() {
-    if (USE_MOCK_DATA)
+    if (this._useMockData)
       return `/mockdata/commits.json`;
     return 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
-  },
+  }
 
   sourceURL(sha, testFile) {
-    if (USE_MOCK_DATA)
+    if (this._useMockData)
       return `/mockdata/page-basic.spec.ts`;
     return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${testFile}`;
-  },
-};
+  }
+}
 
 class CommitData {
-  constructor(sha, onLoadCallback) {
+  constructor(dataURL, sha, onLoadCallback) {
+    this._dataURL = dataURL;
     this._sha = sha;
 
     this._progressIndicator = html`<span style="
@@ -98,7 +122,7 @@ class CommitData {
   }
 
   async _loadData() {
-    const {json, error} = await fetchProgress(URLs.dashboardURL(this._sha), this._onLoadProgress.bind(this))
+    const {json, error} = await fetchProgress(this._dataURL.dashboardURL(this._sha), this._onLoadProgress.bind(this))
       .then(text => ({json: JSON.parse(text)}))
       .catch(error => ({error}));
     if (error) {
@@ -166,22 +190,24 @@ class CommitData {
 }
 
 class DashboardData {
-  static async create() {
-    const commits = await rateLimitedFetch(URLs.commitsURL()).then(text => JSON.parse(text)).then(commits => commits.map(c => {
+  static async create(useMockData = false) {
+    const dataURL = new DataURL(useMockData);
+    const commits = await rateLimitedFetch(dataURL.commitsURL()).then(text => JSON.parse(text)).then(commits => commits.map(c => {
       c.commit.committer.date = +new Date(c.commit.committer.date);
       return c;
     }).sort((c1, c2) => c2.commit.committer.date - c1.commit.committer.date));
-    return new DashboardData(commits);
+    return new DashboardData(dataURL, commits);
   }
 
-  constructor(commits) {
+  constructor(dataURL, commits) {
+    this._dataURL = dataURL;
     this._commits = commits.map((c, index) => ({
       sha: c.sha,
       author: c.commit.author.name,
       email: c.commit.author.email,
       message: c.commit.message,
       timestamp: c.commit.committer.date,
-      data: new CommitData(c.sha, () => { 
+      data: new CommitData(dataURL, c.sha, () => { 
         // Only commits that we plan to render affect rendering.
         if (index < this._lastCommits)
           this._render();
@@ -273,15 +299,15 @@ class DashboardData {
     `;
     this._commitLoadingElement = null;
 
-    this._showFlaky = true;
-    this._showFlakyElement = html`
-      <span style="display: inline-flex; align-items: center;">
-        <input checked=${this._showFlaky} oninput=${e => {
-          this._showFlaky = e.target.checked;
-          this._render();
-        }} id=show-flaky-input-checkbox type=checkbox><label for=show-flaky-input-checkbox>Show flaky</label>
-      </span>
+    this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
     `;
+    this._render();
+  }
+
+  mockData() { return this._dataURL.mockData(); }
+
+  setShowFlaky(value) {
+    this._showFlakyElement.checked = value;
     this._render();
   }
 
@@ -310,7 +336,7 @@ class DashboardData {
 
     const faultySpecIds = new SMap(commits.map(commit => [
       ...commit.data.tests().getAll({category: 'bad'}),
-      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
+      ...(this._showFlakyElement.checked ? commit.data.tests().getAll({category: 'flaky'}) : []),
     ]).flat()).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
       return faultySpecIds.map(specId => commit.data.tests().getAll({specId})).flat();
@@ -358,13 +384,15 @@ class DashboardData {
       console.time('rendering');
       this._mainElement.textContent = '';
       this._mainElement.append(html`
-        ${cronjobsHeader}
         <div style="padding: 1em;">
           <vbox>
             <h3>Settings</h3>
-            <div>
-              ${this._showFlakyElement}
-            </div>
+            <hbox>
+              <span style="display: inline-flex; align-items: center;">
+                ${this._showFlakyElement}
+                <label for=${this._showFlakyElement.id}>Show flaky</label>
+              </span>
+            </hbox>
           </vbox>
           <vbox>
             <h3>${specs.size} problematic specs (over last ${this._lastCommitsSelect} commits)</h3>
@@ -478,7 +506,7 @@ class DashboardData {
       const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
       if (categories.has('bad'))
         color = COLOR_RED;
-      else if (categories.has('flaky') && self._showFlaky)
+      else if (categories.has('flaky') && self._showFlakyElement.checked)
         color = COLOR_VIOLET;
       else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;
@@ -642,7 +670,7 @@ class DashboardData {
       const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
       let textPromise = this._fileContentsCache.get(cacheKey);
       if (!textPromise) {
-        textPromise = fetch(URLs.sourceURL(commit.sha, spec.file)).then(r => r.text());
+        textPromise = fetch(this._dataURL.sourceURL(commit.sha, spec.file)).then(r => r.text());
         this._fileContentsCache.set(cacheKey, textPromise);
       }
 
@@ -687,11 +715,6 @@ class DashboardData {
       });
     }
   }
-}
-
-export async function renderFlakiness() {
-  const data = await DashboardData.create();
-  return data.element;
 }
 
 function isHealthyTest(test) {
@@ -778,6 +801,11 @@ function flattenSpecs(suite, result = []) {
   for (const spec of suite.specs || [])
     result.push(spec);
   return result;
+}
+
+function StringToBool(text) {
+  text = text.trim().toLowerCase();
+  return text === 'yes' || text === 'true';
 }
 
 class TabStrip {

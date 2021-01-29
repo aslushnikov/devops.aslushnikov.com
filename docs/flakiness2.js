@@ -558,8 +558,8 @@ class DashboardData {
               <div>commit:</div>
             </vbox>
             <vbox style="overflow: hidden;">
-              <div><a style="text-overflow: ellipsis; overflow: hidden;" href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a></div>
-              <div><a style="text-overflow: ellipsis; overflow: hidden;" href="${commitURL('playwright', commit.sha)}"><span class=sha>${commit.sha.substring(0, 7)}</span> ${commit.message}</a></div>
+              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a></div>
+              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}"><span class=sha>${commit.sha.substring(0, 7)}</span> ${commit.message}</a></div>
             </vbox>
           </hbox>
           <div style="flex: auto; overflow: auto; padding: 1em;">

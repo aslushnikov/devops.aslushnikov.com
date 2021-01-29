@@ -15,11 +15,13 @@ const CHAR_CROSS = '✖';
 
 const COMMIT_RECT_SIZE = 16;
 
+const COLOR_SELECTION = '#fff9c4';
 const COLOR_YELLOW = '#ffcc80';
 const COLOR_GREEN = '#a5d6a7';
 const COLOR_RED = '#ef9a9a';
 const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
+
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
 const STYLE_NO_TEXT_OVERFLOW = `border-bottom: 1px solid var(--border-color);`;
 
@@ -54,7 +56,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const commits = parseInt(state.commits || '20', 10);
     dashboard.setLastCommits(commits);
-    dashboard.setBrowserNameFilter(state.browser === 'any' ? undefined : state.browser);
+    dashboard.setBrowserFilter(state.browser === 'any' ? undefined : state.browser);
+    dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);
 
     dashboard.render();
   }));
@@ -295,7 +298,8 @@ class DashboardData {
     this.element = this._mainSplitView;
     split.registerResizer(this._mainSplitView, this._tabstrip.tabstripElement());
 
-    this._browserNameFilter = undefined;
+    this._browserFilter = undefined;
+    this._platformFilter = undefined;
 
     this._showFlaky = false;
     this._lastCommits = 0;
@@ -312,13 +316,9 @@ class DashboardData {
     this._lastCommits = value;
   }
 
-  setShowFlaky(value) {
-    this._showFlaky = value;
-  }
-
-  setBrowserNameFilter(value) {
-    this._browserNameFilter = value;
-  }
+  setShowFlaky(value) { this._showFlaky = value; }
+  setBrowserFilter(value) { this._browserFilter = value; }
+  setPlatformFilter(value) { this._platformFilter = value; }
 
   render() {
     const self = this;
@@ -337,15 +337,15 @@ class DashboardData {
       return;
     }
 
-    const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat().map(browserName => browserName || 'N/A'))].sort();
+    const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat())].sort();
     const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
 
     const faultySpecIds = new SMap(commits.map(commit => [
-      ...commit.data.tests().getAll({category: 'bad', browserName: this._browserNameFilter}),
-      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky', browserName: this._browserNameFilter}) : []),
+      ...commit.data.tests().getAll({category: 'bad', browserName: this._browserFilter, platform: this._platformFilter}),
+      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky', browserName: this._browserFilter, platform: this._platformFilter}) : []),
     ]).flat()).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId })).flat();
+      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat();
     }).flat());
 
     const specIdToHealth = new Map();
@@ -408,9 +408,18 @@ class DashboardData {
               <span style="margin-right: 1em;">
                 browser:
                 <select oninput=${e => urlState.amend({browser: e.target.value})}>
-                    <option selected=${this._browserNameFilter === undefined}} value="any">any</option>
+                    <option selected=${this._browserFilter === undefined}} value="any">any</option>
                   ${allBrowserNames.map(browserName => html`
-                    <option selected=${this._browserNameFilter === browserName} value="${browserName}">${browserName}</option>
+                    <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
+                  `)}
+                </select>
+              </span>
+              <span style="margin-right: 1em;">
+                platform:
+                <select oninput=${e => urlState.amend({platform: e.target.value})}>
+                    <option selected=${this._platformFilter === undefined}} value="any">any</option>
+                  ${allPlatforms.map(platform => html`
+                    <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
                   `)}
                 </select>
               </span>
@@ -452,12 +461,36 @@ class DashboardData {
               border-bottom: 1px solid var(--border-color);
             "></div>
           ${allBrowserNames.map(browserName => html`
-            <div style="padding: 4px 1em; border-bottom: 1px solid var(--border-color);"><a href="${amendURL({browser: browserName === self._browserNameFilter ? 'any' : browserName})}">${browserLogo(browserName, 18)}</a></div>
+            <div style="
+                padding: 4px 1em;
+                border-bottom: 1px solid var(--border-color);
+                background-color: ${browserName === self._browserFilter ? COLOR_SELECTION : 'none'};
+            ">
+              <a href="${amendURL({browser: browserName === self._browserFilter ? 'any' : browserName})}">${browserLogo(browserName, 18)}</a>
+            </div>
           `)}
           ${allPlatforms.map(platform => html`
-            <div style="padding: 0 1em; border-right: 1px solid var(--border-color);">${platform}</div>
+            <div style="
+                padding: 0 1em;
+                border-right: 1px solid var(--border-color);
+                background-color: ${platform === self._platformFilter ? COLOR_SELECTION : 'none'};
+            ">
+              <a href="${amendURL({platform: platform === self._platformFilter ? 'any' : platform})}">${platform}</a>
+            </div>
             ${allBrowserNames.map(browserName => html`
-              <div style="text-align: center; padding: 0 1em">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</div>
+              <div style="
+                  text-align: center;
+                  padding: 0 1em;
+                  background-color: ${platform === self._platformFilter || browserName === self._browserFilter ? COLOR_SELECTION : 'none'};
+              "><a style="color: var(--text-color);" href="${(() => {
+                if (platform !== self._platformFilter && browserName !== self._browserFilter)
+                  return amendURL({platform, browser: browserName});
+                if (platform !== self._platformFilter)
+                  return amendURL({platform});
+                if (browserName !== self._browserFilter)
+                  return amendURL({browser: browserName});
+                return amendURL({platform: 'any', browser: 'any'});
+              })()}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
             `)}
           `)}
         </div>
@@ -729,7 +762,7 @@ class DashboardData {
       textPromise.then(async text => {
         const lines = await highlightText(text, 'text/typescript');
         const digits = (lines.length + '').length;
-        const STYLE_SELECTED = 'background-color: #fff9c4;';
+        const STYLE_SELECTED = `background-color: ${COLOR_SELECTION};`;
         gutter.append(html`
           <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid var(--border-color)">
             ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}

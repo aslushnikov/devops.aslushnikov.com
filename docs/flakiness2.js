@@ -51,6 +51,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const showFlaky = StringToBool(state.show_flaky || 'true');
     dashboard.setShowFlaky(showFlaky);
+
+    const commits = parseInt(state.commits || '20', 10);
+    dashboard.setLastCommits(commits);
+    dashboard.render();
   }));
 }, false);
 
@@ -210,7 +214,7 @@ class DashboardData {
       data: new CommitData(dataURL, c.sha, () => { 
         // Only commits that we plan to render affect rendering.
         if (index < this._lastCommits)
-          this._render();
+          this.render();
       }),
     }));
 
@@ -224,7 +228,7 @@ class DashboardData {
     const doCloseSidebar = () => {
       split.hideSidebar(this._splitView);
       this._selectedCommit = null;
-      this._render();
+      this.render();
     };
 
     this._editorTab = {
@@ -286,32 +290,36 @@ class DashboardData {
     this.element = this._splitView;
     split.registerResizer(this._splitView, this._tabstrip.tabstripElement());
 
-    this._lastCommits = 20;
-    this._lastCommitsSelect = html`
-      <select oninput=${e => {
-        this._lastCommits = parseInt(e.target.value, 10);
-        this._render();
-      }}>
-        ${[2,5,10,15,20,30,50].map(value => html`
-          <option value=${value} selected=${value === this._lastCommits}>${value}</option>
-        `)}
-      </select>
-    `;
-    this._commitLoadingElement = null;
-
-    this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
-    `;
-    this._render();
+    this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>`;
+    this._lastCommits = 0;
+    this._lastCommitsSelect = html`<select oninput=${e => urlState.amend({commits: e.target.value})}></select>`;
+    this.setLastCommits(20);
   }
 
   mockData() { return this._dataURL.mockData(); }
 
-  setShowFlaky(value) {
-    this._showFlakyElement.checked = value;
-    this._render();
+  setLastCommits(value) {
+    if (isNaN(value) || value < 1 || value > 50) {
+      console.error(`DASHBOARD: Cannot set last commits number to "${value}"`);
+      return;
+    }
+    this._lastCommits = value;
+
+    const optionValues = new Set([2,5,10,15,20,30,50]);
+    optionValues.add(value);
+    this._lastCommitsSelect.textContent = '';
+    this._lastCommitsSelect.append(html`
+      ${[...optionValues].sort((a, b) => a - b).map(value => html`
+        <option value=${value} selected=${value === this._lastCommits}>${value}</option>
+      `)}
+    `);
   }
 
-  _render() {
+  setShowFlaky(value) {
+    this._showFlakyElement.checked = value;
+  }
+
+  render() {
     const self = this;
     const commits = this._commits.slice(0, this._lastCommits);
     for (const commit of commits)
@@ -319,19 +327,13 @@ class DashboardData {
     const loadedCommits = commits.filter(commit => commit.data.isLoaded());
     if (loadedCommits.length < commits.length) {
       split.hideSidebar(this._splitView);
-      if (!this._commitLoadingElement || !this._commitLoadingElement.isConnected) {
-        this._commitLoadingElement = html`
-          <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
-            <h3>Processed <span></span> of ${this._lastCommitsSelect} commits</h3>
-          </div>
-        `;
-        this._mainElement.textContent = '';
-        this._mainElement.append(this._commitLoadingElement);
-      }
-      this._commitLoadingElement.$('span').textContent = loadedCommits.length;
+      this._mainElement.textContent = '';
+      this._mainElement.append(html`
+        <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
+          <h3>Processed ${loadedCommits.length} of ${this._lastCommits} commits</h3>
+        </div>
+      `);
       return;
-    } else {
-      this._commitLoadingElement = null;
     }
 
     const faultySpecIds = new SMap(commits.map(commit => [
@@ -385,17 +387,20 @@ class DashboardData {
       this._mainElement.textContent = '';
       this._mainElement.append(html`
         <div style="padding: 1em;">
-          <vbox>
-            <h3>Settings</h3>
+          <hbox>
+            <h2 style="margin-right: 1em;">Settings</h2>
             <hbox>
+              <span style="margin-right: 2em;">
+                ${this._lastCommitsSelect} commits
+              </span>
               <span style="display: inline-flex; align-items: center;">
                 ${this._showFlakyElement}
                 <label for=${this._showFlakyElement.id}>Show flaky</label>
               </span>
             </hbox>
-          </vbox>
+          </hbox>
           <vbox>
-            <h3>${specs.size} problematic specs (over last ${this._lastCommitsSelect} commits)</h3>
+            <h3>${specs.size} problematic specs</h3>
           </vbox>
           <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
             ${renderStats()}

@@ -456,13 +456,17 @@ class DashboardData {
 
     function renderSpecTitle(spec) {
       return html`
-        <hbox style="
+        <hbox onclick=${() => selectSpecCommit.call(self, spec, null)} class=hover-darken style="
           width: 600px;
-          margin-right: 1em;
+          cursor: pointer;
+          padding: 0 1em;
+          margin-right: 1px;
+          z-index: 0;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
           align-items: baseline;
+          background: white;
         ">
           <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
           <spacer></spacer>
@@ -533,7 +537,7 @@ class DashboardData {
     function selectSpecCommit(spec, commit) {
       this._selectedCommit = {
         specId: spec.specId,
-        sha: commit.sha,
+        sha: commit?.sha,
         testName: this._selectedCommit?.testName,
       };
       renderMainElement.call(self);
@@ -552,28 +556,33 @@ class DashboardData {
           ">
             <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
               <div>spec:</div>
-              <div>commit:</div>
+              ${commit && html`<div>commit:</div>`}
             </vbox>
             <vbox style="overflow: hidden;">
               <div style="text-overflow: ellipsis; overflow: hidden;">
                 ${(() => {
-                  const url = tests.get({sha: commit.sha, specId: spec.specId})?.url;
+                  const url = commit ? tests.get({sha: commit.sha, specId: spec.specId})?.url : null;
                   const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
                   tag.textContent = `${spec.file} - ${spec.title}`;
                   return tag;
                 })()}
               </div>
-              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.message}</a> (${commit.author})</div>
+              ${commit && html`
+                <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.message}</a> (${commit.author})</div>
+              `}
             </vbox>
           </hbox>
         </vbox>
       `;
-      const hasData = commit.data.specs().has({specId: spec.specId});
+      const viewTests = commit ? tests.getAll({sha: commit.sha, specId: spec.specId}) : tests.getAll({specId: spec.specId});
 
-      if (hasData) {
+      if (viewTests.length) {
         if (this._selectedCommit.testName)
-          renderTestTab.call(this, tests.get({specId: spec.specId, sha: commit.sha, name: this._selectedCommit.testName}));
-        renderCodeTab.call(this, commit, spec);
+          renderTestTab.call(this, viewTests.find(test => test.name === this._selectedCommit.testName));
+        if (commit)
+          renderCodeTab.call(this, commit.data.specs().get({specId: spec.specId}));
+        else
+          renderCodeTab.call(this, spec);
         split.showSidebar(this._secondarySplitView);
         content.append(html`
           <div style="flex: auto; overflow: auto; padding: 1em;">
@@ -582,7 +591,7 @@ class DashboardData {
               <div style="width: 100px; text-align: center;">runs</div>
               <div style="width: 100px; text-align: center;">expected</div>
             </hbox>
-            ${tests.getAll({sha: commit.sha, specId: spec.specId}).sort((t1, t2) => {
+            ${viewTests.sort((t1, t2) => {
               const categoryScore = {
                 'bad': 0,
                 'flaky': 1,
@@ -603,7 +612,7 @@ class DashboardData {
                   overflow: hidden;
                   text-overflow: ellipsis;
                   white-space: nowrap;
-                "><span>${test.name}</span><a href="${test.url}"></a></div>
+                ">${test.name}</div>
                 <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
                 <div style="width: 100px; text-align: center;">
                   ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}
@@ -677,8 +686,7 @@ class DashboardData {
       `;
     }
 
-    function renderCodeTab(commit, spec) {
-      spec = commit.data.specs().get({specId: spec.specId});
+    function renderCodeTab(spec) {
       if (!spec)
         return;
 
@@ -698,10 +706,10 @@ class DashboardData {
       this._editorTab.contentElement.textContent = '';
       this._editorTab.contentElement.append(editorSourceLoadingElement);
 
-      const cacheKey = JSON.stringify({sha: commit.sha, file: spec.file});
+      const cacheKey = JSON.stringify({sha: spec.sha, file: spec.file});
       let textPromise = this._fileContentsCache.get(cacheKey);
       if (!textPromise) {
-        textPromise = fetch(this._dataURL.sourceURL(commit.sha, spec.file)).then(r => r.text());
+        textPromise = fetch(this._dataURL.sourceURL(spec.sha, spec.file)).then(r => r.text());
         this._fileContentsCache.set(cacheKey, textPromise);
       }
 

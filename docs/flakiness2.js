@@ -535,15 +535,7 @@ class DashboardData {
       };
       renderMainElement.call(self);
 
-      if (this._selectedCommit.testName)
-        renderTestTab.call(this, tests.get({specId: spec.specId, sha: commit.sha, name: this._selectedCommit.testName}));
-      renderCodeTab.call(self, commit, spec);
-      if (!commit.data.specs().has({specId: spec.specId})) {
-        split.hideSidebar();
-      }
-
-      this._sideElement.textContent = '';
-      this._sideElement.append(html`
+      const content = html`
         <vbox style="${STYLE_FILL}; overflow: hidden;">
           <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
               white-space: nowrap;
@@ -560,10 +552,27 @@ class DashboardData {
               <div>commit:</div>
             </vbox>
             <vbox style="overflow: hidden;">
-              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${tests.get({sha: commit.sha, specId: spec.specId})?.url}">${spec.file} - ${spec.title}</a></div>
+              <div style="text-overflow: ellipsis; overflow: hidden;">
+                ${(() => {
+                  const url = tests.get({sha: commit.sha, specId: spec.specId})?.url;
+                  const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
+                  tag.textContent = `${spec.file} - ${spec.title}`;
+                  return tag;
+                })()}
+              </div>
               <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.message}</a> (${commit.author})</div>
             </vbox>
           </hbox>
+        </vbox>
+      `;
+      const hasData = commit.data.specs().has({specId: spec.specId});
+
+      if (hasData) {
+        if (this._selectedCommit.testName)
+          renderTestTab.call(this, tests.get({specId: spec.specId, sha: commit.sha, name: this._selectedCommit.testName}));
+        renderCodeTab.call(this, commit, spec);
+        split.showSidebar(this._secondarySplitView);
+        content.append(html`
           <div style="flex: auto; overflow: auto; padding: 1em;">
             <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
               <div style="width: 420px; text-align: center;">test parameters</div>
@@ -602,8 +611,20 @@ class DashboardData {
               </hbox>
             `)}
           </div>
-        </vbox>
-      `);
+        `);
+      } else {
+        split.hideSidebar(this._secondarySplitView);
+        content.append(html`
+          <div style="padding: 1em;">
+            <h3>No Data</h3>
+            <p>
+              This spec didn't run a single time. <a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>
+            </p>
+          </div>
+        `);
+      }
+      this._sideElement.textContent = '';
+      this._sideElement.append(content);
       split.showSidebar(this._mainSplitView);
     }
 

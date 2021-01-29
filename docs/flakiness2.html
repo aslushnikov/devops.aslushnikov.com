@@ -1,12 +1,6 @@
 <meta charset='utf-8'>
-<title>DevOps - Playwright</title>
+<title>DevOps - Playwright Test Status</title>
 <link rel="icon" href="/favicon.svg">
 <link rel=stylesheet href=./all.css>
 
-<script type=module>
-  import {renderFlakiness} from './flakiness2.js';
-
-  window.addEventListener('DOMContentLoaded', async () => {
-    document.body.append(await renderFlakiness());
-  }, false);
-</script>
+<script type=module src="./flakiness2.js"></script>

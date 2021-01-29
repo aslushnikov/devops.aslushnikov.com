@@ -390,10 +390,9 @@ class DashboardData {
       this._mainElement.textContent = '';
       this._mainElement.append(html`
         <div style="padding: 1em;">
-          <hbox>
-            <h2 style="margin-right: 1em;">Settings</h2>
-            <hbox>
-              <span style="margin-right: 2em;">
+          <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+            <hbox style="margin-left: 1em;">
+              <span style="margin-right: 1em;">
                 ${this._lastCommitsSelect} commits
               </span>
               <span style="display: inline-flex; align-items: center;">
@@ -402,8 +401,8 @@ class DashboardData {
               </span>
             </hbox>
           </hbox>
-          <vbox>
-            <h3>${specs.size} problematic specs</h3>
+          <vbox style="margin-left: 1em;">
+            <h2>${specs.size} problematic specs</h2>
           </vbox>
           <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
             ${renderStats()}

@@ -221,12 +221,11 @@ class DashboardData {
     this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
-    this._secondSideElement = html`<vbox style="${STYLE_FILL}"></vbox>`;
 
     this._selectedCommit = null;
 
     const doCloseSidebar = () => {
-      split.hideSidebar(this._splitView);
+      split.hideSidebar(this._mainSplitView);
       this._selectedCommit = null;
       this.render();
     };
@@ -264,15 +263,16 @@ class DashboardData {
     });
 
 
-    this._splitView = split.bottom({
+    this._secondarySplitView = split.right({
+      main: this._sideElement,
+      sidebar: this._tabstrip.element,
+      hidden: false,
+      size: 700,
+    });
+    this._mainSplitView = split.bottom({
       main: this._mainElement,
       sidebar: html`
-        ${split.right({
-          main: this._sideElement,
-          sidebar: this._secondSideElement,
-          hidden: false,
-          size: 700,
-        })}
+        ${this._secondarySplitView}
         <button style="position: absolute;
                        right: -5px;
                        top: 0;
@@ -287,8 +287,8 @@ class DashboardData {
       size: 300,
       hidden: true,
     });
-    this.element = this._splitView;
-    split.registerResizer(this._splitView, this._tabstrip.tabstripElement());
+    this.element = this._mainSplitView;
+    split.registerResizer(this._mainSplitView, this._tabstrip.tabstripElement());
 
     this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>`;
     this._lastCommits = 0;
@@ -326,7 +326,7 @@ class DashboardData {
       commit.data.ensureLoaded();
     const loadedCommits = commits.filter(commit => commit.data.isLoaded());
     if (loadedCommits.length < commits.length) {
-      split.hideSidebar(this._splitView);
+      split.hideSidebar(this._mainSplitView);
       this._mainElement.textContent = '';
       this._mainElement.append(html`
         <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
@@ -535,15 +535,17 @@ class DashboardData {
       };
       renderMainElement.call(self);
 
-      if (this._selectedCommit.testName) {
+      if (this._selectedCommit.testName)
         renderTestTab.call(this, tests.get({specId: spec.specId, sha: commit.sha, name: this._selectedCommit.testName}));
+      renderCodeTab.call(self, commit, spec);
+      if (!commit.data.specs().has({specId: spec.specId})) {
+        split.hideSidebar();
       }
 
-      renderSecondSidebar.call(self, commit, spec);
       this._sideElement.textContent = '';
       this._sideElement.append(html`
         <vbox style="${STYLE_FILL}; overflow: hidden;">
-          <hbox onzrender=${e => split.registerResizer(this._splitView, e)} style="
+          <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
               white-space: nowrap;
               overflow: hidden;
               cursor: row-resize;
@@ -602,7 +604,7 @@ class DashboardData {
           </div>
         </vbox>
       `);
-      split.showSidebar(this._splitView);
+      split.showSidebar(this._mainSplitView);
     }
 
     function selectTest(test) {
@@ -651,10 +653,11 @@ class DashboardData {
       `;
     }
 
-    function renderSecondSidebar(commit, spec) {
+    function renderCodeTab(commit, spec) {
       spec = commit.data.specs().get({specId: spec.specId});
-      if (!spec)
+      if (!spec) {
         return;
+      }
 
       const gutter = html`<div></div>`;
       const scrollToCoords = () => {
@@ -662,9 +665,6 @@ class DashboardData {
       };
 
       this._editorTab.titleElement.textContent = `${spec.file}:${spec.line}`;
-
-      this._secondSideElement.textContent = '';
-      this._secondSideElement.append(this._tabstrip.element);
 
       const editorSourceLoadingElement = html`<div></div>`;
       setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);

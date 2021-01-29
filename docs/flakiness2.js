@@ -54,6 +54,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const commits = parseInt(state.commits || '20', 10);
     dashboard.setLastCommits(commits);
+    dashboard.setBrowserNameFilter(state.browser);
+
     dashboard.render();
   }));
 }, false);
@@ -293,9 +295,10 @@ class DashboardData {
     this.element = this._mainSplitView;
     split.registerResizer(this._mainSplitView, this._tabstrip.tabstripElement());
 
+    this._browserNameFilter = undefined;
+
     this._showFlakyElement = html`<input checked oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>`;
     this._lastCommits = 0;
-    this._lastCommitsSelect = html`<select oninput=${e => urlState.amend({commits: e.target.value})}></select>`;
     this.setLastCommits(20);
   }
 
@@ -307,19 +310,14 @@ class DashboardData {
       return;
     }
     this._lastCommits = value;
-
-    const optionValues = new Set([2,5,10,15,20,30,50]);
-    optionValues.add(value);
-    this._lastCommitsSelect.textContent = '';
-    this._lastCommitsSelect.append(html`
-      ${[...optionValues].sort((a, b) => a - b).map(value => html`
-        <option value=${value} selected=${value === this._lastCommits}>${value}</option>
-      `)}
-    `);
   }
 
   setShowFlaky(value) {
     this._showFlakyElement.checked = value;
+  }
+
+  setBrowserNameFilter(value) {
+    this._browserNameFilter = value;
   }
 
   render() {
@@ -344,7 +342,7 @@ class DashboardData {
       ...(this._showFlakyElement.checked ? commit.data.tests().getAll({category: 'flaky'}) : []),
     ]).flat()).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({specId})).flat();
+      return faultySpecIds.map(specId => commit.data.tests().getAll({specId, browserName: this._browserNameFilter})).flat();
     }).flat());
 
     const specIdToHealth = new Map();
@@ -387,13 +385,20 @@ class DashboardData {
 
     function renderMainElement() {
       console.time('rendering');
+      const platforms = tests.uniqueValues('platform').sort();
+      const browserNames = tests.uniqueValues('browserName').filter(Boolean).sort();
+
       this._mainElement.textContent = '';
       this._mainElement.append(html`
         <div style="padding: 1em;">
           <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
             <hbox style="margin-left: 1em;">
               <span style="margin-right: 1em;">
-                ${this._lastCommitsSelect} commits
+                Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
+                  ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
+                    <option value=${value} selected=${value === this._lastCommits}>${value}</option>
+                  `)}
+                </select> commits
               </span>
               <span style="display: inline-flex; align-items: center;">
                 ${this._showFlakyElement}
@@ -573,7 +578,7 @@ class DashboardData {
           </hbox>
         </vbox>
       `;
-      const viewTests = commit ? tests.getAll({sha: commit.sha, specId: spec.specId}) : tests.getAll({specId: spec.specId});
+      const viewTests = tests.getAll({sha: commit?.sha, specId: spec.specId});
 
       if (viewTests.length) {
         if (this._selectedCommit.testName)

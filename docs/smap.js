@@ -37,7 +37,8 @@ export class SMap {
   }
 
   getAll(selector) {
-    return this._ensureIndex(Object.keys(selector)).getAll(selector);
+    const keys = Object.entries(selector).filter(([key, value]) => value !== undefined).map(([key]) => key);
+    return this._ensureIndex(keys).getAll(selector);
   }
 }
 

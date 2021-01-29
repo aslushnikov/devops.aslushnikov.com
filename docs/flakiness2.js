@@ -547,7 +547,7 @@ class DashboardData {
               padding: 2px 1em;
               border-bottom: 1px solid var(--border-color);
           ">
-            <vbox style="flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
+            <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
               <div>spec:</div>
               <div>commit:</div>
             </vbox>
@@ -676,16 +676,18 @@ class DashboardData {
 
     function renderCodeTab(commit, spec) {
       spec = commit.data.specs().get({specId: spec.specId});
-      if (!spec) {
+      if (!spec)
         return;
-      }
 
       const gutter = html`<div></div>`;
       const scrollToCoords = () => {
         gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
       };
 
-      this._editorTab.titleElement.textContent = `${spec.file}:${spec.line}`;
+      this._editorTab.titleElement.textContent = ``;
+      this._editorTab.titleElement.append(html`
+        <span onclick=${e => scrollToCoords()}>${spec.file}:${spec.line}</span>
+      `);
 
       const editorSourceLoadingElement = html`<div></div>`;
       setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
@@ -888,12 +890,13 @@ class TabStrip {
   }
 
   _onTabClicked(tabId, event) {
-    this.selectTab(tabId);
+    if (this.selectTab(tabId))
+      consumeDOMEvent(event);
   }
 
   selectTab(tabId) {
     if (this._selectedTabId === tabId)
-      return;
+      return false;
     if (this._selectedTabId)
       this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'var(--border-color)');
     this._selectedTabId = tabId;
@@ -902,5 +905,6 @@ class TabStrip {
       this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'white');
       this._content.append(this._tabs.get(this._selectedTabId).contentElement);
     }
+    return true;
   }
 }

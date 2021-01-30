@@ -281,6 +281,8 @@ class DashboardData {
     this._showFlaky = false;
     this._lastCommits = 0;
     this.setLastCommits(20);
+
+    this._renderContext = null;
   }
 
   mockData() { return this._dataURL.mockData(); }
@@ -370,6 +372,16 @@ class DashboardData {
 
     console.timeEnd('preparing');
 
+    this._context = {
+      loadingProgressElement,
+      commits,
+      prefilteredTests, // these are tests without browser/platform filtering.
+      tests,
+      specs,
+      allPlatforms,
+      allBrowserNames,
+    };
+
     renderMainElement.call(self);
 
     function renderMainElement() {
@@ -414,150 +426,32 @@ class DashboardData {
             <h2>${specs.size} problematic specs</h2>
           </hbox>
           <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
-            ${renderStats()}
+            ${this._renderStats()}
           </vbox>
           ${specs.map(spec => html`
             <hbox>
-              ${renderSpecTitle(spec)}
-              ${commits.map(commit => renderCommitTile(spec, commit))}
+              <hbox onclick=${() => selectSpecCommit.call(self, spec, null)} class=hover-darken style="
+                width: 600px;
+                cursor: pointer;
+                padding: 0 1em;
+                margin-right: 1px;
+                z-index: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                align-items: baseline;
+                background: white;
+              ">
+                <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
+                <spacer></spacer>
+                ${this._renderSpecAnnotations(spec)}
+              </hbox>
+              ${commits.map(commit => this._renderCommitTile(spec, commit, selectSpecCommit.bind(this, spec, commit)))}
             </hbox>
           `)}
         </div>
       `);
       console.timeEnd('rendering');
-    }
-
-    function renderStats() {
-      const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
-
-      return html`
-        <hbox>
-        <div style="
-          display: grid;
-          grid-template-rows: ${'auto '.repeat(allPlatforms.length + 1).trim()};
-          grid-template-columns: ${'auto '.repeat(allBrowserNames.length + 1).trim()};
-          border: 1px solid var(--border-color);
-        ">
-          <div style="
-              border-right: 1px solid var(--border-color);
-              border-bottom: 1px solid var(--border-color);
-            "></div>
-          ${allBrowserNames.map(browserName => html`
-            <div style="
-                padding: 4px 1em;
-                border-bottom: 1px solid var(--border-color);
-                background-color: ${browserName === self._browserFilter ? COLOR_SELECTION : 'none'};
-            ">
-              <a href="${amendURL({browser: browserName === self._browserFilter ? 'any' : browserName, platform: 'any'})}">${browserLogo(browserName, 18)}</a>
-            </div>
-          `)}
-          ${allPlatforms.map(platform => html`
-            <div style="
-                padding: 0 1em;
-                border-right: 1px solid var(--border-color);
-                background-color: ${platform === self._platformFilter ? COLOR_SELECTION : 'none'};
-            ">
-              <a href="${amendURL({platform: platform === self._platformFilter ? 'any' : platform, browser: 'any'})}">${platform}</a>
-            </div>
-            ${allBrowserNames.map(browserName => {
-              const url = (platform === self._platformFilter && browserName === self._browserFilter) ? amendURL({platform: 'any', browser: 'any'}) : amendURL({platform, browser: browserName});
-              let isHighlighted = false;
-              if (self._platformFilter && self._browserFilter)
-                isHighlighted = platform === self._platformFilter && browserName === self._browserFilter;
-              else
-                isHighlighted = platform === self._platformFilter || browserName === self._browserFilter;
-              return html`
-                <div style="
-                    text-align: center;
-                    padding: 0 1em;
-                    background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
-                "><a style="color: var(--text-color);" href="${url}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
-              `;
-            })}
-          `)}
-        </div>
-        </hbox>
-      `;
-    }
-
-    function renderSpecTitle(spec) {
-      return html`
-        <hbox onclick=${() => selectSpecCommit.call(self, spec, null)} class=hover-darken style="
-          width: 600px;
-          cursor: pointer;
-          padding: 0 1em;
-          margin-right: 1px;
-          z-index: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          align-items: baseline;
-          background: white;
-        ">
-          <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
-          <spacer></spacer>
-          ${renderSpecAnnotations(spec)}
-        </hbox>
-      `;
-    }
-
-    function renderSpecAnnotations(spec) {
-      const annotations = tests.getAll({specId: spec.specId, sha: spec.sha}).map(test => test.annotations).flat();
-      const types = new SMap(annotations).uniqueValues('type').sort();
-      return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
-    }
-
-    function renderAnnotation(annotationType) {
-      const bgcolors = {
-        'slow': 'grey',
-        'flaky': COLOR_VIOLET,
-        'fail': COLOR_RED,
-        'fixme': 'black',
-        'skip': COLOR_YELLOW,
-      };
-      const colors = {
-        'skip': 'black',
-        'fail': 'black',
-      };
-      return html`
-        <span style="
-            background-color: ${bgcolors[annotationType] || 'blue'};
-            color: ${colors[annotationType] || 'white'};
-            display: inline-flex;
-            user-select: none;
-            align-items: center;
-            justify-content: center;
-            border-radius: 2px;
-            font-size: 8px;
-            margin: 0 2px;
-            width: 5ch;
-            box-sizing: content-box;
-            text-align: center;
-            flex: none;
-          ">${annotationType}</span>
-      `;
-    }
-
-    function renderCommitTile(spec, commit) {
-      let color = COLOR_GREY;
-
-      const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
-      if (categories.has('bad'))
-        color = COLOR_RED;
-      else if (categories.has('flaky') && self._showFlaky)
-        color = COLOR_VIOLET;
-      else if (categories.size || commit.data.specs().has({specId: spec.specId}))
-        color = COLOR_GREEN;
-
-      const clazz = spec.specId === self._selection?.specId && commit.sha === self._selection?.sha ? 'selected-commit' : undefined;
-
-      return svg`
-        <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
-             onclick=${event => selectSpecCommit.call(self, spec, commit)}
-             viewbox="0 0 14 14">
-          <rect x=0 y=0 width=14 height=14 fill="${color}"/>
-        </svg>
-      `;
     }
 
     function selectSpecCommit(spec, commit) {
@@ -604,7 +498,7 @@ class DashboardData {
 
       if (viewTests.length) {
         if (this._selection.testName)
-          renderTestTab.call(this, viewTests.find(test => test.name === this._selection.testName));
+          this._renderTestTab(viewTests.find(test => test.name === this._selection.testName));
         if (commit)
           renderCodeTab.call(this, commit.data.specs().get({specId: spec.specId}));
         else
@@ -670,46 +564,7 @@ class DashboardData {
       this._tabstrip.selectTab('test-tab');
       if (this._selection)
         this._selection.testName = test.name;
-      renderTestTab.call(this, test);
-    }
-
-    function renderTestTab(test) {
-      if (!test) {
-        this._testTab.titleElement.textContent = this._selection.testName;
-        this._testTab.contentElement.textContent = '';
-        this._testTab.contentElement.append(html`
-          <h2>${this._selection.testName}</h2>
-          <h3>No Data</h3>
-        `);
-        return;
-      }
-
-      this._testTab.titleElement.textContent = '';
-      this._testTab.titleElement.append(html`
-        <hbox>
-          <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}</span>
-          ${test.name}
-        </hbox>
-      `);
-      this._testTab.contentElement.textContent = '';
-      this._testTab.contentElement.append(html`
-        <h2>${test.name}</h2>
-        ${test.runs.map((run, index) => renderTestRun(test, run, index))}
-      `);
-    }
-
-    function renderTestRun(test, run, index) {
-      return html`
-        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
-        ${run.error && html`
-          <pre style="
-            background-color: #333;
-            color: #eee;
-            padding: 1em;
-            overflow: auto;
-          ">${highlightANSIText(run.error.stack)}</pre>
-        `}
-      `;
+      this._renderTestTab(test);
     }
 
     function renderCodeTab(spec) {
@@ -780,6 +635,125 @@ class DashboardData {
       });
     }
   }
+
+  _renderStats() {
+    const {allBrowserNames, allPlatforms, prefilteredTests} = this._context;
+    const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
+
+    return html`
+      <hbox>
+      <div style="
+        display: grid;
+        grid-template-rows: ${'auto '.repeat(allPlatforms.length + 1).trim()};
+        grid-template-columns: ${'auto '.repeat(allBrowserNames.length + 1).trim()};
+        border: 1px solid var(--border-color);
+      ">
+        <div style="
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+          "></div>
+        ${allBrowserNames.map(browserName => html`
+          <div style="
+              padding: 4px 1em;
+              border-bottom: 1px solid var(--border-color);
+              background-color: ${browserName === this._browserFilter ? COLOR_SELECTION : 'none'};
+          ">
+            <a href="${amendURL({browser: browserName === this._browserFilter ? 'any' : browserName, platform: 'any'})}">${browserLogo(browserName, 18)}</a>
+          </div>
+        `)}
+        ${allPlatforms.map(platform => html`
+          <div style="
+              padding: 0 1em;
+              border-right: 1px solid var(--border-color);
+              background-color: ${platform === this._platformFilter ? COLOR_SELECTION : 'none'};
+          ">
+            <a href="${amendURL({platform: platform === this._platformFilter ? 'any' : platform, browser: 'any'})}">${platform}</a>
+          </div>
+          ${allBrowserNames.map(browserName => {
+            const url = (platform === this._platformFilter && browserName === this._browserFilter) ? amendURL({platform: 'any', browser: 'any'}) : amendURL({platform, browser: browserName});
+            let isHighlighted = false;
+            if (this._platformFilter && this._browserFilter)
+              isHighlighted = platform === this._platformFilter && browserName === this._browserFilter;
+            else
+              isHighlighted = platform === this._platformFilter || browserName === this._browserFilter;
+            return html`
+              <div style="
+                  text-align: center;
+                  padding: 0 1em;
+                  background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
+              "><a style="color: var(--text-color);" href="${url}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
+            `;
+          })}
+        `)}
+      </div>
+      </hbox>
+    `;
+  }
+
+  _renderSpecAnnotations(spec) {
+    const {tests} = this._context;
+    const annotations = tests.getAll({specId: spec.specId, sha: spec.sha}).map(test => test.annotations).flat();
+    const types = new SMap(annotations).uniqueValues('type').sort();
+    return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
+  }
+
+  _renderCommitTile(spec, commit, onclick) {
+    const {tests} = this._context;
+    let color = COLOR_GREY;
+    const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
+    if (categories.has('bad'))
+      color = COLOR_RED;
+    else if (categories.has('flaky') && this._showFlaky)
+      color = COLOR_VIOLET;
+    else if (categories.size || commit.data.specs().has({specId: spec.specId}))
+      color = COLOR_GREEN;
+
+    const clazz = spec.specId === this._selection?.specId && commit.sha === this._selection?.sha ? 'selected-commit' : undefined;
+
+    return svg`
+      <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
+           onclick=${onclick}
+           viewbox="0 0 14 14">
+        <rect x=0 y=0 width=14 height=14 fill="${color}"/>
+      </svg>
+    `;
+  }
+
+  _renderTestTab(test) {
+    if (!test) {
+      this._testTab.titleElement.textContent = this._selection.testName;
+      this._testTab.contentElement.textContent = '';
+      this._testTab.contentElement.append(html`
+        <h2>${this._selection.testName}</h2>
+        <h3>No Data</h3>
+      `);
+      return;
+    }
+
+    this._testTab.titleElement.textContent = '';
+    this._testTab.titleElement.append(html`
+      <hbox>
+        <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}</span>
+        ${test.name}
+      </hbox>
+    `);
+    this._testTab.contentElement.textContent = '';
+    this._testTab.contentElement.append(html`
+      <h2>${test.name}</h2>
+      ${test.runs.map((run, index) => html`
+        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
+        ${run.error && html`
+          <pre style="
+            background-color: #333;
+            color: #eee;
+            padding: 1em;
+            overflow: auto;
+          ">${highlightANSIText(run.error.stack)}</pre>
+        `}
+      `)}
+    `);
+  }
+
 }
 
 function isHealthyTest(test) {
@@ -872,6 +846,38 @@ function StringToBool(text) {
   text = text.trim().toLowerCase();
   return text === 'yes' || text === 'true';
 }
+
+function renderAnnotation(annotationType) {
+  const bgcolors = {
+    'slow': 'grey',
+    'flaky': COLOR_VIOLET,
+    'fail': COLOR_RED,
+    'fixme': 'black',
+    'skip': COLOR_YELLOW,
+  };
+  const colors = {
+    'skip': 'black',
+    'fail': 'black',
+  };
+  return html`
+    <span style="
+        background-color: ${bgcolors[annotationType] || 'blue'};
+        color: ${colors[annotationType] || 'white'};
+        display: inline-flex;
+        user-select: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 2px;
+        font-size: 8px;
+        margin: 0 2px;
+        width: 5ch;
+        box-sizing: content-box;
+        text-align: center;
+        flex: none;
+      ">${annotationType}</span>
+  `;
+}
+
 
 class TabStrip {
   constructor() {

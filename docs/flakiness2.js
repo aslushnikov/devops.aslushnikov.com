@@ -382,258 +382,264 @@ class DashboardData {
       allBrowserNames,
     };
 
-    renderMainElement.call(self);
+    this._renderMainElement();
+  }
 
-    function renderMainElement() {
-      console.time('rendering');
+  _selectSpecCommit(spec, commit) {
+    this._selection = {
+      specId: spec.specId,
+      sha: commit?.sha,
+      testName: this._selection?.testName,
+    };
+    this._renderMainElement();
+    this._renderSummary(spec, commit);
+  }
 
-      this._mainElement.textContent = '';
-      this._mainElement.append(html`
-        <div style="padding: 1em;">
-          <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
-            <span style="margin-left: 1em; margin-right: 1em;">
-              Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
-                ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
-                  <option value=${value} selected=${value === this._lastCommits}>${value}</option>
-                `)}
-              </select> commits
-            </span>
-            <span style="width: 2em;"> ${loadingProgressElement}</span>
-            <span style="margin-right: 1em; display: inline-flex; align-items: center;">
-              <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
-              <label for=show-flaky-input-checkbox>Show flaky</label>
-            </span>
-            <span style="margin-right: 1em;">
-              browser:
-              <select oninput=${e => urlState.amend({browser: e.target.value})}>
-                  <option selected=${this._browserFilter === undefined}} value="any">any</option>
-                ${allBrowserNames.map(browserName => html`
-                  <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
-                `)}
-              </select>
-            </span>
-            <span style="margin-right: 1em;">
-              platform:
-              <select oninput=${e => urlState.amend({platform: e.target.value})}>
-                  <option selected=${this._platformFilter === undefined}} value="any">any</option>
-                ${allPlatforms.map(platform => html`
-                  <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
-                `)}
-              </select>
-            </span>
+  _selectTest(test) {
+    this._tabstrip.selectTab('test-tab');
+    this._selection.testName = test.name;
+    this._renderTestTab(test);
+  }
+
+  _renderMainElement() {
+    const {allBrowserNames, allPlatforms, specs, commits, loadingProgressElement} = this._context;
+
+    console.time('rendering');
+
+    this._mainElement.textContent = '';
+    this._mainElement.append(html`
+      <div style="padding: 1em;">
+        <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+          <span style="margin-left: 1em; margin-right: 1em;">
+            Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
+              ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
+                <option value=${value} selected=${value === this._lastCommits}>${value}</option>
+              `)}
+            </select> commits
+          </span>
+          <span style="width: 2em;"> ${loadingProgressElement}</span>
+          <span style="margin-right: 1em; display: inline-flex; align-items: center;">
+            <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
+            <label for=show-flaky-input-checkbox>Show flaky</label>
+          </span>
+          <span style="margin-right: 1em;">
+            browser:
+            <select oninput=${e => urlState.amend({browser: e.target.value})}>
+                <option selected=${this._browserFilter === undefined}} value="any">any</option>
+              ${allBrowserNames.map(browserName => html`
+                <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
+              `)}
+            </select>
+          </span>
+          <span style="margin-right: 1em;">
+            platform:
+            <select oninput=${e => urlState.amend({platform: e.target.value})}>
+                <option selected=${this._platformFilter === undefined}} value="any">any</option>
+              ${allPlatforms.map(platform => html`
+                <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
+              `)}
+            </select>
+          </span>
+        </hbox>
+        <hbox style="margin-left: 1em;">
+          <h2>${specs.size} problematic specs</h2>
+        </hbox>
+        <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+          ${this._renderStats()}
+        </vbox>
+        ${specs.map(spec => html`
+          <hbox>
+            <hbox onclick=${this._selectSpecCommit.bind(this, spec, null)} class=hover-darken style="
+              width: 600px;
+              cursor: pointer;
+              padding: 0 1em;
+              margin-right: 1px;
+              z-index: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              align-items: baseline;
+              background: white;
+            ">
+              <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
+              <spacer></spacer>
+              ${this._renderSpecAnnotations(spec)}
+            </hbox>
+            ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec, commit)))}
           </hbox>
-          <hbox style="margin-left: 1em;">
-            <h2>${specs.size} problematic specs</h2>
-          </hbox>
-          <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
-            ${this._renderStats()}
+        `)}
+      </div>
+    `);
+    console.timeEnd('rendering');
+  }
+
+  _renderSummary(spec, commit) {
+    const {tests} = this._context;
+
+    const content = html`
+      <vbox style="${STYLE_FILL}; overflow: hidden;">
+        <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
+            white-space: nowrap;
+            overflow: hidden;
+            cursor: row-resize;
+            text-overflow: ellipsis;
+            flex: none;
+            background-color: var(--border-color);
+            padding: 2px 1em;
+            border-bottom: 1px solid var(--border-color);
+        ">
+          <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
+            <div>spec:</div>
+            ${commit && html`<div>commit:</div>`}
           </vbox>
-          ${specs.map(spec => html`
-            <hbox>
-              <hbox onclick=${() => selectSpecCommit.call(self, spec, null)} class=hover-darken style="
-                width: 600px;
-                cursor: pointer;
-                padding: 0 1em;
-                margin-right: 1px;
-                z-index: 0;
+          <vbox style="overflow: hidden;">
+            <div style="text-overflow: ellipsis; overflow: hidden;">
+              ${(() => {
+                const url = commit ? tests.get({sha: commit.sha, specId: spec.specId})?.url : null;
+                const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
+                tag.textContent = `${spec.file} - ${spec.title}`;
+                return tag;
+              })()}
+            </div>
+            ${commit && html`
+              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.title}</a> (${commit.author})</div>
+            `}
+          </vbox>
+        </hbox>
+      </vbox>
+    `;
+    const viewTests = tests.getAll({sha: commit?.sha, specId: spec.specId});
+
+    if (viewTests.length) {
+      if (this._selection.testName)
+        this._renderTestTab(viewTests.find(test => test.name === this._selection.testName));
+      if (commit)
+        this._renderCodeTab(commit.data.specs().get({specId: spec.specId}));
+      else
+        this._renderCodeTab(spec);
+      split.showSidebar(this._secondarySplitView);
+      content.append(html`
+        <div style="flex: auto; overflow: auto; padding: 1em;">
+          <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
+            <div style="width: 420px; text-align: center;">test parameters</div>
+            <div style="width: 100px; text-align: center;">runs</div>
+            <div style="width: 100px; text-align: center;">expected</div>
+          </hbox>
+          ${viewTests.sort((t1, t2) => {
+            const categoryScore = {
+              'bad': 0,
+              'flaky': 1,
+              'good': 2,
+            };
+            if (t1.category !== t2.category)
+              return categoryScore[t1.category] - categoryScore[t2.category];
+            if (t1.annotations.length !== t2.annotations.length)
+              return t2.annotations.length - t1.annotations.length;
+            if (t1.name !== t2.name)
+              return t1.name < t2.name ? -1 : 1;
+            return 0;
+          }).map(test => html`
+            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${this._selectTest.bind(this, test)}>
+              <div style="
+                width: 300px;
+                padding-left: 1ex;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                align-items: baseline;
-                background: white;
-              ">
-                <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
-                <spacer></spacer>
-                ${this._renderSpecAnnotations(spec)}
-              </hbox>
-              ${commits.map(commit => this._renderCommitTile(spec, commit, selectSpecCommit.bind(this, spec, commit)))}
+              ">${test.name}</div>
+              <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
+              <div style="width: 100px; text-align: center;">
+                ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}
+              </div>
+              <div style="width: 100px; text-align: center;">
+                ${renderTestStatus(test.expectedStatus)}
+              </div>
             </hbox>
           `)}
         </div>
       `);
-      console.timeEnd('rendering');
-    }
-
-    function selectSpecCommit(spec, commit) {
-      this._selection = {
-        specId: spec.specId,
-        sha: commit?.sha,
-        testName: this._selection?.testName,
-      };
-      renderMainElement.call(self);
-
-      const content = html`
-        <vbox style="${STYLE_FILL}; overflow: hidden;">
-          <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
-              white-space: nowrap;
-              overflow: hidden;
-              cursor: row-resize;
-              text-overflow: ellipsis;
-              flex: none;
-              background-color: var(--border-color);
-              padding: 2px 1em;
-              border-bottom: 1px solid var(--border-color);
-          ">
-            <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
-              <div>spec:</div>
-              ${commit && html`<div>commit:</div>`}
-            </vbox>
-            <vbox style="overflow: hidden;">
-              <div style="text-overflow: ellipsis; overflow: hidden;">
-                ${(() => {
-                  const url = commit ? tests.get({sha: commit.sha, specId: spec.specId})?.url : null;
-                  const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
-                  tag.textContent = `${spec.file} - ${spec.title}`;
-                  return tag;
-                })()}
-              </div>
-              ${commit && html`
-                <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.title}</a> (${commit.author})</div>
-              `}
-            </vbox>
-          </hbox>
-        </vbox>
-      `;
-      const viewTests = tests.getAll({sha: commit?.sha, specId: spec.specId});
-
-      if (viewTests.length) {
-        if (this._selection.testName)
-          this._renderTestTab(viewTests.find(test => test.name === this._selection.testName));
-        if (commit)
-          renderCodeTab.call(this, commit.data.specs().get({specId: spec.specId}));
-        else
-          renderCodeTab.call(this, spec);
-        split.showSidebar(this._secondarySplitView);
-        content.append(html`
-          <div style="flex: auto; overflow: auto; padding: 1em;">
-            <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
-              <div style="width: 420px; text-align: center;">test parameters</div>
-              <div style="width: 100px; text-align: center;">runs</div>
-              <div style="width: 100px; text-align: center;">expected</div>
-            </hbox>
-            ${viewTests.sort((t1, t2) => {
-              const categoryScore = {
-                'bad': 0,
-                'flaky': 1,
-                'good': 2,
-              };
-              if (t1.category !== t2.category)
-                return categoryScore[t1.category] - categoryScore[t2.category];
-              if (t1.annotations.length !== t2.annotations.length)
-                return t2.annotations.length - t1.annotations.length;
-              if (t1.name !== t2.name)
-                return t1.name < t2.name ? -1 : 1;
-              return 0;
-            }).map(test => html`
-              <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${() => selectTest.call(self, test)}>
-                <div style="
-                  width: 300px;
-                  padding-left: 1ex;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  white-space: nowrap;
-                ">${test.name}</div>
-                <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
-                <div style="width: 100px; text-align: center;">
-                  ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}
-                </div>
-                <div style="width: 100px; text-align: center;">
-                  ${renderTestStatus(test.expectedStatus)}
-                </div>
-              </hbox>
-            `)}
-          </div>
-        `);
-      } else {
-        split.hideSidebar(this._secondarySplitView);
-        content.append(html`
-          <div style="padding: 1em;">
-            <h3>No Data</h3>
-            <p>
-              This spec didn't run a single time. <a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>
-            </p>
-          </div>
-        `);
-      }
-      this._sideElement.textContent = '';
-      this._sideElement.append(content);
-      split.showSidebar(this._mainSplitView);
-    }
-
-    function selectTest(test) {
-      this._tabstrip.selectTab('test-tab');
-      if (this._selection)
-        this._selection.testName = test.name;
-      this._renderTestTab(test);
-    }
-
-    function renderCodeTab(spec) {
-      if (!spec)
-        return;
-
-      const gutter = html`<div></div>`;
-      const scrollToCoords = () => {
-        gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
-      };
-
-      this._editorTab.titleElement.textContent = ``;
-      this._editorTab.titleElement.append(html`
-        <span onclick=${e => scrollToCoords()}>${spec.file}:${spec.line}</span>
+    } else {
+      split.hideSidebar(this._secondarySplitView);
+      content.append(html`
+        <div style="padding: 1em;">
+          <h3>No Data</h3>
+          <p>
+            This spec didn't run a single time. <a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>
+          </p>
+        </div>
       `);
-
-      const editorSourceLoadingElement = html`<div></div>`;
-      setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
-
-      this._editorTab.contentElement.textContent = '';
-      this._editorTab.contentElement.append(editorSourceLoadingElement);
-
-      const cacheKey = JSON.stringify({sha: spec.sha, file: spec.file});
-      let textPromise = this._fileContentsCache.get(cacheKey);
-      if (!textPromise) {
-        textPromise = fetch(this._dataURL.sourceURL(spec.sha, spec.file)).then(r => r.text());
-        this._fileContentsCache.set(cacheKey, textPromise);
-      }
-
-      preloadHighlighter('text/typescript');
-
-      textPromise.then(async text => {
-        const lines = await highlightText(text, 'text/typescript');
-        const digits = (lines.length + '').length;
-        const STYLE_SELECTED = `background-color: ${COLOR_SELECTION};`;
-        gutter.append(html`
-          <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid var(--border-color)">
-            ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}
-          </div>
-        `);
-        const code = html`
-          <div style="flex: auto">
-          <div>
-          ${lines.map((line, index) => html`
-            <div style="
-              display: flex;
-              padding-left: 1em;
-              ${index + 1 === spec.line ? STYLE_SELECTED : ''}
-            ">
-              ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
-            </div>
-          `)}
-          </div>
-          </div>
-        `;
-        this._editorTab.contentElement.textContent = '';
-        this._editorTab.contentElement.append(html`
-          <div style="display: flex;
-                      white-space: pre;
-                      overflow: auto;
-                      font-family: var(--monospace);
-          ">
-            ${gutter}
-            ${code}
-          </div>
-        `);
-        scrollToCoords();
-      });
     }
+    this._sideElement.textContent = '';
+    this._sideElement.append(content);
+    split.showSidebar(this._mainSplitView);
+  }
+
+  _renderCodeTab(spec) {
+    if (!spec)
+      return;
+
+    const gutter = html`<div></div>`;
+    const scrollToCoords = () => {
+      gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
+    };
+
+    this._editorTab.titleElement.textContent = ``;
+    this._editorTab.titleElement.append(html`
+      <span onclick=${e => scrollToCoords()}>${spec.file}:${spec.line}</span>
+    `);
+
+    const editorSourceLoadingElement = html`<div></div>`;
+    setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
+
+    this._editorTab.contentElement.textContent = '';
+    this._editorTab.contentElement.append(editorSourceLoadingElement);
+
+    const cacheKey = JSON.stringify({sha: spec.sha, file: spec.file});
+    let textPromise = this._fileContentsCache.get(cacheKey);
+    if (!textPromise) {
+      textPromise = fetch(this._dataURL.sourceURL(spec.sha, spec.file)).then(r => r.text());
+      this._fileContentsCache.set(cacheKey, textPromise);
+    }
+
+    preloadHighlighter('text/typescript');
+
+    textPromise.then(async text => {
+      const lines = await highlightText(text, 'text/typescript');
+      const digits = (lines.length + '').length;
+      const STYLE_SELECTED = `background-color: ${COLOR_SELECTION};`;
+      gutter.append(html`
+        <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid var(--border-color)">
+          ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}
+        </div>
+      `);
+      const code = html`
+        <div style="flex: auto">
+        <div>
+        ${lines.map((line, index) => html`
+          <div style="
+            display: flex;
+            padding-left: 1em;
+            ${index + 1 === spec.line ? STYLE_SELECTED : ''}
+          ">
+            ${line.length ? line.map(({tokenText, className}) => html`<span class=${className ? 'cm-js-' + className : undefined}>${tokenText}</span>`) : html`<span> </span>`}
+          </div>
+        `)}
+        </div>
+        </div>
+      `;
+      this._editorTab.contentElement.textContent = '';
+      this._editorTab.contentElement.append(html`
+        <div style="display: flex;
+                    white-space: pre;
+                    overflow: auto;
+                    font-family: var(--monospace);
+        ">
+          ${gutter}
+          ${code}
+        </div>
+      `);
+      scrollToCoords();
+    });
   }
 
   _renderStats() {

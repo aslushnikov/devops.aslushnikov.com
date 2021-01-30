@@ -297,6 +297,7 @@ class DashboardData {
   setPlatformFilter(value) { this._platformFilter = value; }
 
   render() {
+    console.time('preparing');
     const self = this;
     const commits = this._commits.slice(0, this._lastCommits);
 
@@ -321,10 +322,11 @@ class DashboardData {
       updateProgress();
     }
 
-    const faultySpecIds = new SMap(commits.map(commit => [
-      ...commit.data.tests().getAll({category: 'bad', browserName: this._browserFilter, platform: this._platformFilter}),
-      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky', browserName: this._browserFilter, platform: this._platformFilter}) : []),
-    ]).flat()).uniqueValues('specId');
+    const prefilteredTests = new SMap(commits.map(commit => [
+      ...commit.data.tests().getAll({category: 'bad'}),
+      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
+    ]).flat());
+    const faultySpecIds = new SMap(prefilteredTests.getAll({browserName: this._browserFilter, platform: this._platformFilter})).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
       return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat();
     }).flat());
@@ -364,6 +366,8 @@ class DashboardData {
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
     }));
+
+    console.timeEnd('preparing');
 
     renderMainElement.call(self);
 
@@ -414,7 +418,7 @@ class DashboardData {
           ${specs.map(spec => html`
             <hbox>
               ${renderSpecTitle(spec)}
-              ${commits.map(commit => renderSpecCommit(spec, commit))}
+              ${commits.map(commit => renderCommitTile(spec, commit))}
             </hbox>
           `)}
         </div>
@@ -423,10 +427,7 @@ class DashboardData {
     }
 
     function renderStats() {
-      const faultySpecCount = (browserName, platform) => new SMap([
-        ...tests.getAll({category: 'bad', browserName, platform}),
-        ...tests.getAll({category: 'flaky', browserName, platform}),
-      ]).uniqueValues('specId').length;
+      const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
 
       return html`
         <hbox>
@@ -446,7 +447,7 @@ class DashboardData {
                 border-bottom: 1px solid var(--border-color);
                 background-color: ${browserName === self._browserFilter ? COLOR_SELECTION : 'none'};
             ">
-              <a href="${amendURL({browser: browserName === self._browserFilter ? 'any' : browserName})}">${browserLogo(browserName, 18)}</a>
+              <a href="${amendURL({browser: browserName === self._browserFilter ? 'any' : browserName, platform: 'any'})}">${browserLogo(browserName, 18)}</a>
             </div>
           `)}
           ${allPlatforms.map(platform => html`
@@ -455,23 +456,24 @@ class DashboardData {
                 border-right: 1px solid var(--border-color);
                 background-color: ${platform === self._platformFilter ? COLOR_SELECTION : 'none'};
             ">
-              <a href="${amendURL({platform: platform === self._platformFilter ? 'any' : platform})}">${platform}</a>
+              <a href="${amendURL({platform: platform === self._platformFilter ? 'any' : platform, browser: 'any'})}">${platform}</a>
             </div>
-            ${allBrowserNames.map(browserName => html`
-              <div style="
-                  text-align: center;
-                  padding: 0 1em;
-                  background-color: ${platform === self._platformFilter || browserName === self._browserFilter ? COLOR_SELECTION : 'none'};
-              "><a style="color: var(--text-color);" href="${(() => {
-                if (platform !== self._platformFilter && browserName !== self._browserFilter)
-                  return amendURL({platform, browser: browserName});
-                if (platform !== self._platformFilter)
-                  return amendURL({platform});
-                if (browserName !== self._browserFilter)
-                  return amendURL({browser: browserName});
-                return amendURL({platform: 'any', browser: 'any'});
-              })()}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
-            `)}
+            ${allBrowserNames.map(browserName => {
+              const url = (platform === self._platformFilter && browserName === self._browserFilter) ? amendURL({platform: 'any', browser: 'any'}) : amendURL({platform, browser: browserName});
+              let isHighlighted = false;
+              if (self._platformFilter && self._browserFilter)
+                isHighlighted = platform === self._platformFilter && browserName === self._browserFilter;
+              else
+                isHighlighted = platform === self._platformFilter || browserName === self._browserFilter;
+              return html`
+                <div style="
+                    text-align: center;
+                    padding: 0 1em;
+                    background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
+                    font-weight: ${isHighlighted ? 'bold' : 'normal'};
+                "><a style="color: var(--text-color);" href="${url}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
+              `;
+            })}
           `)}
         </div>
         </hbox>
@@ -536,7 +538,7 @@ class DashboardData {
       `;
     }
 
-    function renderSpecCommit(spec, commit) {
+    function renderCommitTile(spec, commit) {
       let color = COLOR_GREY;
 
       const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));

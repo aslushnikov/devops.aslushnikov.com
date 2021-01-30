@@ -194,6 +194,7 @@ class DashboardData {
       sha: c.sha,
       author: c.commit.author.name,
       email: c.commit.author.email,
+      title: c.commit.message.split('\n')[0],
       message: c.commit.message,
       timestamp: c.commit.committer.date,
       data: new CommitData(dataURL, c.sha),
@@ -593,7 +594,7 @@ class DashboardData {
                 })()}
               </div>
               ${commit && html`
-                <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.message}</a> (${commit.author})</div>
+                <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.title}</a> (${commit.author})</div>
               `}
             </vbox>
           </hbox>

@@ -90,21 +90,11 @@ class DataURL {
 }
 
 class CommitData {
-  constructor(dataURL, sha, onLoadCallback) {
+  constructor(dataURL, sha) {
     this._dataURL = dataURL;
     this._sha = sha;
 
-    this._progressIndicator = html`<span style="
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: none;
-      width: ${COMMIT_RECT_SIZE};
-      height: ${COMMIT_RECT_SIZE};
-      margin: 1px;
-    ">${svgPie({ratio: 0})}</span>`;
     this._loadingPromise = null;
-    this._onLoadCallback = onLoadCallback;
 
     this._specs = new SMap();
     this._tests = new SMap();
@@ -114,7 +104,6 @@ class CommitData {
   isLoaded() { return this._isLoaded; }
   specs() { return this._specs; }
   tests() { return this._tests; }
-  loadingIndicator() { return this._progressIndicator; }
 
   async ensureLoaded() {
     if (!this._loadingPromise)
@@ -123,11 +112,9 @@ class CommitData {
   }
 
   _onLoadProgress(received, total, isComplete) {
-    this._progressIndicator.textContent = '';
     // Experimentally it turns out that compression ratio is ~19 for JSON reports.
     const COMPRESSION_RATIO = 19;
     const ratio = isComplete ? 1 : received / total / COMPRESSION_RATIO;
-    this._progressIndicator.append(svgPie({ratio}));
   }
 
   async _loadData() {
@@ -135,15 +122,9 @@ class CommitData {
       .then(text => ({json: JSON.parse(text)}))
       .catch(error => ({error}));
     if (error) {
-      this._progressIndicator.textContent = '';
-      this._progressIndicator.append(html`
-        <span style="cursor: help;" title="${error}">${CHAR_WARNING}</span>
-      `);
       this._isLoaded = true;
-      this._onLoadCallback.call(null);
       return;
     }
-    this._progressIndicator.textContent = '';
 
     // All specs are sorted by filename/line/column location.
     // const specs = json.map(report => flattenSpecs(report)).flat();
@@ -194,7 +175,6 @@ class CommitData {
     this._specs = new SMap(specs);
     this._tests = new SMap(tests);
     this._isLoaded = true;
-    this._onLoadCallback.call(null);
   }
 }
 
@@ -216,11 +196,7 @@ class DashboardData {
       email: c.commit.author.email,
       message: c.commit.message,
       timestamp: c.commit.committer.date,
-      data: new CommitData(dataURL, c.sha, () => { 
-        // Only commits that we plan to render affect rendering.
-        if (index < this._lastCommits)
-          this.render();
-      }),
+      data: new CommitData(dataURL, c.sha),
     }));
 
     this._fileContentsCache = new Map();
@@ -323,22 +299,27 @@ class DashboardData {
   render() {
     const self = this;
     const commits = this._commits.slice(0, this._lastCommits);
-    for (const commit of commits)
-      commit.data.ensureLoaded();
-    const loadedCommits = commits.filter(commit => commit.data.isLoaded());
-    if (loadedCommits.length < commits.length) {
-      split.hideSidebar(this._mainSplitView);
-      this._mainElement.textContent = '';
-      this._mainElement.append(html`
-        <div style="${STYLE_FILL}; display: flex; align-items: center; justify-content: center;">
-          <h3>Processed ${loadedCommits.length} of ${this._lastCommits} commits</h3>
-        </div>
-      `);
-      return;
-    }
 
     const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat())].sort();
     const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
+
+    let loadingProgressElement = null;
+    const pendingCommits = commits.filter(commit => !commit.data.isLoaded());
+    if (pendingCommits.length > 0) {
+      loadingProgressElement = html`<div></div>`;
+      const updateProgress = () => {
+        const complete = commits.filter(commit => commit.data.isLoaded());
+        if (complete.length === commits.length) {
+          this.render();
+        } else {
+          loadingProgressElement.textContent = '';
+          loadingProgressElement.append(svgPie({ratio: complete.length / commits.length}));
+        }
+      };
+      for (const pending of pendingCommits)
+        pending.data.ensureLoaded().then(() => updateProgress());
+      updateProgress();
+    }
 
     const faultySpecIds = new SMap(commits.map(commit => [
       ...commit.data.tests().getAll({category: 'bad', browserName: this._browserFilter, platform: this._platformFilter}),
@@ -393,41 +374,40 @@ class DashboardData {
       this._mainElement.append(html`
         <div style="padding: 1em;">
           <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
-            <hbox style="margin-left: 1em;">
-              <span style="margin-right: 1em;">
-                Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
-                  ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
-                    <option value=${value} selected=${value === this._lastCommits}>${value}</option>
-                  `)}
-                </select> commits
-              </span>
-              <span style="margin-right: 1em; display: inline-flex; align-items: center;">
-                <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
-                <label for=show-flaky-input-checkbox>Show flaky</label>
-              </span>
-              <span style="margin-right: 1em;">
-                browser:
-                <select oninput=${e => urlState.amend({browser: e.target.value})}>
-                    <option selected=${this._browserFilter === undefined}} value="any">any</option>
-                  ${allBrowserNames.map(browserName => html`
-                    <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
-                  `)}
-                </select>
-              </span>
-              <span style="margin-right: 1em;">
-                platform:
-                <select oninput=${e => urlState.amend({platform: e.target.value})}>
-                    <option selected=${this._platformFilter === undefined}} value="any">any</option>
-                  ${allPlatforms.map(platform => html`
-                    <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
-                  `)}
-                </select>
-              </span>
-            </hbox>
+            <span style="margin-left: 1em; margin-right: 1em;">
+              Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
+                ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
+                  <option value=${value} selected=${value === this._lastCommits}>${value}</option>
+                `)}
+              </select> commits
+            </span>
+            <span style="width: 2em;"> ${loadingProgressElement}</span>
+            <span style="margin-right: 1em; display: inline-flex; align-items: center;">
+              <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
+              <label for=show-flaky-input-checkbox>Show flaky</label>
+            </span>
+            <span style="margin-right: 1em;">
+              browser:
+              <select oninput=${e => urlState.amend({browser: e.target.value})}>
+                  <option selected=${this._browserFilter === undefined}} value="any">any</option>
+                ${allBrowserNames.map(browserName => html`
+                  <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
+                `)}
+              </select>
+            </span>
+            <span style="margin-right: 1em;">
+              platform:
+              <select oninput=${e => urlState.amend({platform: e.target.value})}>
+                  <option selected=${this._platformFilter === undefined}} value="any">any</option>
+                ${allPlatforms.map(platform => html`
+                  <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
+                `)}
+              </select>
+            </span>
           </hbox>
-          <vbox style="margin-left: 1em;">
+          <hbox style="margin-left: 1em;">
             <h2>${specs.size} problematic specs</h2>
-          </vbox>
+          </hbox>
           <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
             ${renderStats()}
           </vbox>

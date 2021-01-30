@@ -203,11 +203,11 @@ class DashboardData {
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
 
-    this._selectedCommit = null;
+    this._selection = {};
 
     const doCloseSidebar = () => {
       split.hideSidebar(this._mainSplitView);
-      this._selectedCommit = null;
+      this._selection = {};
       this.render();
     };
 
@@ -470,7 +470,6 @@ class DashboardData {
                     text-align: center;
                     padding: 0 1em;
                     background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
-                    font-weight: ${isHighlighted ? 'bold' : 'normal'};
                 "><a style="color: var(--text-color);" href="${url}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
               `;
             })}
@@ -549,7 +548,7 @@ class DashboardData {
       else if (categories.size || commit.data.specs().has({specId: spec.specId}))
         color = COLOR_GREEN;
 
-      const clazz = spec.specId === self._selectedCommit?.specId && commit.sha === self._selectedCommit?.sha ? 'selected-commit' : undefined;
+      const clazz = spec.specId === self._selection?.specId && commit.sha === self._selection?.sha ? 'selected-commit' : undefined;
 
       return svg`
         <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
@@ -561,10 +560,10 @@ class DashboardData {
     }
 
     function selectSpecCommit(spec, commit) {
-      this._selectedCommit = {
+      this._selection = {
         specId: spec.specId,
         sha: commit?.sha,
-        testName: this._selectedCommit?.testName,
+        testName: this._selection?.testName,
       };
       renderMainElement.call(self);
 
@@ -603,8 +602,8 @@ class DashboardData {
       const viewTests = tests.getAll({sha: commit?.sha, specId: spec.specId});
 
       if (viewTests.length) {
-        if (this._selectedCommit.testName)
-          renderTestTab.call(this, viewTests.find(test => test.name === this._selectedCommit.testName));
+        if (this._selection.testName)
+          renderTestTab.call(this, viewTests.find(test => test.name === this._selection.testName));
         if (commit)
           renderCodeTab.call(this, commit.data.specs().get({specId: spec.specId}));
         else
@@ -668,17 +667,17 @@ class DashboardData {
 
     function selectTest(test) {
       this._tabstrip.selectTab('test-tab');
-      if (this._selectedCommit)
-        this._selectedCommit.testName = test.name;
+      if (this._selection)
+        this._selection.testName = test.name;
       renderTestTab.call(this, test);
     }
 
     function renderTestTab(test) {
       if (!test) {
-        this._testTab.titleElement.textContent = this._selectedCommit.testName;
+        this._testTab.titleElement.textContent = this._selection.testName;
         this._testTab.contentElement.textContent = '';
         this._testTab.contentElement.append(html`
-          <h2>${this._selectedCommit.testName}</h2>
+          <h2>${this._selection.testName}</h2>
           <h3>No Data</h3>
         `);
         return;

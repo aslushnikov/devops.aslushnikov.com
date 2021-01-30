@@ -190,7 +190,7 @@ class DashboardData {
 
   constructor(dataURL, commits) {
     this._dataURL = dataURL;
-    this._commits = commits.map((c, index) => ({
+    this._allCommits = commits.map((c, index) => ({
       sha: c.sha,
       author: c.commit.author.name,
       email: c.commit.author.email,
@@ -302,7 +302,7 @@ class DashboardData {
   render() {
     console.time('preparing');
     const self = this;
-    const commits = this._commits.slice(0, this._lastCommits);
+    const commits = this._allCommits.slice(0, this._lastCommits);
 
     const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat())].sort();
     const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
@@ -383,16 +383,15 @@ class DashboardData {
     };
 
     this._renderMainElement();
+    this._renderSummary();
   }
 
-  _selectSpecCommit(spec, commit) {
-    this._selection = {
-      specId: spec.specId,
-      sha: commit?.sha,
-      testName: this._selection?.testName,
-    };
+  _selectSpecCommit(specId, sha) {
+    this._selection.specId = specId;
+    this._selection.sha = sha;
+    split.showSidebar(this._mainSplitView);
     this._renderMainElement();
-    this._renderSummary(spec, commit);
+    this._renderSummary();
   }
 
   _selectTest(test) {
@@ -449,7 +448,7 @@ class DashboardData {
         </vbox>
         ${specs.map(spec => html`
           <hbox>
-            <hbox onclick=${this._selectSpecCommit.bind(this, spec, null)} class=hover-darken style="
+            <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
               width: 600px;
               cursor: pointer;
               padding: 0 1em;
@@ -465,7 +464,7 @@ class DashboardData {
               <spacer></spacer>
               ${this._renderSpecAnnotations(spec)}
             </hbox>
-            ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec, commit)))}
+            ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec.specId, commit.sha)))}
           </hbox>
         `)}
       </div>
@@ -473,8 +472,11 @@ class DashboardData {
     console.timeEnd('rendering');
   }
 
-  _renderSummary(spec, commit) {
-    const {tests} = this._context;
+  _renderSummary() {
+    const {tests, commits} = this._context;
+
+    const commit = this._allCommits.find(({sha}) => sha === this._selection.sha);
+    const spec = (commit || commits[0]).data.specs().get({specId: this._selection.specId});
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
@@ -490,12 +492,12 @@ class DashboardData {
         ">
           <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
             <div>spec:</div>
-            ${commit && html`<div>commit:</div>`}
+            ${this._selection.sha && html`<div>commit:</div>`}
           </vbox>
           <vbox style="overflow: hidden;">
             <div style="text-overflow: ellipsis; overflow: hidden;">
               ${(() => {
-                const url = commit ? tests.get({sha: commit.sha, specId: spec.specId})?.url : null;
+                const url = tests.get({sha: this._selection.sha, specId: this._selection.specId})?.url;
                 const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
                 tag.textContent = `${spec.file} - ${spec.title}`;
                 return tag;
@@ -508,13 +510,13 @@ class DashboardData {
         </hbox>
       </vbox>
     `;
-    const viewTests = tests.getAll({sha: commit?.sha, specId: spec.specId});
+    const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId});
 
     if (viewTests.length) {
       if (this._selection.testName)
         this._renderTestTab(viewTests.find(test => test.name === this._selection.testName));
       if (commit)
-        this._renderCodeTab(commit.data.specs().get({specId: spec.specId}));
+        this._renderCodeTab(commit.data.specs().get({specId: this._selection.specId}));
       else
         this._renderCodeTab(spec);
       split.showSidebar(this._secondarySplitView);
@@ -564,14 +566,13 @@ class DashboardData {
         <div style="padding: 1em;">
           <h3>No Data</h3>
           <p>
-            This spec didn't run a single time. <a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>
+            This spec didn't run a single time. ${commit && html`<a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>`}
           </p>
         </div>
       `);
     }
     this._sideElement.textContent = '';
     this._sideElement.append(content);
-    split.showSidebar(this._mainSplitView);
   }
 
   _renderCodeTab(spec) {

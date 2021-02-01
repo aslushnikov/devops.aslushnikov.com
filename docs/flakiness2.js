@@ -403,7 +403,7 @@ class DashboardData {
   _renderMainElement() {
     const {allBrowserNames, allPlatforms, specs, commits, loadingProgressElement} = this._context;
 
-    console.time('rendering');
+    console.time('rendering main');
 
     this._mainElement.textContent = '';
     this._mainElement.append(html`
@@ -469,10 +469,13 @@ class DashboardData {
         `)}
       </div>
     `);
-    console.timeEnd('rendering');
+    console.timeEnd('rendering main');
   }
 
   _renderSummary() {
+    if (!split.isSidebarShown(this._mainSplitView))
+      return;
+    console.time('rendering summary');
     const {tests, commits} = this._context;
 
     const commit = this._allCommits.find(({sha}) => sha === this._selection.sha);
@@ -573,6 +576,7 @@ class DashboardData {
     }
     this._sideElement.textContent = '';
     this._sideElement.append(content);
+    console.timeEnd('rendering summary');
   }
 
   _renderCodeTab(spec) {

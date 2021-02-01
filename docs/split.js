@@ -22,6 +22,7 @@ export const split = {
   bottom: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'bottom'),
   hideSidebar: (splitElement) => splitElement.removeAttribute('sidebar-shown'),
   showSidebar: (splitElement) => splitElement.setAttribute('sidebar-shown', true),
+  isSidebarShown: (splitElement) => splitElement.hasAttribute('sidebar-shown'),
   registerResizer: (splitElement, resizerElement) => registerResizer(splitElement, resizerElement),
 };
 

@@ -481,7 +481,7 @@ class DashboardData {
     const {tests, commits} = this._context;
 
     const commit = this._allCommits.find(({sha}) => sha === this._selection.sha);
-    const spec = (commit || this._allCommits.find(({data}) => data.specs().has({specId: this._selection.specId}))).data.specs().get({specId: this._selection.specId});
+    const spec = [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0];
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">

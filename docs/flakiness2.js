@@ -190,7 +190,7 @@ class DashboardData {
 
   constructor(dataURL, commits) {
     this._dataURL = dataURL;
-    this._allCommits = commits.map((c, index) => ({
+    this._allCommits = new SMap(commits.map((c, index) => ({
       sha: c.sha,
       author: c.commit.author.name,
       email: c.commit.author.email,
@@ -198,7 +198,7 @@ class DashboardData {
       message: c.commit.message,
       timestamp: c.commit.committer.date,
       data: new CommitData(dataURL, c.sha),
-    }));
+    })));
 
     this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
@@ -228,7 +228,6 @@ class DashboardData {
             flex: auto;
             padding: 1em;
             white-space: pre;
-            font-family: var(--monospace);
             overflow: auto;
           "></section>
       `,
@@ -281,8 +280,6 @@ class DashboardData {
     this._showFlaky = false;
     this._lastCommits = 0;
     this.setLastCommits(20);
-
-    this._renderContext = null;
   }
 
   mockData() { return this._dataURL.mockData(); }
@@ -399,6 +396,7 @@ class DashboardData {
   _selectTest(testName) {
     this._tabstrip.selectTab('errors-tab');
     this._selection.testName = testName;
+    this._renderSummary();
     this._renderErrorsTab();
   }
 
@@ -461,6 +459,7 @@ class DashboardData {
               white-space: nowrap;
               align-items: baseline;
               background: white;
+              ${this._selection.specId === spec.specId && !this._selection.sha ? 'outline: 2px solid black; z-index: 1;' : ''}
             ">
               <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
               <spacer></spacer>
@@ -474,14 +473,19 @@ class DashboardData {
     console.timeEnd('rendering main');
   }
 
+  _resolveSelectionToObjects() {
+    const commit = this._selection.sha ? this._allCommits.get({sha: this._selection.sha}) : undefined;
+    const spec = [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0];
+    return {commit, spec};
+  }
+
   _renderSummary() {
     if (!split.isSidebarShown(this._mainSplitView))
       return;
     console.time('rendering summary');
     const {tests, commits} = this._context;
 
-    const commit = this._allCommits.find(({sha}) => sha === this._selection.sha);
-    const spec = [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0];
+    const {commit, spec} = this._resolveSelectionToObjects();
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
@@ -496,21 +500,7 @@ class DashboardData {
             border-bottom: 1px solid var(--border-color);
         ">
           <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
-            <div>spec:</div>
-            ${this._selection.sha && html`<div>commit:</div>`}
-          </vbox>
-          <vbox style="overflow: hidden;">
-            <div style="text-overflow: ellipsis; overflow: hidden;">
-              ${(() => {
-                const url = tests.get({sha: this._selection.sha, specId: this._selection.specId})?.url;
-                const tag = url ? html`<a href="${url}"></a>` : html`<span style="cursor: default;"></span>`;
-                tag.textContent = `${spec.file} - ${spec.title}`;
-                return tag;
-              })()}
-            </div>
-            ${commit && html`
-              <div style="text-overflow: ellipsis; overflow: hidden;"><a href="${commitURL('playwright', commit.sha)}">${commit.title}</a> (${commit.author})</div>
-            `}
+            <div>Details</div>
           </vbox>
         </hbox>
       </vbox>
@@ -548,20 +538,22 @@ class DashboardData {
     });
 
     if (testNames.length) {
-      if (commit)
-        this._renderCodeTab(commit.data.specs().get({specId: this._selection.specId}));
-      else
-        this._renderCodeTab(spec);
+      this._renderCodeTab(spec);
       split.showSidebar(this._secondarySplitView);
       content.append(html`
         <div style="flex: auto; overflow: auto; padding: 1em;">
+          ${this._renderSelection()}
           <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
             <div style="width: 420px; text-align: center;">test parameters</div>
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
           ${testNames.map(([testName, stats]) => html`
-            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${this._selectTest.bind(this, testName)}>
+            <hbox class="hover-darken" style="
+                background-color: white;
+                cursor: pointer;
+                ${this._selection.testName === testName ? 'outline: 2px solid black; z-index: 100;' : ''}
+              " onclick=${this._selectTest.bind(this, testName)}>
               <div style="
                 width: 300px;
                 padding-left: 1ex;
@@ -607,6 +599,24 @@ class DashboardData {
     this._sideElement.textContent = '';
     this._sideElement.append(content);
     console.timeEnd('rendering summary');
+  }
+
+  _renderSelection({showTestName = false} = {}) {
+    const {commit, spec} = this._resolveSelectionToObjects();
+    return html`
+      <hbox style="margin-bottom: 1em;">
+        <vbox style="align-items: flex-end;">
+          <div>spec:</div>
+          <div>commit:</div>
+          ${showTestName ? html`<div>test:</div>` : undefined}
+        </vbox>
+        <vbox style="margin-left: 1ex; align-items: flex-start;">
+          <div>${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
+          <div>${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
+          ${showTestName ? html`<div>${this._selection.testName || `<summary for all tests>`}</div>` : undefined}
+        </vbox>
+      </hbox>
+    `;
   }
 
   _renderCodeTab(spec) {
@@ -771,9 +781,10 @@ class DashboardData {
     }))).flat();
 
     if (!runsWithErrors.length) {
-      this._errorsTab.titleElement.textContent = `Errors - none`;
+      this._errorsTab.titleElement.textContent = `Unique Errors - none`;
       this._errorsTab.contentElement.textContent = '';
       this._errorsTab.contentElement.append(html`
+        ${this._renderSelection({showTestName: true})}
         <h3>No Errors</h3>
       `);
       return;
@@ -799,6 +810,7 @@ class DashboardData {
     this._errorsTab.titleElement.textContent = `Unique Errors: ${stackIdToInfo.size}`;
     this._errorsTab.contentElement.textContent = '';
     this._errorsTab.contentElement.append(html`
+      ${this._renderSelection({showTestName: true})}
       <h2>Unique Errors: ${stackIdToInfo.size}</h2>
       ${[...stackIdToInfo.values()].sort((info1, info2) => {
         if (info1.specIds.size !== info2.specIds.size)

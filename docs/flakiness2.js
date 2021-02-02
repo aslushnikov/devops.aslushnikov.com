@@ -12,6 +12,7 @@ const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
 const CHAR_WARNING = '⚠';
 const CHAR_CROSS = '✖';
+const CHAR_INFINITY = '∞';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -442,6 +443,7 @@ class DashboardData {
         </hbox>
         <hbox style="margin-left: 1em;">
           <h2>${specs.size} problematic specs</h2>
+          <a style="margin-left: 1em; cursor: pointer;" onclick=${this._selectSpecCommit.bind(this, undefined, undefined)}>(summary)</a>
         </hbox>
         <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
@@ -475,7 +477,7 @@ class DashboardData {
 
   _resolveSelectionToObjects() {
     const commit = this._selection.sha ? this._allCommits.get({sha: this._selection.sha}) : undefined;
-    const spec = [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0];
+    const spec = this._selection.specId ? [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0] : undefined;
     return {commit, spec};
   }
 
@@ -573,7 +575,7 @@ class DashboardData {
                     for (let i = 0; i < count; ++i)
                       result.append(renderTestStatus(status, {marginRight: 2, size: 10}));
                   } else {
-                    result.append(renderTestStatus(status, {count, marginRight: 2, size: 14}));
+                    result.append(renderTestStatus(status, {count: count > 99 ? CHAR_INFINITY : count, marginRight: 2, size: 14}));
                   }
                 }
                 result.lastElementChild.style.removeProperty('margin-right');

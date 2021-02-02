@@ -61,7 +61,8 @@ function maximizeSidebar(splitElement) {
   const propertyName = info.sidebarPosition === 'left' || info.sidebarPosition === 'right' ? 'width' : 'height';
   const dimensionName = info.sidebarPosition === 'left' || info.sidebarPosition === 'right' ? 'offsetWidth' : 'offsetHeight';
   info.sideElement.style.setProperty(propertyName, '100%');
-  info.size = info.sideElement[dimensionName];
+  //TODO: 5px comes from resizer size. We should merge split.css in here.
+  info.size = info.sideElement[dimensionName] - 5;
   info.sideElement.style.setProperty('--size', info.size);
   info.sideElement.style.removeProperty(propertyName);
 }

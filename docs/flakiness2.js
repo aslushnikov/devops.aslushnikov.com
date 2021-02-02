@@ -570,12 +570,22 @@ class DashboardData {
                 white-space: nowrap;
               ">${testName}</div>
               <div style="width: 120px;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
-              <hbox style="width: 100px; align-items: center; justify-content: center;">
-                ${stats.failed ? renderTestStatus('failed', {count: stats.failed !== 1 ? stats.failed : '', marginRight: 2, size: stats.failed === 1 ? 10 : 14}) : undefined}
-                ${stats.timedOut ? renderTestStatus('timedOut', {count: stats.timedOut !== 1 ? stats.timedOut : '', marginRight: 2, size: stats.timedOut === 1 ? 10 : 14}) : undefined}
-                ${stats.passed ? renderTestStatus('passed', {count: stats.passed !== 1 ? stats.passed : '', marginRight: 2, size: stats.passed === 1 ? 10 : 14}) : undefined}
-                ${stats.skipped ? renderTestStatus('skipped', {count: stats.skipped !== 1 ? stats.skipped : '', marginRight: 2, size: stats.skipped === 1 ? 10 : 14}) : undefined}
-              </hbox>
+              ${(() => {
+                const result = html`<hbox style="width: 100px; align-items: center; justify-content: center;"></hbox>`;
+                for (const status of ['failed', 'timedOut', 'passed', 'skipped']) {
+                  const count = stats[status];
+                  if (count === 0)
+                    continue;
+                  if (count <= 4) {
+                    for (let i = 0; i < count; ++i)
+                      result.append(renderTestStatus(status, {marginRight: 2, size: 10}));
+                  } else {
+                    result.append(renderTestStatus(status, {count, marginRight: 2, size: 14}));
+                  }
+                }
+                result.lastElementChild.style.removeProperty('margin-right');
+                return result;
+              })()}
               <div style="width: 100px; text-align: center;">
                 ${[...stats.expectedStatuses].map(status => renderTestStatus(status, {size: 10}))}
               </div>

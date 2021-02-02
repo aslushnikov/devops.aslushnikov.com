@@ -541,7 +541,7 @@ class DashboardData {
       this._renderCodeTab(spec);
       split.showSidebar(this._secondarySplitView);
       content.append(html`
-        <div style="flex: auto; overflow: auto; padding: 1em;">
+        <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
           ${this._renderSelection()}
           <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
             <div style="width: 420px; text-align: center;">test parameters</div>
@@ -551,6 +551,7 @@ class DashboardData {
           ${testNames.map(([testName, stats]) => html`
             <hbox class="hover-darken" style="
                 background-color: white;
+                position: relative;
                 cursor: pointer;
                 ${this._selection.testName === testName ? 'outline: 2px solid black; z-index: 100;' : ''}
               " onclick=${this._selectTest.bind(this, testName)}>

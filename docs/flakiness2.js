@@ -576,7 +576,7 @@ class DashboardData {
                 return result;
               })()}
               <div style="width: 100px; text-align: center;">
-                ${[...stats.expectedStatuses].map(status => renderTestStatus(status, {size: 10}))}
+                ${[...stats.expectedStatuses].map((status, index) => renderTestStatus(status, {size: 10, marginRight: index < stats.expectedStatuses.size - 1 ? 2 : 0}))}
               </div>
             </hbox>
           `)}

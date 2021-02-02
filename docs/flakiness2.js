@@ -497,9 +497,17 @@ class DashboardData {
             padding: 2px 1em;
             border-bottom: 1px solid var(--border-color);
         ">
-          <vbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
-            <div>Details</div>
-          </vbox>
+          <hbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
+            ${svg`
+            <svg style="margin-left: -10px; cursor: pointer;" onclick=${() => split.maximizeSidebar(this._mainSplitView)} height="20px" version="1.1" viewBox="0 0 36 36" width="20px">
+              <path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z"></path>
+              <path d="m 20,10 0,2 4,0 0,4 2,0 L 26,10 l -6,0 0,0 z"></path>
+              <path d="m 24,24 -4,0 0,2 L 26,26 l 0,-6 -2,0 0,4 0,0 z"></path>
+              <path d="M 12,20 10,20 10,26 l 6,0 0,-2 -4,0 0,-4 0,0 z"></path>
+            </svg>
+            `}
+            <div >Details</div>
+          </hbox>
         </hbox>
       </vbox>
     `;
@@ -558,7 +566,7 @@ class DashboardData {
                 padding-left: 1ex;
                 ${STYLE_TEXT_OVERFLOW}
               ">${testName}</div>
-              <div style="width: 120px;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
+              <div style="width: 120px; white-space: nowrap;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
               ${(() => {
                 const result = html`<hbox style="width: 100px; align-items: center; justify-content: center;"></hbox>`;
                 for (const status of ['failed', 'timedOut', 'passed', 'skipped']) {

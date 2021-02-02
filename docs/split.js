@@ -22,6 +22,7 @@ export const split = {
   bottom: ({sidebar, main, size, hidden = false }) => splitElement(sidebar, main, size, hidden, 'bottom'),
   hideSidebar: (splitElement) => splitElement.removeAttribute('sidebar-shown'),
   showSidebar: (splitElement) => splitElement.setAttribute('sidebar-shown', true),
+  maximizeSidebar: (splitElement) => maximizeSidebar(splitElement),
   isSidebarShown: (splitElement) => splitElement.hasAttribute('sidebar-shown'),
   registerResizer: (splitElement, resizerElement) => registerResizer(splitElement, resizerElement),
 };
@@ -50,6 +51,19 @@ function splitElement(sidebar, main, size, hidden, sidebarPosition) {
   };
   registerResizer(element, resizer);
   return element;
+}
+
+function maximizeSidebar(splitElement) {
+  const info = splitElement[MetaInfoSymbol];
+  if (!info)
+    throw new Error('ERROR: given element is not a splitElement');
+  info.sideElement.style.removeProperty('--size');
+  const propertyName = info.sidebarPosition === 'left' || info.sidebarPosition === 'right' ? 'width' : 'height';
+  const dimensionName = info.sidebarPosition === 'left' || info.sidebarPosition === 'right' ? 'offsetWidth' : 'offsetHeight';
+  info.sideElement.style.setProperty(propertyName, '100%');
+  info.size = info.sideElement[dimensionName];
+  info.sideElement.style.setProperty('--size', info.size);
+  info.sideElement.style.removeProperty(propertyName);
 }
 
 function registerResizer(splitElement, resizerElement) {

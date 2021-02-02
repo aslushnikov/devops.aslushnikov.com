@@ -25,6 +25,11 @@ export class SMap {
     return entries.length ? entries[0] : null;
   }
 
+  getAll(selector) {
+    const keys = Object.entries(selector).filter(([key, value]) => value !== undefined).map(([key]) => key);
+    return this._ensureIndex(keys).getAll(selector);
+  }
+
   _ensureIndex(keys) {
     keys.sort();
     const indexId = JSON.stringify(keys);
@@ -34,11 +39,6 @@ export class SMap {
       this._indexes.set(indexId, index);
     }
     return index;
-  }
-
-  getAll(selector) {
-    const keys = Object.entries(selector).filter(([key, value]) => value !== undefined).map(([key]) => key);
-    return this._ensureIndex(keys).getAll(selector);
   }
 }
 

@@ -481,7 +481,7 @@ class DashboardData {
     const {tests, commits} = this._context;
 
     const commit = this._allCommits.find(({sha}) => sha === this._selection.sha);
-    const spec = (commit || commits[0]).data.specs().get({specId: this._selection.specId});
+    const spec = (commit || this._allCommits.find(({data}) => data.specs().has({specId: this._selection.specId}))).data.specs().get({specId: this._selection.specId});
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
@@ -764,34 +764,76 @@ class DashboardData {
     const {tests} = this._context;
 
     const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId, name: this._selection.testName});
-    if (!viewTests.length) {
+    const runsWithErrors = viewTests.map(test => test.runs.filter(run => run.error).map(run => ({
+      test,
+      run,
+      stackId: createStackSignature(run.error.stack),
+    }))).flat();
+
+    if (!runsWithErrors.length) {
       this._errorsTab.titleElement.textContent = `Errors - none`;
       this._errorsTab.contentElement.textContent = '';
       this._errorsTab.contentElement.append(html`
-        <h2>${this._selection.testName}</h2>
         <h3>No Errors</h3>
       `);
       return;
     }
 
-    const runsWithErrors = viewTests.map(test => test.runs.filter(run => run.error).map(run => ({
-      test,
-      run,
-    }))).flat();
-    this._errorsTab.titleElement.textContent = `Errors - ${runsWithErrors.length}`;
+
+    const stackIdToInfo = new Map();
+    for (const {test, run, stackId} of runsWithErrors) {
+      let info = stackIdToInfo.get(stackId);
+      if (!info) {
+        info = {
+          specIds: new Set(),
+          commitSHAs: new Set(),
+          runs: [],
+        };
+        stackIdToInfo.set(stackId, info);
+      }
+      info.specIds.add(test.specId);
+      info.commitSHAs.add(test.sha);
+      info.runs.push(run);
+    }
+
+    this._errorsTab.titleElement.textContent = `Unique Errors: ${stackIdToInfo.size}`;
     this._errorsTab.contentElement.textContent = '';
     this._errorsTab.contentElement.append(html`
-      <h2>Errors</h2>
-      ${runsWithErrors.map(({test, run}, index) => html`
-        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${runsWithErrors.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
-        ${run.error && html`
-          <pre style="
-            background-color: #333;
-            color: #eee;
-            padding: 1em;
-            overflow: auto;
-          ">${highlightANSIText(run.error.stack)}</pre>
-        `}
+      <h2>Unique Errors: ${stackIdToInfo.size}</h2>
+      ${[...stackIdToInfo.values()].sort((info1, info2) => {
+        if (info1.specIds.size !== info2.specIds.size)
+          return info2.specIds.size - info1.specIds.size;
+        if (info1.commitSHAs.size !== info2.commitSHAs.size)
+          return info2.commitSHAs.size - info1.commitSHAs.size;
+        return info2.runs.length - info1.runs.length;
+      }).map(({specIds, commitSHAs, runs}, index) => html`
+        <h3 style="display: flex;align-items: center;">#${index + 1} Unique Error</h3>
+        ${(() => {
+          const terminal = html`
+              <pre style="
+                background-color: #333;
+                color: #eee;
+                padding: 1em;
+                overflow: auto;
+              ">${highlightANSIText(runs[0].error.stack)}</pre>
+          `;
+          const select = html`
+            <select oninput=${e => {
+              terminal.textContent = '';
+              terminal.append(highlightANSIText(e.target.selectedOptions[0].run.error.stack));
+            }}>
+              ${runs.map((run, index) => html`
+                <option onzrender=${e => e.run = run}>#${index}</option>
+              `)}
+            </select>
+          `;
+          return html`
+            <div style="margin-left: 1em;">
+              ${select}
+              ${terminal}
+            </div>
+          `;
+        })()}
       `)}
     `);
   }
@@ -993,4 +1035,20 @@ class TabStrip {
     }
     return true;
   }
+}
+
+function createStackSignature(stack) {
+  // Sometimes stack traces are slightly different:
+  // 1. They might contain GUID's that did not match
+  // 2. They might contain numbers that did not match
+  // We want to "dedupe" these stacktraces.
+  return stack.split('\n')
+      // we care about stack only, so get all the lines that start with 'at '
+      .map(line => line.trim())
+      .filter(line => line.startsWith('at '))
+      .join('\n')
+      // replace all numbers with '<NUM>'
+      .replaceAll(/\b\d+\b/g, '<NUM>')
+      // replace all hex numbers with '<HEXNUM>'
+      .replaceAll(/\b0x[0-9a-e]+\b/gi, '<HEXNUM>');
 }

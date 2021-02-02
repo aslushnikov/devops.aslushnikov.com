@@ -24,7 +24,7 @@ const COLOR_VIOLET = '#ce93d8';
 const COLOR_GREY = '#eeeeee';
 
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
-const STYLE_NO_TEXT_OVERFLOW = `border-bottom: 1px solid var(--border-color);`;
+const STYLE_TEXT_OVERFLOW = `white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
 
 const testRunColors = {
   'passed': COLOR_GREEN,
@@ -451,14 +451,12 @@ class DashboardData {
         ${specs.map(spec => html`
           <hbox>
             <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
+              ${STYLE_TEXT_OVERFLOW}
               width: 600px;
               cursor: pointer;
               padding: 0 1em;
               margin-right: 1px;
               z-index: 0;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
               align-items: baseline;
               background: white;
               ${this._selection.specId === spec.specId && !this._selection.sha ? 'outline: 2px solid black; z-index: 1;' : ''}
@@ -492,10 +490,8 @@ class DashboardData {
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
         <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
-            white-space: nowrap;
-            overflow: hidden;
+            ${STYLE_TEXT_OVERFLOW}
             cursor: row-resize;
-            text-overflow: ellipsis;
             flex: none;
             background-color: var(--border-color);
             padding: 2px 1em;
@@ -560,9 +556,7 @@ class DashboardData {
               <div style="
                 width: 300px;
                 padding-left: 1ex;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                ${STYLE_TEXT_OVERFLOW}
               ">${testName}</div>
               <div style="width: 120px;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
               ${(() => {
@@ -613,10 +607,10 @@ class DashboardData {
           <div>commit:</div>
           ${showTestName ? html`<div>test:</div>` : undefined}
         </vbox>
-        <vbox style="margin-left: 1ex; align-items: flex-start;">
-          <div>${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
-          <div>${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
-          ${showTestName ? html`<div>${this._selection.testName || `<summary for all tests>`}</div>` : undefined}
+        <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
+          <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
+          <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
+          ${showTestName ? html`<div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>` : undefined}
         </vbox>
       </hbox>
     `;

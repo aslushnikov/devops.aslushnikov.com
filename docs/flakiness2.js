@@ -462,7 +462,7 @@ class DashboardData {
               align-items: baseline;
               background: white;
             ">
-              <span style="overflow: hidden; text-overflow: ellipsis;">${spec.file} - ${spec.title}</span>
+              <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
               <spacer></spacer>
               ${this._renderSpecAnnotations(spec)}
             </hbox>

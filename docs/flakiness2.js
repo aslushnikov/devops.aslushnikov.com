@@ -219,7 +219,7 @@ class DashboardData {
           onconnected=${w => w.scrollTop = editorTabScrollTop}
           onscroll=${e => editorTabScrollTop = e.target.scrollTop} style="${STYLE_FILL}; overflow: auto;"></z-widget>`,
     };
-    this._testTab = {
+    this._errorsTab = {
       titleElement: html`<span></span>`,
       contentElement: html`
           <section style="
@@ -241,9 +241,9 @@ class DashboardData {
       selected: true,
     });
     this._tabstrip.addTab({
-      tabId: 'test-tab',
-      titleElement: this._testTab.titleElement,
-      contentElement: this._testTab.contentElement,
+      tabId: 'errors-tab',
+      titleElement: this._errorsTab.titleElement,
+      contentElement: this._errorsTab.contentElement,
       selected: false,
     });
 
@@ -389,15 +389,17 @@ class DashboardData {
   _selectSpecCommit(specId, sha) {
     this._selection.specId = specId;
     this._selection.sha = sha;
+    this._selection.testName = undefined;
     split.showSidebar(this._mainSplitView);
     this._renderMainElement();
     this._renderSummary();
+    this._renderErrorsTab();
   }
 
-  _selectTest(test) {
-    this._tabstrip.selectTab('test-tab');
-    this._selection.testName = test.name;
-    this._renderTestTab(test);
+  _selectTest(testName) {
+    this._tabstrip.selectTab('errors-tab');
+    this._selection.testName = testName;
+    this._renderErrorsTab();
   }
 
   _renderMainElement() {
@@ -513,11 +515,39 @@ class DashboardData {
         </hbox>
       </vbox>
     `;
-    const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId});
 
-    if (viewTests.length) {
-      if (this._selection.testName)
-        this._renderTestTab(viewTests.find(test => test.name === this._selection.testName));
+    const testNameToStats = new Map();
+    for (const test of tests.getAll({sha: this._selection.sha, specId: this._selection.specId})) {
+      let stats = testNameToStats.get(test.name);
+      if (!stats) {
+        stats = {
+          passed: 0,
+          failed: 0,
+          timedOut: 0,
+          skipped: 0,
+          annotationTypes: new Set(),
+          expectedStatuses: new Set(),
+        };
+        testNameToStats.set(test.name, stats);
+      }
+      for (const annotation of test.annotations)
+        stats.annotationTypes.add(annotation.type);
+      for (const run of test.runs)
+        stats[run.status] = (stats[run.status] || 0) + 1;
+      stats.expectedStatuses.add(test.expectedStatus);
+    }
+
+    const testNames = [...testNameToStats.entries()].sort(([t1, s1], [t2, s2]) => {
+      if (s1.failed !== s2.failed)
+        return s2.failed - s1.failed;
+      if (s1.timedOut !== s2.timedOut)
+        return s2.timedOut - s1.timedOut;
+      if (s1.annotationTypes.size !== s2.annotationTypes.size)
+        return s2.annotationTypes.size - s1.annotationTypes.size;
+      return t1 < t2 ? -1 : 1;
+    });
+
+    if (testNames.length) {
       if (commit)
         this._renderCodeTab(commit.data.specs().get({specId: this._selection.specId}));
       else
@@ -530,34 +560,24 @@ class DashboardData {
             <div style="width: 100px; text-align: center;">runs</div>
             <div style="width: 100px; text-align: center;">expected</div>
           </hbox>
-          ${viewTests.sort((t1, t2) => {
-            const categoryScore = {
-              'bad': 0,
-              'flaky': 1,
-              'good': 2,
-            };
-            if (t1.category !== t2.category)
-              return categoryScore[t1.category] - categoryScore[t2.category];
-            if (t1.annotations.length !== t2.annotations.length)
-              return t2.annotations.length - t1.annotations.length;
-            if (t1.name !== t2.name)
-              return t1.name < t2.name ? -1 : 1;
-            return 0;
-          }).map(test => html`
-            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${this._selectTest.bind(this, test)}>
+          ${testNames.map(([testName, stats]) => html`
+            <hbox class="hover-darken" style="background-color: white; cursor: pointer;" onclick=${this._selectTest.bind(this, testName)}>
               <div style="
                 width: 300px;
                 padding-left: 1ex;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-              ">${test.name}</div>
-              <div style="width: 120px;">${test.annotations.map(a => renderAnnotation(a.type))}</div>
+              ">${testName}</div>
+              <div style="width: 120px;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
+              <hbox style="width: 100px; align-items: center; justify-content: center;">
+                ${stats.failed ? renderTestStatus('failed', {count: stats.failed !== 1 ? stats.failed : '', marginRight: 2, size: stats.failed === 1 ? 10 : 14}) : undefined}
+                ${stats.timedOut ? renderTestStatus('timedOut', {count: stats.timedOut !== 1 ? stats.timedOut : '', marginRight: 2, size: stats.timedOut === 1 ? 10 : 14}) : undefined}
+                ${stats.passed ? renderTestStatus('passed', {count: stats.passed !== 1 ? stats.passed : '', marginRight: 2, size: stats.passed === 1 ? 10 : 14}) : undefined}
+                ${stats.skipped ? renderTestStatus('skipped', {count: stats.skipped !== 1 ? stats.skipped : '', marginRight: 2, size: stats.skipped === 1 ? 10 : 14}) : undefined}
+              </hbox>
               <div style="width: 100px; text-align: center;">
-                ${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}
-              </div>
-              <div style="width: 100px; text-align: center;">
-                ${renderTestStatus(test.expectedStatus)}
+                ${[...stats.expectedStatuses].map(status => renderTestStatus(status, {size: 10}))}
               </div>
             </hbox>
           `)}
@@ -730,29 +750,30 @@ class DashboardData {
     `;
   }
 
-  _renderTestTab(test) {
-    if (!test) {
-      this._testTab.titleElement.textContent = this._selection.testName;
-      this._testTab.contentElement.textContent = '';
-      this._testTab.contentElement.append(html`
+  _renderErrorsTab() {
+    const {tests} = this._context;
+
+    const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId, name: this._selection.testName});
+    if (!viewTests.length) {
+      this._errorsTab.titleElement.textContent = `Errors - none`;
+      this._errorsTab.contentElement.textContent = '';
+      this._errorsTab.contentElement.append(html`
         <h2>${this._selection.testName}</h2>
-        <h3>No Data</h3>
+        <h3>No Errors</h3>
       `);
       return;
     }
 
-    this._testTab.titleElement.textContent = '';
-    this._testTab.titleElement.append(html`
-      <hbox>
-        <span style="margin: 0 4px 0 -6px;">${test.runs.map((run, index) => renderTestStatus(run.status, {marginRight: index < test.runs.length - 1 ? 2 : 0}))}</span>
-        ${test.name}
-      </hbox>
-    `);
-    this._testTab.contentElement.textContent = '';
-    this._testTab.contentElement.append(html`
-      <h2>${test.name}</h2>
-      ${test.runs.map((run, index) => html`
-        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${test.runs.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
+    const runsWithErrors = viewTests.map(test => test.runs.filter(run => run.error).map(run => ({
+      test,
+      run,
+    }))).flat();
+    this._errorsTab.titleElement.textContent = `Errors - ${runsWithErrors.length}`;
+    this._errorsTab.contentElement.textContent = '';
+    this._errorsTab.contentElement.append(html`
+      <h2>Errors</h2>
+      ${runsWithErrors.map(({test, run}, index) => html`
+        <h3 style="display: flex;align-items: center;">${renderTestStatus(run.status, {size: 12})} Run ${index + 1}/${runsWithErrors.length} - ${run.status} (${(run.duration / 1000).toFixed(1)}s)</h3>
         ${run.error && html`
           <pre style="
             background-color: #333;
@@ -835,10 +856,11 @@ function svgPie({ratio, color = '#bbb', size = COMMIT_RECT_SIZE}) {
   `;
 }
 
-function renderTestStatus(status, {size=10, marginRight=0} = {}) {
+function renderTestStatus(status, {count='', size=14, marginRight=0} = {}) {
   return svg`
-    <svg style="margin-right: ${marginRight}px;" width=${size} height=${size} viewbox="0 0 10 10">
-      <circle cx=5 cy=5 r=5 fill="${testRunColors[status] || 'blue'}">
+    <svg style="margin-right: ${marginRight}px;" width=${size } height=${size } viewbox="0 0 ${size * 2} ${size * 2}">
+      <circle cx=${size} cy=${size} r=${size} fill="${testRunColors[status] || 'blue'}"></circle>
+      <text font-weight=200 font-size=large x=${size} y=${size} text-anchor="middle" stroke="#333"  dy=".3em">${count}</text>
     </svg>
   `;
 }

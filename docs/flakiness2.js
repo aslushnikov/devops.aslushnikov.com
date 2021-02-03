@@ -495,18 +495,17 @@ class DashboardData {
             flex: none;
             background-color: var(--border-color);
             padding: 2px 1em;
-            border-bottom: 1px solid var(--border-color);
         ">
-          <hbox style="cursor: default; flex: none; align-items: flex-end; margin-right: 1ex; font-weight: bold">
+          <hbox onclick=${() => split.maximizeSidebar(this._mainSplitView)} style="cursor: pointer; flex: none; margin-right: 1ex; font-weight: bold">
             ${svg`
-            <svg style="margin-left: -10px; cursor: pointer;" onclick=${() => split.maximizeSidebar(this._mainSplitView)} height="20px" version="1.1" viewBox="0 0 36 36" width="20px">
+            <svg style="margin-right: 4px;" height="10px" version="1.1" viewBox="8 8 20 20" width="10px">
               <path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z"></path>
               <path d="m 20,10 0,2 4,0 0,4 2,0 L 26,10 l -6,0 0,0 z"></path>
               <path d="m 24,24 -4,0 0,2 L 26,26 l 0,-6 -2,0 0,4 0,0 z"></path>
               <path d="M 12,20 10,20 10,26 l 6,0 0,-2 -4,0 0,-4 0,0 z"></path>
             </svg>
             `}
-            <div >Details</div>
+            <div>Details</div>
           </hbox>
         </hbox>
       </vbox>
@@ -548,7 +547,18 @@ class DashboardData {
       split.showSidebar(this._secondarySplitView);
       content.append(html`
         <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
-          ${this._renderSelection()}
+          <hbox style="margin-bottom: 1em;">
+            <vbox style="align-items: flex-end;">
+              <div>spec:</div>
+              <div>commit:</div>
+              <div>test:</div>
+            </vbox>
+            <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
+              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
+              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
+              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>
+            </vbox>
+          </hbox>
           <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
             <div style="width: 420px; text-align: center;">test parameters</div>
             <div style="width: 100px; text-align: center;">runs</div>
@@ -609,18 +619,6 @@ class DashboardData {
   _renderSelection({showTestName = false} = {}) {
     const {commit, spec} = this._resolveSelectionToObjects();
     return html`
-      <hbox style="margin-bottom: 1em;">
-        <vbox style="align-items: flex-end;">
-          <div>spec:</div>
-          <div>commit:</div>
-          ${showTestName ? html`<div>test:</div>` : undefined}
-        </vbox>
-        <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
-          <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
-          <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
-          ${showTestName ? html`<div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>` : undefined}
-        </vbox>
-      </hbox>
     `;
   }
 
@@ -789,7 +787,6 @@ class DashboardData {
       this._errorsTab.titleElement.textContent = `Unique Errors - none`;
       this._errorsTab.contentElement.textContent = '';
       this._errorsTab.contentElement.append(html`
-        ${this._renderSelection({showTestName: true})}
         <h3>No Errors</h3>
       `);
       return;
@@ -815,8 +812,6 @@ class DashboardData {
     this._errorsTab.titleElement.textContent = `Unique Errors: ${stackIdToInfo.size}`;
     this._errorsTab.contentElement.textContent = '';
     this._errorsTab.contentElement.append(html`
-      ${this._renderSelection({showTestName: true})}
-      <h2>Unique Errors: ${stackIdToInfo.size}</h2>
       ${[...stackIdToInfo.values()].sort((info1, info2) => {
         if (info1.specIds.size !== info2.specIds.size)
           return info2.specIds.size - info1.specIds.size;
@@ -824,7 +819,7 @@ class DashboardData {
           return info2.commitSHAs.size - info1.commitSHAs.size;
         return info2.runs.length - info1.runs.length;
       }).map(({specIds, commitSHAs, runs}, index) => html`
-        <h3 style="display: flex;align-items: center;">#${index + 1} Unique Error</h3>
+        <h3 style="display: flex;align-items: center;">${index + 1}/${stackIdToInfo.size} StackId: foo-bar</h3>
         ${(() => {
           const terminal = html`
               <pre style="

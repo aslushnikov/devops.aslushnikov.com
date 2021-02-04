@@ -7,6 +7,7 @@ import {split} from './split.js';
 import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
 import {highlightText, preloadHighlighter} from './codehighlight.js';
 import {URLState, newURL, amendURL} from './urlstate.js';
+import {humanId} from './humanid.js';
 
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
@@ -382,6 +383,7 @@ class DashboardData {
 
     this._renderMainElement();
     this._renderSummary();
+    this._renderErrorsTab();
   }
 
   _selectSpecCommit(specId, sha) {
@@ -780,7 +782,7 @@ class DashboardData {
     const runsWithErrors = viewTests.map(test => test.runs.filter(run => run.error).map(run => ({
       test,
       run,
-      stackId: createStackSignature(run.error.stack),
+      stackId: humanId(createStackSignature(run.error.stack)),
     }))).flat();
 
     if (!runsWithErrors.length) {
@@ -798,6 +800,7 @@ class DashboardData {
       let info = stackIdToInfo.get(stackId);
       if (!info) {
         info = {
+          stackId,
           specIds: new Set(),
           commitSHAs: new Set(),
           runs: [],
@@ -818,34 +821,33 @@ class DashboardData {
         if (info1.commitSHAs.size !== info2.commitSHAs.size)
           return info2.commitSHAs.size - info1.commitSHAs.size;
         return info2.runs.length - info1.runs.length;
-      }).map(({specIds, commitSHAs, runs}, index) => html`
-        <h3 style="display: flex;align-items: center;">${index + 1}/${stackIdToInfo.size} StackId: foo-bar</h3>
-        ${(() => {
-          const terminal = html`
-              <pre style="
-                background-color: #333;
-                color: #eee;
-                padding: 1em;
-                overflow: auto;
-              ">${highlightANSIText(runs[0].error.stack)}</pre>
-          `;
-          const select = html`
-            <select oninput=${e => {
-              terminal.textContent = '';
-              terminal.append(highlightANSIText(e.target.selectedOptions[0].run.error.stack));
-            }}>
-              ${runs.map((run, index) => html`
-                <option onzrender=${e => e.run = run}>#${index}</option>
-              `)}
-            </select>
-          `;
-          return html`
-            <div style="margin-left: 1em;">
-              ${select}
-              ${terminal}
-            </div>
-          `;
-        })()}
+      }).map(({stackId, specIds, commitSHAs, runs}, index) => html`
+        <h2 style="display: flex;align-items: center;">(${index + 1}/${stackIdToInfo.size}) error "${stackId}"</h2>
+        <div style="margin-left: 1em;">
+          <div>specs: ${specIds.size}</div>
+          ${(() => {
+            const terminal = html`<pre style="overflow: auto;">${highlightANSIText(runs[0].error.stack)}</pre>`;
+            return html`
+                <div style="
+                  background-color: #333;
+                  color: #eee;
+                  padding: 1em;
+                ">
+                  <div>Occurence <select style="background-color: #333; color: white;" oninput=${e => {
+                      terminal.textContent = '';
+                      terminal.append(highlightANSIText(e.target.selectedOptions[0].run.error.stack));
+                    }}>
+                      ${runs.map((run, index) => html`
+                        <option onzrender=${e => e.run = run}>#${index + 1}</option>
+                      `)}
+                    </select>
+                  </div>
+                  <hr/>
+                  ${terminal}
+                </div>
+            `;
+          })()}
+        </div>
       `)}
     `);
   }

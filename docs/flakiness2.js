@@ -75,7 +75,7 @@ class DataURL {
   dashboardURL(sha) {
     if (this._useMockData)
       return `/mockdata/${sha}.json`;
-    return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/raw/${sha}.json`;
+    return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/compressed_v1/${sha}.json`;
   }
 
   commitsURL() {
@@ -128,47 +128,47 @@ class CommitData {
       return;
     }
 
-    // All specs are sorted by filename/line/column location.
-    // const specs = json.map(report => flattenSpecs(report)).flat();
     const specs = [];
     const tests = [];
-    for (const report of json) {
-      for (const spec of flattenSpecs(report)) {
-        const specId = spec.file + '---' + spec.title;
+
+    for (const entry of json) {
+      for (const spec of entry.specs) {
+        const specId = entry.file + '---' + spec.title;
         const specObject = {
           specId,
           sha: this._sha,
-          file: spec.file,
+          file: entry.file,
           title: spec.title,
           line: spec.line,
           column: spec.column,
         };
         specs.push(specObject);
         for (const test of spec.tests || []) {
-          if (test.runs.length === 1 && !test.runs[0].status)
-            continue;
-          // Overwrite test platform parameter with a more specific information from
-          // build run.
-          test.parameters.platform = report.metadata.osName + ' ' + report.metadata.osVersion;
-          if (test.parameters.platform.toUpperCase().startsWith('MINGW'))
-            test.parameters.platform = 'Windows';
-          tests.push({
+          const testObject = {
             specId,
-            url: report.metadata.runURL,
             spec: specObject,
             sha: this._sha,
             name: getTestName(test),
             browserName: test.parameters.browserName || 'N/A',
             platform: test.parameters.platform,
             parameters: test.parameters,
-            annotations: test.annotations,
-            runs: test.runs,
-            expectedStatus: test.expectedStatus,
-            category: getTestCategory(test),
-          });
+            annotations: test.annotations || [],
+            runs: {
+              passed: test.passed || 0,
+              skipped: test.skipped || 0,
+              timedOut: test.timedOut || 0,
+              failed: test.failed ? test.failed.length : 0,
+            },
+            errors: test.failed || [],
+            maxTime: test.maxTime, // max time with test passing
+            expectedStatus: test.expectedStatus || 'passed',
+          };
+          testObject.category = getTestCategory(testObject);
+          tests.push(testObject);
         }
       }
     }
+
     specs.sort((s1, s2) => {
       if (s1.file !== s2.file)
         return s1.file < s2.file ? -1 : 1;
@@ -527,10 +527,12 @@ class DashboardData {
         };
         testNameToStats.set(test.name, stats);
       }
+      stats.passed += test.runs.passed;
+      stats.failed += test.runs.failed;
+      stats.timedOut += test.runs.timedOut;
+      stats.skipped += test.runs.skipped;
       for (const annotation of test.annotations)
         stats.annotationTypes.add(annotation.type);
-      for (const run of test.runs)
-        stats[run.status] = (stats[run.status] || 0) + 1;
       stats.expectedStatuses.add(test.expectedStatus);
     }
 
@@ -779,10 +781,10 @@ class DashboardData {
     const {tests} = this._context;
 
     const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId, name: this._selection.testName});
-    const runsWithErrors = viewTests.map(test => test.runs.filter(run => run.error).map(run => ({
+    const runsWithErrors = viewTests.map(test => test.errors.map(error => ({
       test,
-      run,
-      stackId: humanId(createStackSignature(run.error.stack)),
+      error,
+      stackId: humanId(createStackSignature(error.stack)),
     }))).flat();
 
     if (!runsWithErrors.length) {
@@ -796,20 +798,20 @@ class DashboardData {
 
 
     const stackIdToInfo = new Map();
-    for (const {test, run, stackId} of runsWithErrors) {
+    for (const {test, error, stackId} of runsWithErrors) {
       let info = stackIdToInfo.get(stackId);
       if (!info) {
         info = {
           stackId,
           specIds: new Set(),
           commitSHAs: new Set(),
-          runs: [],
+          errors: [],
         };
         stackIdToInfo.set(stackId, info);
       }
       info.specIds.add(test.specId);
       info.commitSHAs.add(test.sha);
-      info.runs.push(run);
+      info.errors.push(error);
     }
 
     this._errorsTab.titleElement.textContent = `Unique Errors: ${stackIdToInfo.size}`;
@@ -820,13 +822,13 @@ class DashboardData {
           return info2.specIds.size - info1.specIds.size;
         if (info1.commitSHAs.size !== info2.commitSHAs.size)
           return info2.commitSHAs.size - info1.commitSHAs.size;
-        return info2.runs.length - info1.runs.length;
-      }).map(({stackId, specIds, commitSHAs, runs}, index) => html`
+        return info2.errors.length - info1.errors.length;
+      }).map(({stackId, specIds, commitSHAs, errors}, index) => html`
         <h2 style="display: flex;align-items: center;">(${index + 1}/${stackIdToInfo.size}) error "${stackId}"</h2>
         <div style="margin-left: 1em;">
           <div>specs: ${specIds.size}</div>
           ${(() => {
-            const terminal = html`<pre style="overflow: auto;">${highlightANSIText(runs[0].error.stack)}</pre>`;
+            const terminal = html`<pre style="overflow: auto;">${highlightANSIText(errors[0].stack)}</pre>`;
             return html`
                 <div style="
                   background-color: #333;
@@ -835,10 +837,10 @@ class DashboardData {
                 ">
                   <div>Occurence <select style="background-color: #333; color: white;" oninput=${e => {
                       terminal.textContent = '';
-                      terminal.append(highlightANSIText(e.target.selectedOptions[0].run.error.stack));
+                      terminal.append(highlightANSIText(e.target.selectedOptions[0].error.stack));
                     }}>
-                      ${runs.map((run, index) => html`
-                        <option onzrender=${e => e.run = run}>#${index + 1}</option>
+                      ${errors.map((error, index) => html`
+                        <option onzrender=${e => e.error = error}>#${index + 1}</option>
                       `)}
                     </select>
                   </div>
@@ -854,32 +856,9 @@ class DashboardData {
 
 }
 
-function isHealthyTest(test) {
-  if (test.runs.length !== 1)
-    return false;
-  const run = test.runs[0];
-  return !run.status || run.status === 'skipped' || run.status === 'passed';
-}
-
-function getTestsSummary(tests) {
-  const allRuns = [];
-  for (const test of tests)
-    allRuns.push(...test.runs);
-  const runs = allRuns.filter(run => run.status && run.status !== 'skipped');
-  return [...new Set(runs.map(run => run.status))];
-}
-
-function isFlakyTest(test) {
-  if (test.runs.length === 1)
-    return false;
-  if (!test.annotations.some(annotation => annotation.type === 'flaky'))
-    return false;
-  return test.runs.some(run => run.status === test.expectedStatus);
-}
-
 function getTestCategory(test) {
-  const hasGoodRun = test.runs.some(run => run.status === test.expectedStatus);
-  const hasBadRun = test.runs.some(run => run.status !== test.expectedStatus && run.status && run.status !== 'skipped');
+  const hasGoodRun = test.runs[test.expectedStatus] > 0;
+  const hasBadRun = (test.expectedStatus !== 'failed' && test.runs.failed > 0) || (test.expectedStatus !== 'passed' && test.runs.passed > 0) || (test.expectedStatus !== 'timedOut' && test.runs.timedOut > 0);
   if (hasGoodRun && hasBadRun)
     return 'flaky';
   if (hasBadRun)

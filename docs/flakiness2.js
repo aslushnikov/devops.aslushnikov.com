@@ -247,6 +247,13 @@ class DashboardData {
       contentElement: this._errorsTab.contentElement,
       selected: false,
     });
+    this._tabstrip.setRightWidget(html`
+        <button style="appearance: none;
+                       background-color: var(--border-color);
+                       border: none;
+                       cursor: pointer;"
+                onclick=${doCloseSidebar}>${CHAR_CROSS} close</button>
+    `);
 
 
     this._secondarySplitView = split.right({
@@ -257,19 +264,7 @@ class DashboardData {
     });
     this._mainSplitView = split.bottom({
       main: this._mainElement,
-      sidebar: html`
-        ${this._secondarySplitView}
-        <button style="position: absolute;
-                       right: -5px;
-                       top: 0;
-                       appearance: none;
-                       background-color: var(--border-color);
-                       border: 5px solid var(--border-color);
-                       cursor: pointer;
-                       transform: translate(0, -100%);
-                       z-index: 10000;"
-                onclick=${doCloseSidebar}>${CHAR_CROSS} close</button>
-      `,
+      sidebar: this._secondarySplitView,
       size: 300,
       hidden: true,
     });
@@ -406,6 +401,8 @@ class DashboardData {
       selectedElement = this._mainElement.$(`svg[data-specid="${this._selection.specId}"][data-commitsha="${this._selection.sha}"]`);
     else if (this._selection.specId)
       selectedElement = this._mainElement.$(`hbox[data-specid="${this._selection.specId}"]`);
+    else
+      selectedElement = null;
     if (selectedElement)
       selectedElement.classList.add('selected-element');
   }
@@ -971,13 +968,22 @@ function renderAnnotation(annotationType) {
 
 class TabStrip {
   constructor() {
-    this._strip = html`
+    this._tabContainer = html`
       <div style="
-          background-color: var(--border-color);
-          cursor: row-resize;
           flex: none;
           display: flex;
       "></div>
+    `;
+    this._widgetContainer = html`<div style="flex: none;"></div>`;
+    this._strip = html`
+      <hbox style="
+          background: var(--border-color);
+          justify-content: space-between;
+          cursor: row-resize;
+      ">
+        ${this._tabContainer}
+        ${this._widgetContainer}
+      </hbox>
     `;
     this._content = html`
       <div style="
@@ -999,6 +1005,11 @@ class TabStrip {
     this._tabs = new Map();
   }
 
+  setRightWidget(element) {
+    this._widgetContainer.textContent = '';
+    this._widgetContainer.append(element);
+  }
+
   tabstripElement() {
     return this._strip;
   }
@@ -1017,7 +1028,7 @@ class TabStrip {
     `;
     tabElement.onclick = this._onTabClicked.bind(this, tabId);
     this._tabs.set(tabId, {titleElement, contentElement, tabElement});
-    this._strip.append(tabElement);
+    this._tabContainer.append(tabElement);
     if (selected)
       this.selectTab(tabId);
   }

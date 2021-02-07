@@ -47,12 +47,14 @@ split-element {
       display: block;
       flex: auto;
       position: relative;
+      contain: strict;
     }
 
     split-element > side-pane {
       display: none;
       flex: none;
       position: relative;
+      contain: strict;
     }
     split-element[sidebar-shown] > side-pane {
       display: block;

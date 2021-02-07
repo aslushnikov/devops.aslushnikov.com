@@ -305,9 +305,9 @@ class DashboardData {
     const self = this;
     const commits = this._allCommits.slice(0, this._lastCommits);
 
-    const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat())].sort();
-    const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
-    const allErrorIds = [...new Set([...commits.map(commit => commit.data.tests().getAll({hasErrors: true}).map(test => test.errors.map(error => error.errorId)).flat()).flat()])].sort();
+    const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
+    const allPlatforms = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('platform')).flat(), this._platformFilter].filter(Boolean))].sort();
+    const allErrorIds = [...new Set([...commits.map(commit => commit.data.tests().getAll({hasErrors: true}).map(test => test.errors.map(error => error.errorId)).flat()).flat()]), this._errorIdFilter].filter(Boolean).sort();
 
     let loadingProgressElement = null;
     const pendingCommits = commits.filter(commit => !commit.data.isLoaded());

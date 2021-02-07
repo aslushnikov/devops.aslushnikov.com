@@ -383,5 +383,5 @@ function cyrb53(str, seed = 0) {
 };
 
 export function humanId(text) {
-  return `${adjectives[cyrb53(text, 1) % adjectives.length]}-${animals[cyrb53(text, 2) % animals.length]}-${cyrb53(text, 3) % 23 + 7}`;
+  return `${adjectives[cyrb53(text, 1) % adjectives.length]}-${animals[cyrb53(text, 2) % animals.length]}-${cyrb53(text, 3) % 97 + 3}`;
 }

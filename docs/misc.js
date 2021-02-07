@@ -60,6 +60,8 @@ export function browserLogo(browserName, width = 30, height) {
     height = width;
   if (browserName === 'N/A')
     return html`<span>N/A</span>`;
+  if (!browserLogoURL(browserName))
+    return html`<span>⦻</span>`;
   return html`
     <img src="${browserLogoURL(browserName)}" width=${width} height=${height}>
   `;

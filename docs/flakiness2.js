@@ -384,6 +384,7 @@ class DashboardData {
     this._renderMainElement();
     this._renderSummary();
     this._renderErrorsTab();
+    this._updateMainElementSelection();
   }
 
   _selectSpecCommit(specId, sha) {
@@ -391,9 +392,22 @@ class DashboardData {
     this._selection.sha = sha;
     this._selection.testName = undefined;
     split.showSidebar(this._mainSplitView);
-    this._renderMainElement();
     this._renderSummary();
     this._renderErrorsTab();
+
+    this._updateMainElementSelection();
+  }
+
+  _updateMainElementSelection() {
+    let selectedElement = this._mainElement.$('.selected-element');
+    if (selectedElement)
+      selectedElement.classList.remove('selected-element');
+    if (this._selection.specId && this._selection.sha)
+      selectedElement = this._mainElement.$(`svg[data-specid="${this._selection.specId}"][data-commitsha="${this._selection.sha}"]`);
+    else if (this._selection.specId)
+      selectedElement = this._mainElement.$(`hbox[data-specid="${this._selection.specId}"]`);
+    if (selectedElement)
+      selectedElement.classList.add('selected-element');
   }
 
   _selectTest(testName) {
@@ -458,11 +472,9 @@ class DashboardData {
               cursor: pointer;
               padding: 0 1em;
               margin-right: 1px;
-              z-index: 0;
               align-items: baseline;
               background: white;
-              ${this._selection.specId === spec.specId && !this._selection.sha ? 'outline: 2px solid black; z-index: 1;' : ''}
-            ">
+            " data-specid="${spec.specId}">
               <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
               <spacer></spacer>
               ${this._renderSpecAnnotations(spec)}
@@ -766,10 +778,10 @@ class DashboardData {
     else if (categories.size || commit.data.specs().has({specId: spec.specId}))
       color = COLOR_GREEN;
 
-    const clazz = spec.specId === this._selection?.specId && commit.sha === this._selection?.sha ? 'selected-commit' : undefined;
-
     return svg`
-      <svg class="${clazz} hover-darken" style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
+      <svg class=hover-darken style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
+           data-specid="${spec.specId}"
+           data-commitsha="${commit.sha}"
            onclick=${onclick}
            viewbox="0 0 14 14">
         <rect x=0 y=0 width=14 height=14 fill="${color}"/>

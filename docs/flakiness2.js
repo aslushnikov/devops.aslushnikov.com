@@ -60,6 +60,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setLastCommits(commits);
     dashboard.setBrowserFilter(state.browser === 'any' ? undefined : state.browser);
     dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);
+    dashboard.setErrorIdFilter(state.errorid === 'any' ? undefined : state.errorid);
 
     dashboard.render();
   }));
@@ -159,7 +160,11 @@ class CommitData {
               timedOut: test.timedOut || 0,
               failed: test.failed ? test.failed.length : 0,
             },
-            errors: test.failed || [],
+            errors: (test.failed || []).map(error => ({
+              stack: error.stack,
+              errorId: humanId(createStackSignature(error.stack)),
+            })),
+            hasErrors: test.failed?.length > 0,
             maxTime: test.maxTime, // max time with test passing
             expectedStatus: test.expectedStatus || 'passed',
           };
@@ -273,6 +278,7 @@ class DashboardData {
 
     this._browserFilter = undefined;
     this._platformFilter = undefined;
+    this._errorIdFilter = undefined;
 
     this._showFlaky = false;
     this._lastCommits = 0;
@@ -292,6 +298,7 @@ class DashboardData {
   setShowFlaky(value) { this._showFlaky = value; }
   setBrowserFilter(value) { this._browserFilter = value; }
   setPlatformFilter(value) { this._platformFilter = value; }
+  setErrorIdFilter(value) { this._errorIdFilter = value; }
 
   render() {
     console.time('preparing');
@@ -300,6 +307,7 @@ class DashboardData {
 
     const allBrowserNames = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat())].sort();
     const allPlatforms = [...new Set(commits.map(commit => commit.data.tests().uniqueValues('platform')).flat())].sort();
+    const allErrorIds = [...new Set([...commits.map(commit => commit.data.tests().getAll({hasErrors: true}).map(test => test.errors.map(error => error.errorId)).flat()).flat()])].sort();
 
     let loadingProgressElement = null;
     const pendingCommits = commits.filter(commit => !commit.data.isLoaded());
@@ -319,13 +327,20 @@ class DashboardData {
       updateProgress();
     }
 
-    const prefilteredTests = new SMap(commits.map(commit => [
-      ...commit.data.tests().getAll({category: 'bad'}),
-      ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
-    ]).flat());
+    const prefilteredTests = this._errorIdFilter ?
+        new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat())
+        :
+        new SMap(commits.map(commit => [
+          ...commit.data.tests().getAll({category: 'bad'}),
+          ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
+        ]).flat());
     const faultySpecIds = new SMap(prefilteredTests.getAll({browserName: this._browserFilter, platform: this._platformFilter})).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat();
+      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat().filter(test => {
+        if (!test.hasErrors || !this._errorIdFilter)
+          return true;
+        return test.errors.some(error => error.errorId === this._errorIdFilter);
+      });
     }).flat());
 
     const specIdToHealth = new Map();
@@ -374,6 +389,7 @@ class DashboardData {
       specs,
       allPlatforms,
       allBrowserNames,
+      allErrorIds,
     };
 
     this._renderMainElement();
@@ -415,7 +431,7 @@ class DashboardData {
   }
 
   _renderMainElement() {
-    const {allBrowserNames, allPlatforms, specs, commits, loadingProgressElement} = this._context;
+    const {allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement} = this._context;
 
     console.time('rendering main');
 
@@ -450,6 +466,15 @@ class DashboardData {
                 <option selected=${this._platformFilter === undefined}} value="any">any</option>
               ${allPlatforms.map(platform => html`
                 <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
+              `)}
+            </select>
+          </span>
+          <span style="margin-right: 1em;">
+            errorId:
+            <select oninput=${e => urlState.amend({errorid: e.target.value})}>
+                <option selected=${this._errorIdFilter === undefined}} value="any">any</option>
+              ${allErrorIds.map(errorId => html`
+                <option selected=${this._errorIdFilter === errorId} value="${errorId}">${errorId}</option>
               `)}
             </select>
           </span>
@@ -793,7 +818,7 @@ class DashboardData {
     const runsWithErrors = viewTests.map(test => test.errors.map(error => ({
       test,
       error,
-      stackId: humanId(createStackSignature(error.stack)),
+      stackId: error.errorId,
     }))).flat();
 
     if (!runsWithErrors.length) {

@@ -17,7 +17,7 @@ const CHAR_INFINITY = '∞';
 
 const COMMIT_RECT_SIZE = 16;
 
-const COLOR_SELECTION = '#fff9c4';
+const COLOR_SELECTION = '#fff59d';
 const COLOR_YELLOW = '#ffcc80';
 const COLOR_GREEN = '#a5d6a7';
 const COLOR_RED = '#ef9a9a';
@@ -26,6 +26,7 @@ const COLOR_GREY = '#eeeeee';
 
 const STYLE_FILL = 'position: absolute; left: 0; top: 0; right: 0; bottom: 0;';
 const STYLE_TEXT_OVERFLOW = `white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
+const STYLE_SELECTED = `background-color: ${COLOR_SELECTION};`;
 
 const testRunColors = {
   'passed': COLOR_GREEN,
@@ -453,7 +454,7 @@ class DashboardData {
           </span>
           <span style="margin-right: 1em;">
             browser:
-            <select oninput=${e => urlState.amend({browser: e.target.value})}>
+            <select style="${this._browserFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({browser: e.target.value})}>
                 <option selected=${this._browserFilter === undefined}} value="any">any</option>
               ${allBrowserNames.map(browserName => html`
                 <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
@@ -462,7 +463,7 @@ class DashboardData {
           </span>
           <span style="margin-right: 1em;">
             platform:
-            <select oninput=${e => urlState.amend({platform: e.target.value})}>
+            <select style="${this._platformFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({platform: e.target.value})}>
                 <option selected=${this._platformFilter === undefined}} value="any">any</option>
               ${allPlatforms.map(platform => html`
                 <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
@@ -471,7 +472,7 @@ class DashboardData {
           </span>
           <span style="margin-right: 1em;">
             errorId:
-            <select oninput=${e => urlState.amend({errorid: e.target.value})}>
+            <select style="${this._errorIdFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({errorid: e.target.value})}>
                 <option selected=${this._errorIdFilter === undefined}} value="any">any</option>
               ${allErrorIds.map(errorId => html`
                 <option selected=${this._errorIdFilter === errorId} value="${errorId}">${errorId}</option>
@@ -692,7 +693,6 @@ class DashboardData {
     textPromise.then(async text => {
       const lines = await highlightText(text, 'text/typescript');
       const digits = (lines.length + '').length;
-      const STYLE_SELECTED = `background-color: ${COLOR_SELECTION};`;
       gutter.append(html`
         <div style="padding: 0 1em 0 1em; text-align: right; border-right: 1px solid var(--border-color)">
           ${lines.map((line, index) => html`<div x-line-number=${index + 1}>${index + 1}</div>`)}

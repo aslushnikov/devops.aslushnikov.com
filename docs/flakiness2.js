@@ -581,75 +581,63 @@ class DashboardData {
       return t1 < t2 ? -1 : 1;
     });
 
-    if (testNames.length) {
-      this._renderCodeTab(spec);
-      split.showSidebar(this._secondarySplitView);
-      content.append(html`
-        <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
-          <hbox style="margin-bottom: 1em;">
-            <vbox style="align-items: flex-end;">
-              <div>spec:</div>
-              <div>commit:</div>
-              <div>test:</div>
-            </vbox>
-            <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
-              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
-              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
-              <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>
-            </vbox>
-          </hbox>
-          <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
-            <div style="width: 420px; text-align: center;">test parameters</div>
-            <div style="width: 100px; text-align: center;">runs</div>
-            <div style="width: 100px; text-align: center;">expected</div>
-          </hbox>
-          ${testNames.map(([testName, stats]) => html`
-            <hbox class="hover-darken" style="
-                background-color: white;
-                position: relative;
-                cursor: pointer;
-                ${this._selection.testName === testName ? 'outline: 2px solid black; z-index: 100;' : ''}
-              " onclick=${this._selectTest.bind(this, testName)}>
-              <div style="
-                width: 300px;
-                padding-left: 1ex;
-                ${STYLE_TEXT_OVERFLOW}
-              ">${testName}</div>
-              <div style="width: 120px; white-space: nowrap;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
-              ${(() => {
-                const result = html`<hbox style="width: 100px; align-items: center; justify-content: center;"></hbox>`;
-                for (const status of ['failed', 'timedOut', 'passed', 'skipped']) {
-                  const count = stats[status];
-                  if (count === 0)
-                    continue;
-                  if (count <= 4) {
-                    for (let i = 0; i < count; ++i)
-                      result.append(renderTestStatus(status, {marginRight: 2, size: 10}));
-                  } else {
-                    result.append(renderTestStatus(status, {count: count > 99 ? CHAR_INFINITY : count, marginRight: 2, size: 14}));
-                  }
+    this._renderCodeTab(spec);
+    split.showSidebar(this._secondarySplitView);
+    content.append(html`
+      <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
+        <hbox style="margin-bottom: 1em;">
+          <vbox style="align-items: flex-end;">
+            <div>spec:</div>
+            <div>commit:</div>
+            <div>test:</div>
+          </vbox>
+          <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>
+          </vbox>
+        </hbox>
+        <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
+          <div style="width: 420px; text-align: center;">test parameters</div>
+          <div style="width: 100px; text-align: center;">runs</div>
+          <div style="width: 100px; text-align: center;">expected</div>
+        </hbox>
+        ${testNames.map(([testName, stats]) => html`
+          <hbox class="hover-darken" style="
+              background-color: white;
+              position: relative;
+              cursor: pointer;
+              ${this._selection.testName === testName ? 'outline: 2px solid black; z-index: 100;' : ''}
+            " onclick=${this._selectTest.bind(this, testName)}>
+            <div style="
+              width: 300px;
+              padding-left: 1ex;
+              ${STYLE_TEXT_OVERFLOW}
+            ">${testName}</div>
+            <div style="width: 120px; white-space: nowrap;">${[...stats.annotationTypes].map(annotationType => renderAnnotation(annotationType))}</div>
+            ${(() => {
+              const result = html`<hbox style="width: 100px; align-items: center; justify-content: center;"></hbox>`;
+              for (const status of ['failed', 'timedOut', 'passed', 'skipped']) {
+                const count = stats[status];
+                if (count === 0)
+                  continue;
+                if (count <= 4) {
+                  for (let i = 0; i < count; ++i)
+                    result.append(renderTestStatus(status, {marginRight: 2, size: 10}));
+                } else {
+                  result.append(renderTestStatus(status, {count: count > 99 ? CHAR_INFINITY : count, marginRight: 2, size: 14}));
                 }
-                result.lastElementChild.style.removeProperty('margin-right');
-                return result;
-              })()}
-              <div style="width: 100px; text-align: center;">
-                ${[...stats.expectedStatuses].map((status, index) => renderTestStatus(status, {size: 10, marginRight: index < stats.expectedStatuses.size - 1 ? 2 : 0}))}
-              </div>
-            </hbox>
-          `)}
-        </div>
-      `);
-    } else {
-      split.hideSidebar(this._secondarySplitView);
-      content.append(html`
-        <div style="padding: 1em;">
-          <h3>No Data</h3>
-          <p>
-            This spec didn't run a single time. ${commit && html`<a href="${commitURL('playwright', commit.sha)}">See on GitHub</a>`}
-          </p>
-        </div>
-      `);
-    }
+              }
+              result.lastElementChild.style.removeProperty('margin-right');
+              return result;
+            })()}
+            <div style="width: 100px; text-align: center;">
+              ${[...stats.expectedStatuses].map((status, index) => renderTestStatus(status, {size: 10, marginRight: index < stats.expectedStatuses.size - 1 ? 2 : 0}))}
+            </div>
+          </hbox>
+        `)}
+      </div>
+    `);
     this._sideElement.textContent = '';
     this._sideElement.append(content);
     console.timeEnd('rendering summary');
@@ -860,7 +848,11 @@ class DashboardData {
       }).map(({stackId, specIds, commitSHAs, errors}, index) => html`
         <h2 style="display: flex;align-items: center;">(${index + 1}/${stackIdToInfo.size}) error "${stackId}"</h2>
         <div style="margin-left: 1em;">
-          <div>specs: ${specIds.size}</div>
+          <div>
+            <div>different specs: ${specIds.size}</div>
+            <div>different commits: ${commitSHAs.size}</div>
+            <div>occurrences: ${errors.length}</div>
+          </div>
           ${(() => {
             const terminal = html`<pre style="overflow: auto;">${highlightANSIText(errors[0].stack)}</pre>`;
             return html`

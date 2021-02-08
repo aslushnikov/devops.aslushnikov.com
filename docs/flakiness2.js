@@ -506,11 +506,12 @@ class DashboardData {
         ${specs.size <= 40 ? undefined : html`
           <vbox style="position: relative;">
             <div style="
-              height: 100px;
+              height: 80px;
               width: 100%;
               background: linear-gradient(#ffffff00, #ffffff);
               position: absolute;
-              top: -100px;
+              pointer-events: none;
+              top: -80px;
             "></div>
             <div class=hover-darken onclick=${e => {
               e.target.parentElement.replaceWith(html`${specs.slice(40).map(renderSpecRow)}`);
@@ -521,11 +522,10 @@ class DashboardData {
                 height: 50px;
                 font-size: 12px;
                 color: #9e9e9e;
+                cursor: pointer;
                 background-color: white;
                 margin-top: 1em;
-            ">
-              Render the rest ${specs.size - 40} specs
-            </div>
+            ">Render all ${specs.size} specs</div>
           </vbox>
         `}
       </div>

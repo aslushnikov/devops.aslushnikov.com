@@ -595,9 +595,15 @@ class DashboardData {
             <div>test:</div>
           </vbox>
           <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
-            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${spec ? 'bold' : 'normal'}">${spec?.title || `<summary for ${this._context.specs.size} specs>`}</div>
-            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${commit ? 'bold' : 'normal'}">${commit?.title || `<summary for ${this._context.commits.length} commits>`}</div>
-            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%; font-weight: ${this._selection.testName ? 'bold' : 'normal'}">${this._selection.testName || `<summary for all tests>`}</div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
+              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
+            </div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
+              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title}</span>` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
+            </div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
+              ${this._selection.testName ? html`<span onclick=${() => this._selectTest(undefined)} style="cursor: pointer;">${CHAR_CROSS} ${this._selection.testName}</span>` : html`<span style="color: #999;">&lt;summary for all tests&gt;</span>`}
+            </div>
           </vbox>
         </hbox>
         <hbox style="border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">

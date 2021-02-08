@@ -525,7 +525,7 @@ class DashboardData {
                 cursor: pointer;
                 background-color: white;
                 margin-top: 1em;
-            ">Render all ${specs.size} specs</div>
+            ">Show all ${specs.size} specs</div>
           </vbox>
         `}
       </div>

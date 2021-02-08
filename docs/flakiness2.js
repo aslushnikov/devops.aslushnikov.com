@@ -398,9 +398,6 @@ class DashboardData {
     split.showSidebar(this._mainSplitView);
     this._renderSidebar();
 
-    if (specId && !sha)
-      this._tabstrip.selectTab(this._editorTab);
-
     this._updateMainElementSelection();
   }
 
@@ -807,7 +804,7 @@ class DashboardData {
     }))).flat();
 
     if (!runsWithErrors.length) {
-      this._errorsTab.titleElement.textContent = `Unique Errors - none`;
+      this._errorsTab.titleElement.textContent = `Errors: 0`;
       this._errorsTab.contentElement.textContent = '';
       this._errorsTab.contentElement.append(html`
         <h3>No Errors</h3>
@@ -832,7 +829,10 @@ class DashboardData {
       info.errors.push(error);
     }
 
-    this._errorsTab.titleElement.textContent = `Unique Errors: ${stackIdToInfo.size}`;
+    if (this._errorIdFilter)
+      this._errorsTab.titleElement.textContent = `Error: ${this._errorIdFilter}`;
+    else
+      this._errorsTab.titleElement.textContent = `Errors: ${stackIdToInfo.size}`;
     this._errorsTab.contentElement.textContent = '';
     this._errorsTab.contentElement.append(html`
       ${[...stackIdToInfo.values()].sort((info1, info2) => {
@@ -842,11 +842,14 @@ class DashboardData {
           return info2.commitSHAs.size - info1.commitSHAs.size;
         return info2.errors.length - info1.errors.length;
       }).map(({stackId, specIds, commitSHAs, errors}, index) => html`
-        <h2 style="display: flex;align-items: center;">(${index + 1}/${stackIdToInfo.size}) error "${stackId}"</h2>
+        <h3 style="
+          display: flex;
+          align-items: center;
+        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : ''}error <a href="${amendURL({errorid: stackId === this._errorIdFilter ? 'any' : stackId})}">${stackId}</a></h3>
         <div style="margin-left: 1em;">
-          <div>
-            <div>different specs: ${specIds.size}</div>
-            <div>different commits: ${commitSHAs.size}</div>
+          <div style="margin-left: 1em; margin-bottom: 1em;">
+            ${!this._selection.specId && html`<div>different specs: ${specIds.size}</div>`}
+            ${!this._selection.sha && html`<div>different commits: ${commitSHAs.size}</div>`}
             <div>occurrences: ${errors.length}</div>
           </div>
           ${(() => {

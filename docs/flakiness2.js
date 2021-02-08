@@ -472,6 +472,9 @@ class DashboardData {
               `)}
             </select>
           </span>
+          <span style="margin-right: 1em;">
+            <a href="${amendURL({browser: 'any', platform: 'any', errorid: 'any'})}">Reset All</a>
+          </span>
         </hbox>
         <hbox style="margin-left: 1em;">
           <h2>${specs.size} problematic specs</h2>
@@ -585,7 +588,6 @@ class DashboardData {
       return t1 < t2 ? -1 : 1;
     });
 
-    split.showSidebar(this._secondarySplitView);
     content.append(html`
       <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
         <hbox style="margin-bottom: 1em;">

@@ -429,6 +429,25 @@ class DashboardData {
 
     console.time('rendering main');
 
+    const renderSpecRow = (spec) => html`
+      <hbox>
+        <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
+          ${STYLE_TEXT_OVERFLOW}
+          width: 600px;
+          cursor: pointer;
+          padding: 0 1em;
+          margin-right: 1px;
+          align-items: baseline;
+          background: white;
+        " data-specid="${spec.specId}">
+          <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
+          <spacer></spacer>
+          ${this._renderSpecAnnotations(spec)}
+        </hbox>
+        ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec.specId, commit.sha)))}
+      </hbox>
+    `;
+
     this._mainElement.textContent = '';
     this._mainElement.append(html`
       <div style="padding: 1em;">
@@ -483,24 +502,32 @@ class DashboardData {
         <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
         </vbox>
-        ${specs.map(spec => html`
-          <hbox>
-            <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
-              ${STYLE_TEXT_OVERFLOW}
-              width: 600px;
-              cursor: pointer;
-              padding: 0 1em;
-              margin-right: 1px;
-              align-items: baseline;
-              background: white;
-            " data-specid="${spec.specId}">
-              <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
-              <spacer></spacer>
-              ${this._renderSpecAnnotations(spec)}
-            </hbox>
-            ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec.specId, commit.sha)))}
-          </hbox>
-        `)}
+        ${specs.slice(0, 40).map(renderSpecRow)}
+        ${specs.size <= 40 ? undefined : html`
+          <vbox style="position: relative;">
+            <div style="
+              height: 100px;
+              width: 100%;
+              background: linear-gradient(#ffffff00, #ffffff);
+              position: absolute;
+              top: -100px;
+            "></div>
+            <div class=hover-darken onclick=${e => {
+              e.target.parentElement.replaceWith(html`${specs.slice(40).map(renderSpecRow)}`);
+            }} style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 50px;
+                font-size: 12px;
+                color: #9e9e9e;
+                background-color: white;
+                margin-top: 1em;
+            ">
+              Render the rest ${specs.size - 40} specs
+            </div>
+          </vbox>
+        `}
       </div>
     `);
     console.timeEnd('rendering main');

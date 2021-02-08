@@ -241,18 +241,6 @@ class DashboardData {
       `,
     };
     this._tabstrip = new TabStrip();
-    this._tabstrip.addTab({
-      tabId: 'editor-tab',
-      titleElement: this._editorTab.titleElement,
-      contentElement: this._editorTab.contentElement,
-      selected: true,
-    });
-    this._tabstrip.addTab({
-      tabId: 'errors-tab',
-      titleElement: this._errorsTab.titleElement,
-      contentElement: this._errorsTab.contentElement,
-      selected: false,
-    });
     this._tabstrip.setRightWidget(html`
         <button style="appearance: none;
                        background-color: var(--border-color);
@@ -394,8 +382,7 @@ class DashboardData {
     };
 
     this._renderMainElement();
-    this._renderSummary();
-    this._renderErrorsTab();
+    this._renderSidebar();
     this._updateMainElementSelection();
   }
 
@@ -404,8 +391,10 @@ class DashboardData {
     this._selection.sha = sha;
     this._selection.testName = undefined;
     split.showSidebar(this._mainSplitView);
-    this._renderSummary();
-    this._renderErrorsTab();
+    this._renderSidebar();
+
+    if (specId && !sha)
+      this._tabstrip.selectTab(this._editorTab);
 
     this._updateMainElementSelection();
   }
@@ -425,10 +414,9 @@ class DashboardData {
   }
 
   _selectTest(testName) {
-    this._tabstrip.selectTab('errors-tab');
+    this._tabstrip.selectTab(this._editorTab);
     this._selection.testName = testName;
-    this._renderSummary();
-    this._renderErrorsTab();
+    this._renderSidebar();
   }
 
   _renderMainElement() {
@@ -516,13 +504,24 @@ class DashboardData {
     return {commit, spec};
   }
 
-  _renderSummary() {
+  _renderSidebar() {
     if (!split.isSidebarShown(this._mainSplitView))
       return;
+    const {commit, spec} = this._resolveSelectionToObjects();
+    if (spec)
+      this._tabstrip.setTabs([this._editorTab, this._errorsTab]);
+    else
+      this._tabstrip.setTabs([this._errorsTab]);
+
+    this._renderSummary(commit, spec);
+    if (spec)
+      this._renderCodeTab(spec);
+    this._renderErrorsTab();
+  }
+
+  _renderSummary(commit, spec) {
     console.time('rendering summary');
     const {tests, commits} = this._context;
-
-    const {commit, spec} = this._resolveSelectionToObjects();
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
@@ -581,7 +580,6 @@ class DashboardData {
       return t1 < t2 ? -1 : 1;
     });
 
-    this._renderCodeTab(spec);
     split.showSidebar(this._secondarySplitView);
     content.append(html`
       <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
@@ -643,16 +641,7 @@ class DashboardData {
     console.timeEnd('rendering summary');
   }
 
-  _renderSelection({showTestName = false} = {}) {
-    const {commit, spec} = this._resolveSelectionToObjects();
-    return html`
-    `;
-  }
-
   _renderCodeTab(spec) {
-    if (!spec)
-      return;
-
     const gutter = html`<div></div>`;
     const scrollToCoords = () => {
       gutter.$(`[x-line-number="${spec.line}"]`)?.scrollIntoView({block: 'center'});
@@ -1018,7 +1007,7 @@ class TabStrip {
       ${this._content}
     </section>`;
 
-    this._selectedTabId = '';
+    this._selectedTab = null;
     this._tabs = new Map();
   }
 
@@ -1031,40 +1020,43 @@ class TabStrip {
     return this._strip;
   }
 
-  addTab({tabId, titleElement, contentElement, selected = false}) {
-    const tabElement = html`
-      <span class=hover-lighten style="
-        user-select: none;
-        padding: 2px 1em;
-        cursor: pointer;
-        display: inline-block;
-        white-space: pre;
-        flex: none;
-        background-color: ${selected ? 'white' : 'none'};
-      ">${titleElement}</span>
-    `;
-    tabElement.onclick = this._onTabClicked.bind(this, tabId);
-    this._tabs.set(tabId, {titleElement, contentElement, tabElement});
-    this._tabContainer.append(tabElement);
-    if (selected)
-      this.selectTab(tabId);
+  setTabs(tabs) {
+    this._tabContainer.textContent = '';
+    const toBeSelected = tabs.find(tab => tab.contentElement.isConnected) || tabs[0];
+    for (const tab of tabs) {
+      const tabElement = html`
+        <span class=hover-lighten style="
+          user-select: none;
+          padding: 2px 1em;
+          cursor: pointer;
+          display: inline-block;
+          white-space: pre;
+          flex: none;
+          background-color: ${toBeSelected === tab ? 'white' : 'none'};
+        ">${tab.titleElement}</span>
+      `;
+      tabElement.onclick = this._onTabClicked.bind(this, tab);
+      this._tabs.set(tab, {tabElement});
+      this._tabContainer.append(tabElement);
+    }
+    this.selectTab(toBeSelected);
   }
 
-  _onTabClicked(tabId, event) {
-    if (this.selectTab(tabId))
+  _onTabClicked(tab, event) {
+    if (this.selectTab(tab))
       consumeDOMEvent(event);
   }
 
-  selectTab(tabId) {
-    if (this._selectedTabId === tabId)
+  selectTab(tab) {
+    if (this._selectedTab === tab)
       return false;
-    if (this._selectedTabId)
-      this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'var(--border-color)');
-    this._selectedTabId = tabId;
+    if (this._selectedTab)
+      this._tabs.get(this._selectedTab).tabElement.style.setProperty('background-color', 'var(--border-color)');
+    this._selectedTab = tab;
     this._content.textContent = '';
-    if (this._selectedTabId) {
-      this._tabs.get(this._selectedTabId).tabElement.style.setProperty('background-color', 'white');
-      this._content.append(this._tabs.get(this._selectedTabId).contentElement);
+    if (this._selectedTab) {
+      this._tabs.get(this._selectedTab).tabElement.style.setProperty('background-color', 'white');
+      this._content.append(tab.contentElement);
     }
     return true;
   }

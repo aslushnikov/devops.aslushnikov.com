@@ -387,8 +387,13 @@ class DashboardData {
   }
 
   _selectSpecCommit(specId, sha) {
-    this._selection.specId = specId;
-    this._selection.sha = sha;
+    if (this._selection.specId === specId && this._selection.sha === sha) {
+      this._selection.specId = undefined;
+      this._selection.sha = undefined;
+    } else {
+      this._selection.specId = specId;
+      this._selection.sha = sha;
+    }
     this._selection.testName = undefined;
     split.showSidebar(this._mainSplitView);
     this._renderSidebar();
@@ -414,9 +419,12 @@ class DashboardData {
   }
 
   _selectTest(testName) {
-    this._tabstrip.selectTab(this._editorTab);
-    this._selection.testName = testName;
+    if (this._selection.testName === testName)
+      this._selection.testName = undefined;
+    else
+      this._selection.testName = testName;
     this._renderSidebar();
+    this._tabstrip.selectTab(this._errorsTab);
   }
 
   _renderMainElement() {
@@ -806,7 +814,6 @@ class DashboardData {
       `);
       return;
     }
-
 
     const stackIdToInfo = new Map();
     for (const {test, error, stackId} of runsWithErrors) {

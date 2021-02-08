@@ -714,6 +714,12 @@ class DashboardData {
     const {allBrowserNames, allPlatforms, prefilteredTests} = this._context;
     const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
 
+    const getFilterURL = (browserName, platform) => {
+      if (browserName === this._browserFilter && platform === this._platformFilter)
+        return amendURL({browser: 'any', platform: 'any'});
+      return amendURL({browser: browserName || 'any', platform: platform || 'any'});
+    };
+
     return html`
       <hbox>
       <div style="
@@ -732,7 +738,7 @@ class DashboardData {
               border-bottom: 1px solid var(--border-color);
               background-color: ${browserName === this._browserFilter ? COLOR_SELECTION : 'none'};
           ">
-            <a href="${amendURL({browser: browserName === this._browserFilter ? 'any' : browserName, platform: 'any'})}">${browserLogo(browserName, 18)}</a>
+            <a href="${getFilterURL(browserName, undefined)}">${browserLogo(browserName, 18)}</a>
           </div>
         `)}
         ${allPlatforms.map(platform => html`
@@ -741,10 +747,9 @@ class DashboardData {
               border-right: 1px solid var(--border-color);
               background-color: ${platform === this._platformFilter ? COLOR_SELECTION : 'none'};
           ">
-            <a href="${amendURL({platform: platform === this._platformFilter ? 'any' : platform, browser: 'any'})}">${platform}</a>
+            <a href="${getFilterURL(undefined, platform)}">${platform}</a>
           </div>
           ${allBrowserNames.map(browserName => {
-            const url = (platform === this._platformFilter && browserName === this._browserFilter) ? amendURL({platform: 'any', browser: 'any'}) : amendURL({platform, browser: browserName});
             let isHighlighted = false;
             if (this._platformFilter && this._browserFilter)
               isHighlighted = platform === this._platformFilter && browserName === this._browserFilter;
@@ -755,7 +760,7 @@ class DashboardData {
                   text-align: center;
                   padding: 0 1em;
                   background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
-              "><a style="color: var(--text-color);" href="${url}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
+              "><a style="color: var(--text-color);" href="${getFilterURL(browserName, platform)}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
             `;
           })}
         `)}

@@ -15,7 +15,7 @@ on:
 jobs:
   test_linux_docker:
     name: Docker
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
@@ -24,14 +24,14 @@ jobs:
     - uses: actions/checkout@v2
       with:
         repository: microsoft/playwright
-    - uses: actions/setup-node@v1
+    - uses: actions/setup-node@v2
       with:
-        node-version: 10
+        node-version: 14
     - uses: microsoft/playwright-github-action@v1
     - run: npm ci
     - run: npm run build
     - name: Build
-      run: bash docs/docker/build.sh ${{ matrix.tag }} playwright:localbuild-${{ matrix.tag }}
+      run: bash utils/docker/build.sh ${{ matrix.tag }} playwright:localbuild-${{ matrix.tag }}
     - name: Test
       run: |
         npm run clean

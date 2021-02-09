@@ -1,6 +1,6 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
-import {CriticalSection, consumeDOMEvent} from './utils.js';
+import {CriticalSection, consumeDOMEvent, Throttler} from './utils.js';
 import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
 import {SMap} from './smap.js';
 import {split} from './split.js';
@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const useMockData = StringToBool(state.mockdata || 'false');
     if (!dashboard || useMockData !== dashboard.mockData()) {
       document.body.textContent = '';
-      dashboard = await DashboardData.create(useMockData);
+      dashboard = new Dashboard(useMockData);
       document.body.append(dashboard.element);
     }
 
@@ -62,6 +62,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setBrowserFilter(state.browser === 'any' ? undefined : state.browser);
     dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);
     dashboard.setErrorIdFilter(state.errorid === 'any' ? undefined : state.errorid);
+    dashboard.setUntilCommits(state.timestamp);
 
     dashboard.render();
   }));
@@ -80,10 +81,13 @@ class DataURL {
     return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/compressed_v1/${sha}.json`;
   }
 
-  commitsURL() {
+  commitsURL(untilTimestamp = undefined) {
     if (this._useMockData)
       return `/mockdata/commits.json`;
-    return 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
+    let url = 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
+    if (untilTimestamp)
+      url += '&until=' + (new Date(untilTimestamp).toISOString());
+    return url;
   }
 
   sourceURL(sha, testFile) {
@@ -186,28 +190,12 @@ class CommitData {
   }
 }
 
-class DashboardData {
-  static async create(useMockData = false) {
-    const dataURL = new DataURL(useMockData);
-    const commits = await rateLimitedFetch(dataURL.commitsURL()).then(text => JSON.parse(text)).then(commits => commits.map(c => {
-      c.commit.committer.date = +new Date(c.commit.committer.date);
-      return c;
-    }).sort((c1, c2) => c2.commit.committer.date - c1.commit.committer.date));
-    return new DashboardData(dataURL, commits);
-  }
+class Dashboard {
+  constructor(useMockData) {
+    this._dataURL = new DataURL(useMockData);
+    this._allCommits = new Map();
 
-  constructor(dataURL, commits) {
-    this._dataURL = dataURL;
-    this._allCommits = new SMap(commits.map((c, index) => ({
-      sha: c.sha,
-      author: c.commit.author.name,
-      email: c.commit.author.email,
-      title: c.commit.message.split('\n')[0],
-      message: c.commit.message,
-      timestamp: c.commit.committer.date,
-      data: new CommitData(dataURL, c.sha),
-    })));
-
+    this._commitsThrottler = new Throttler();
     this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
@@ -217,7 +205,7 @@ class DashboardData {
     const doCloseSidebar = () => {
       split.hideSidebar(this._mainSplitView);
       this._selection = {};
-      this.render();
+      this._updateMainElementSelection();
     };
 
     let editorTabScrollTop = 0;
@@ -271,13 +259,36 @@ class DashboardData {
 
     this._showFlaky = false;
     this._lastCommits = 0;
-    this.setLastCommits(20);
   }
+
+  setUntilCommits(timestamp) {
+    this._untilCommitsFilter = +timestamp;
+    this._commitsThrottler.schedule(async () => {
+      const text = await rateLimitedFetch(this._dataURL.commitsURL(this._untilCommitsFilter));
+      const rawCommits = JSON.parse(text);
+      const commits = rawCommits.map(c => ({
+        sha: c.sha,
+        author: c.commit.author.name,
+        email: c.commit.author.email,
+        title: c.commit.message.split('\n')[0],
+        message: c.commit.message,
+        timestamp: +new Date(c.commit.committer.date),
+        data: new CommitData(this._dataURL, c.sha),
+      }));
+      for (const commit of commits) {
+        if (!this._allCommits.has(commit.sha))
+          this._allCommits.set(commit.sha, commit);
+      }
+      if (!this._commitsThrottler.isScheduled())
+        this.render();
+    });
+  }
+
 
   mockData() { return this._dataURL.mockData(); }
 
   setLastCommits(value) {
-    if (isNaN(value) || value < 1 || value > 50) {
+    if (isNaN(value) || value < 1 || value > 100) {
       console.error(`DASHBOARD: Cannot set last commits number to "${value}"`);
       return;
     }
@@ -292,7 +303,9 @@ class DashboardData {
   render() {
     console.time('preparing');
     const self = this;
-    const commits = this._allCommits.slice(0, this._lastCommits);
+    const sortedCommits = [...this._allCommits.values()].sort((c1, c2) => c2.timestamp - c1.timestamp);
+    const until = this._untilCommitsFilter ? this._untilCommitsFilter : sortedCommits[0]?.timestamp || Date.now();
+    const commits = sortedCommits.filter(c => c.timestamp <= until).slice(0, this._lastCommits);
 
     const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
     const allPlatforms = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('platform')).flat(), this._platformFilter].filter(Boolean))].sort();
@@ -347,6 +360,7 @@ class DashboardData {
       specIdToHealth.set(specId, {
         goodCommits: good,
         firstBadIndex,
+        hasBad: tests.has({specId, category: 'bad'}),
       });
     }
 
@@ -359,6 +373,8 @@ class DashboardData {
     }).sort((spec1, spec2) => {
       const h1 = specIdToHealth.get(spec1.specId);
       const h2 = specIdToHealth.get(spec2.specId);
+      if (h1.hasBad !== h2.hasBad)
+        return h1.hasBad ? -1 : 1;
       if (h1.goodCommits !== h2.goodCommits)
         return h1.goodCommits - h2.goodCommits;
       if (h1.firstBadIndex !== h2.firstBadIndex)
@@ -372,6 +388,7 @@ class DashboardData {
 
     this._context = {
       loadingProgressElement,
+      until,
       commits,
       prefilteredTests, // these are tests without browser/platform filtering.
       tests,
@@ -425,7 +442,7 @@ class DashboardData {
   }
 
   _renderMainElement() {
-    const {allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement} = this._context;
+    const {until, allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement} = this._context;
 
     console.time('rendering main');
 
@@ -439,6 +456,7 @@ class DashboardData {
           margin-right: 1px;
           align-items: baseline;
           background: white;
+          min-width: 400px;
         " data-specid="${spec.specId}">
           <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
           <spacer></spacer>
@@ -449,6 +467,7 @@ class DashboardData {
     `;
 
     this._mainElement.textContent = '';
+    const RENDER_ROWS = Math.max(25, 1000 / commits.length);
     this._mainElement.append(html`
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
@@ -457,7 +476,9 @@ class DashboardData {
               ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
                 <option value=${value} selected=${value === this._lastCommits}>${value}</option>
               `)}
-            </select> commits
+            </select> commits ${this._untilCommitsFilter ? html`
+              after <span style="${STYLE_SELECTED}; padding: 4px;">${new Date(this._untilCommitsFilter).toLocaleString()}</span>
+            `: undefined}
           </span>
           <span style="width: 2em;"> ${loadingProgressElement}</span>
           <span style="margin-right: 1em; display: inline-flex; align-items: center;">
@@ -492,7 +513,11 @@ class DashboardData {
             </select>
           </span>
           <span style="margin-right: 1em;">
-            <a href="${amendURL({browser: 'any', platform: 'any', errorid: 'any'})}">Reset All</a>
+            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, timestamp: undefined})}">Reset All</a>
+          </span>
+          <spacer></spacer>
+          <span style="margin-right: 1em;">
+            <a href="${amendURL({timestamp: until})}">Permalink</a>
           </span>
         </hbox>
         <hbox style="margin-left: 1em;">
@@ -502,8 +527,8 @@ class DashboardData {
         <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
         </vbox>
-        ${specs.slice(0, 40).map(renderSpecRow)}
-        ${specs.size <= 40 ? undefined : html`
+        ${specs.slice(0, RENDER_ROWS).map(renderSpecRow)}
+        ${specs.size <= RENDER_ROWS ? undefined : html`
           <vbox style="position: relative;">
             <div style="
               height: 80px;
@@ -534,8 +559,8 @@ class DashboardData {
   }
 
   _resolveSelectionToObjects() {
-    const commit = this._selection.sha ? this._allCommits.get({sha: this._selection.sha}) : undefined;
-    const spec = this._selection.specId ? [commit, ...this._allCommits].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0] : undefined;
+    const commit = this._selection.sha ? this._allCommits.get(this._selection.sha) : undefined;
+    const spec = this._selection.specId ? [commit, ...this._allCommits.values()].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0] : undefined;
     return {commit, spec};
   }
 

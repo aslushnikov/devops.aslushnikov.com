@@ -8,7 +8,7 @@ export function newURL(state) {
 export function amendURL(changes) {
   const params = new URLSearchParams(window.location.hash.substring(1));
   const state = Object.fromEntries(params.entries());
-  const newParams = new URLSearchParams(Object.entries({...state, ...changes}));
+  const newParams = new URLSearchParams(Object.entries({...state, ...changes}).filter(([key, value]) => value !== undefined));
   return '#' + newParams.toString();
 }
 

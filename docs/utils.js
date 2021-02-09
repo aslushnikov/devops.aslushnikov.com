@@ -87,6 +87,10 @@ export class Throttler {
     this._maybeRun();
   }
 
+  isScheduled() {
+    return !!this._pendingOperation;
+  }
+
   reset() {
     this.schedule(null);
   }

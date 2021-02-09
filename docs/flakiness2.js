@@ -345,23 +345,32 @@ class Dashboard {
       });
     }).flat());
 
-    const specIdToHealth = new Map();
+    const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
+      let category = '';
+      const categories = new Set(tests.getAll({specId, sha: commit.sha}).map(test => test.category));
+      if (categories.has('bad'))
+        category = 'bad';
+      else if (categories.has('flaky') && this._showFlaky)
+        category = 'flaky';
+      else if (categories.size || commit.data.specs().has({specId}))
+        category = 'good';
+      return {
+        specId,
+        sha: commit.sha,
+        category,
+      };
+    })).flat());
+
+    const specIdToFirstFailingCommit = new Map();
     for (const specId of faultySpecIds) {
-      let good = 0;
-      let firstBadIndex = -1;
-      for (let i = 0; i < commits.length; ++i) {
-        const commit = commits[i];
-        const isGood = tests.getAll({specId, sha: commit.sha}).every(test => test.category === 'good');
-        if (isGood)
-          ++good;
-        else if (firstBadIndex === -1)
-          firstBadIndex = i;
+      specIdToFirstFailingCommit.set(specId, commits.length + 1);
+      const tiles = commitTiles.getAll({specId});
+      for (let i = 0; i < tiles.length; ++i) {
+        if (tiles[i].category !== 'good' && tiles[i].category) {
+          specIdToFirstFailingCommit.set(specId, i);
+          break;
+        }
       }
-      specIdToHealth.set(specId, {
-        goodCommits: good,
-        firstBadIndex,
-        hasBad: tests.has({specId, category: 'bad'}),
-      });
     }
 
     const specs = new SMap(faultySpecIds.map(specId => {
@@ -371,18 +380,25 @@ class Dashboard {
           return result;
       }
     }).sort((spec1, spec2) => {
-      const h1 = specIdToHealth.get(spec1.specId);
-      const h2 = specIdToHealth.get(spec2.specId);
-      if (h1.hasBad !== h2.hasBad)
-        return h1.hasBad ? -1 : 1;
-      if (h1.goodCommits !== h2.goodCommits)
-        return h1.goodCommits - h2.goodCommits;
-      if (h1.firstBadIndex !== h2.firstBadIndex)
-        return h1.firstBadIndex - h2.firstBadIndex;
+      const bad1 = commitTiles.getAll({specId: spec1.specId, category: 'bad'}).length;
+      const bad2 = commitTiles.getAll({specId: spec2.specId, category: 'bad'}).length;
+      if (bad1 !== bad2)
+        return bad2 - bad1;
+
+      const flaky1 = commitTiles.getAll({specId: spec1.specId, category: 'flaky'}).length;
+      const flaky2 = commitTiles.getAll({specId: spec2.specId, category: 'flaky'}).length;
+      if (flaky1 !== flaky2)
+        return flaky2 - flaky1;
+
+      const firstFailing1 = specIdToFirstFailingCommit.get(spec1.specId);
+      const firstFailing2 = specIdToFirstFailingCommit.get(spec2.specId);
+      if (firstFailing1 !== firstFailing2)
+        return firstFailing1 - firstFailing2;
       if (spec1.file !== spec2.file)
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;
     }));
+
 
     console.timeEnd('preparing');
 
@@ -396,6 +412,7 @@ class Dashboard {
       allPlatforms,
       allBrowserNames,
       allErrorIds,
+      commitTiles,
     };
 
     this._renderMainElement();
@@ -442,7 +459,7 @@ class Dashboard {
   }
 
   _renderMainElement() {
-    const {until, allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement} = this._context;
+    const {until, allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement, commitTiles} = this._context;
 
     console.time('rendering main');
 
@@ -462,7 +479,7 @@ class Dashboard {
           <spacer></spacer>
           ${this._renderSpecAnnotations(spec)}
         </hbox>
-        ${commits.map(commit => this._renderCommitTile(spec, commit, this._selectSpecCommit.bind(this, spec.specId, commit.sha)))}
+        ${commitTiles.getAll({specId: spec.specId}).map(commitTile => this._renderCommitTile(commitTile, this._selectSpecCommit.bind(this, commitTile.specId, commitTile.sha)))}
       </hbox>
     `;
 
@@ -836,21 +853,18 @@ class Dashboard {
     return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
   }
 
-  _renderCommitTile(spec, commit, onclick) {
-    const {tests} = this._context;
-    let color = COLOR_GREY;
-    const categories = new Set(tests.getAll({specId: spec.specId, sha: commit.sha}).map(test => test.category));
-    if (categories.has('bad'))
-      color = COLOR_RED;
-    else if (categories.has('flaky') && this._showFlaky)
-      color = COLOR_VIOLET;
-    else if (categories.size || commit.data.specs().has({specId: spec.specId}))
-      color = COLOR_GREEN;
+  _renderCommitTile(commitTile, onclick) {
+    const color = {
+      '': COLOR_GREY,
+      'bad': COLOR_RED,
+      'flaky': COLOR_VIOLET,
+      'good': COLOR_GREEN,
+    }[commitTile.category];
 
     return svg`
       <svg class=hover-darken style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
-           data-specid="${spec.specId}"
-           data-commitsha="${commit.sha}"
+           data-specid="${commitTile.specId}"
+           data-commitsha="${commitTile.sha}"
            onclick=${onclick}
            viewbox="0 0 14 14">
         <rect x=0 y=0 width=14 height=14 fill="${color}"/>

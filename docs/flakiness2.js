@@ -582,8 +582,11 @@ class Dashboard {
           background-color: ${COLOR_SELECTION};
       ">
         <h4>
-          Showing state as of <b>${new Intl.DateTimeFormat("en-US", {month: "long", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',}).format(new Date(this._untilCommitsFilter))}</b>
-          <a style="margin-left: 1ex;" href="${amendURL({timestamp: undefined})}">See latest</a>
+          Showing state as of <b style="
+            border-bottom: 1px black dashed;
+            cursor: pointer;
+          "onclick=${this._popover.onClickHandler(() => this._renderCalendar())} >${new Intl.DateTimeFormat("en-US", {month: "long", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',}).format(new Date(this._untilCommitsFilter))}</b>
+          <a style="margin-left: 2ex;" href="${amendURL({timestamp: undefined})}">See latest</a>
         </h4>
       </div>
       ` : undefined}
@@ -657,16 +660,13 @@ class Dashboard {
         <vbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
         </vbox>
-        ${commits.length ? html`
+        ${commits.length && specs.size ? html`
         <hbox style="
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 1ex;
             padding-bottom: 4px;
         ">
-          <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
-            <spacer></spacer>
-            <span onclick=${this._popover.onClickHandler(() => this._renderCalendar())} style="cursor: pointer; color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
-          </hbox>
+          <hbox style="width: 600px; min-width: 400px; margin-right: 1px;"></hbox>
           ${commits.map(commit => {
             let color = COLOR_GREY;
             if (commitTiles.has({sha: commit.sha, category: 'bad'}))

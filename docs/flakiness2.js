@@ -541,7 +541,7 @@ class Dashboard {
             </select>
           </span>
           <span style="margin-right: 1em;">
-            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, timestamp: undefined})}">Reset All</a>
+            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined})}">Reset All</a>
           </span>
           <spacer></spacer>
           <span style="margin-right: 1em;">

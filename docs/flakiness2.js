@@ -150,6 +150,7 @@ class CommitData {
         const specObject = {
           specId,
           sha: this._sha,
+          url: `https://github.com/microsoft/playwright/blob/${this._sha}/test/${entry.file}#L${spec.line}`,
           file: entry.file,
           title: spec.title,
           line: spec.line,
@@ -295,6 +296,7 @@ class Dashboard {
       const commits = rawCommits.map(c => ({
         sha: c.sha,
         author: c.commit.author.name,
+        url: c.html_url,
         email: c.commit.author.email,
         title: c.commit.message.split('\n')[0],
         message: c.commit.message,
@@ -733,10 +735,13 @@ class Dashboard {
           </vbox>
           <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
+              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>
+                <a style="padding-left: 1em;" href="${spec.url}"><away-link style="vertical-align: text-top;"></away-link></a>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title}</span>` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
+              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title} (${commit.author})</span>
+                              <a style="padding-left: 1em;" href="${commit.url}"><away-link style="vertical-align: text-top;"></away-link></a>
+              ` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
               ${this._selection.testName ? html`<span onclick=${() => this._selectTest(undefined)} style="cursor: pointer;">${CHAR_CROSS} ${this._selection.testName}</span>` : html`<span style="color: #999;">&lt;summary for all tests&gt;</span>`}

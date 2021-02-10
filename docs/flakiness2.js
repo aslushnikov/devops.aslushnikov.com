@@ -863,7 +863,7 @@ class Dashboard {
             padding: 2px 1em;
         ">
           <hbox style="flex: auto;">
-            <hbox onclick=${() => split.maximizeSidebar(this._mainSplitView)} style="cursor: pointer; flex: none; margin-right: 1ex;">
+            <hbox onclick=${() => split.toggleExpand(this._mainSplitView)} style="cursor: pointer; flex: none; margin-right: 1ex;">
               ${svg`
               <svg style="margin-right: 4px;" height="10px" version="1.1" viewBox="8 8 20 20" width="10px">
                 <path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z"></path>

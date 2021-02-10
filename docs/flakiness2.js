@@ -597,10 +597,11 @@ class Dashboard {
           <span style="margin-right: 1em;">
             <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, branch: undefined})}">Reset All</a>
           </span>
+          ${!this._untilCommitsFilter ? html`
           <spacer></spacer>
           <span style="margin-right: 1em;">
             <a href="${amendURL({timestamp: until})}">Permalink</a>
-          </span>
+          </span>` : undefined}
         </hbox>
         <hbox style="margin-left: 1em;">
           <h2>${specs.size} problematic specs</h2>

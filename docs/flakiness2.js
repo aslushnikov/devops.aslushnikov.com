@@ -1,7 +1,7 @@
 import {html, svg} from './zhtml.js';
 import {humanReadableDate, browserLogoURL, browserLogo, commitURL, highlightANSIText} from './misc.js';
 import {CriticalSection, consumeDOMEvent, Throttler} from './utils.js';
-import {SortButton, ExpandButton, FilterConjunctionGroup, Popover} from './widgets.js';
+import {Popover} from './widgets.js';
 import {SMap} from './smap.js';
 import {split} from './split.js';
 import {rateLimitedFetch, fetchProgress} from './fetch-extras.js';
@@ -37,8 +37,6 @@ const testRunColors = {
   'skipped': COLOR_GREY,
 };
 
-const popover = new Popover(document);
-document.documentElement.addEventListener('click', () => popover.hide(), false);
 
 const urlState = new URLState();
 
@@ -210,6 +208,8 @@ class Dashboard {
     this._fileContentsCache = new Map();
     this._mainElement = html`<section style="overflow: auto;${STYLE_FILL}"></section>`;
     this._sideElement = html`<section style="padding: 1em; overflow: auto;${STYLE_FILL}"></section>`;
+    this._popover = new Popover(this._mainElement);
+    document.documentElement.addEventListener('click', () => this._popover.hide(), false);
 
     this._selection = {};
 
@@ -652,7 +652,7 @@ class Dashboard {
         <vbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
         </vbox>
-        ${commits.length && specs.size ? html`
+        ${commits.length ? html`
         <hbox style="
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 1ex;
@@ -660,7 +660,7 @@ class Dashboard {
         ">
           <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
             <spacer></spacer>
-            <span style="color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
+            <span onclick=${this._popover.onClickHandler(() => this._renderCalendar())} style="color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
           </hbox>
           ${commits.map(commit => {
             let color = COLOR_GREY;
@@ -721,6 +721,83 @@ class Dashboard {
     const commit = this._selection.sha ? this._allCommits.get(this._selection.sha) : undefined;
     const spec = this._selection.specId ? [commit, ...this._allCommits.values()].filter(Boolean).map(({data}) => data.specs().get({specId: this._selection.specId})).filter(Boolean)[0] : undefined;
     return {commit, spec};
+  }
+
+  _renderCalendar() {
+    const {until} = this._context;
+
+    const date = new Date(until);
+    let selectedDate = new Date(until);
+
+    const table = html`<section style="white-space: pre;margin-top: 1ex;"></section>`;
+    const renderTable = () => {
+      const rolling = new Date(selectedDate);
+      rolling.setHours(23, 59, 0, 0);
+      rolling.setDate(1);
+      rolling.setDate(-rolling.getDay());
+
+      table.textContent = '';
+      for (let week = 0; week < 6; ++week) {
+        const el = html`<div></div>`;
+        table.append(el);
+        for (let day = 0; day < 7; ++day) {
+          rolling.setDate(rolling.getDate() + 1);
+          el.append(html`
+            <a href="${amendURL({timestamp: +rolling})}" onclick=${e => {
+              this._popover.hide();
+            }} class=hover-darken style="
+              display: inline-block;
+              width: 3em;
+              text-align: center;
+              cursor: pointer;
+              background: white;
+              ${rolling.getMonth() !== selectedDate.getMonth() ? 'color: #9e9e9e;' : ''}
+              ${rolling.getDate() === date.getDate() && rolling.getFullYear() === date.getFullYear() && rolling.getMonth() === date.getMonth() ? `
+                background: #2196f3;
+                color: white;
+                font-weight: bold;
+              ` : ''}
+            ">${rolling.getDate()}</a>
+          `);
+        }
+      }
+    }
+    renderTable();
+
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
+    const monthSelector = html`
+      <select style="margin-right: 1em;" oninput=${e => {
+        selectedDate.setMonth(e.target.value);
+        renderTable();
+      }}>
+        ${months.map((month, index) => html`<option selected=${index === selectedDate.getMonth()} value=${index}>${month}</option>`)}
+      </select>
+    `;
+    const yearSelector = html`<select oninput=${e => {
+      selectedDate.setFullYear(e.target.value);
+      renderTable();
+    }}></select>`;
+    for (let i = -10; i <= 10; ++i)
+      yearSelector.append(html`<option selected=${i === 0} value=${selectedDate.getFullYear() + i}>${selectedDate.getFullYear() + i}</option>`);
+
+    return html`
+      <vbox>
+        <hbox style='margin-bottom: 1ex;'>
+          ${monthSelector}
+          ${yearSelector}
+        </hbox>
+        <div>
+          ${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => html`
+            <span style="
+              display: inline-block;
+              width: 3em;
+              text-align: center;
+            ">${day}</span>
+          `)}
+        </div>
+        ${table}
+      </vbox>
+    `;
   }
 
   _renderSidebar() {

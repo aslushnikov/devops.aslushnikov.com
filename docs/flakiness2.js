@@ -366,7 +366,6 @@ class Dashboard {
 
     const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
     const allPlatforms = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('platform')).flat(), this._platformFilter].filter(Boolean))].sort();
-    const allErrorIds = [...new Set([...commits.map(commit => commit.data.tests().getAll({hasErrors: true, browserName: this._browserFilter, platform: this._platformFilter}).map(test => test.errors.map(error => error.errorId)).flat()).flat()]), this._errorIdFilter].filter(Boolean).sort();
 
     let loadingProgressElement = null;
     const pendingCommits = commits.filter(commit => !commit.data.isLoaded());
@@ -469,6 +468,7 @@ class Dashboard {
       return spec1.line - spec2.line;
     }));
 
+    const allErrorIds = [...new Set([...tests.map(test => test.errors.map(error => error.errorId)).flat(), this._errorIdFilter].filter(Boolean))].sort();
 
     console.timeEnd('preparing');
 
@@ -610,6 +610,12 @@ class Dashboard {
               `)}
             </select>
           </span>
+          <span style="margin-right: 1em">
+            <input style="${this._specFilter ? STYLE_SELECTED : ''}" type=text placeholder="filter specs" value=${this._specFilter || ''} onkeydown=${e => {
+              if (e.key === 'Enter')
+                e.target.blur();
+            }} onblur=${e => urlState.amend({filter_spec: e.target.value})}>
+          </span>
           <span style="margin-right: 1em;">
             errorId:
             <select style="${this._errorIdFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({errorid: e.target.value})}>
@@ -619,14 +625,8 @@ class Dashboard {
               `)}
             </select>
           </span>
-          <span style="margin-right: 1em">
-            <input style="${this._specFilter ? STYLE_SELECTED : ''}" type=text placeholder="filter specs" value=${this._specFilter || ''} onkeydown=${e => {
-              if (e.key === 'Enter')
-                e.target.blur();
-            }} onblur=${e => urlState.amend({filter_spec: e.target.value})}>
-          </span>
           <span style="margin-right: 1em;">
-            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, branch: undefined})}">Reset All</a>
+            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, branch: undefined, filter_spec: undefined})}">Reset All</a>
           </span>
           ${!this._untilCommitsFilter ? html`
           <spacer></spacer>
@@ -635,7 +635,7 @@ class Dashboard {
           </span>` : undefined}
         </hbox>
         <hbox style="margin-left: 1em;">
-          <h2>${specs.size} problematic specs</h2>
+          <h2>${specs.size} ${this._specFilter ? '' : 'problematic'} specs</h2>
           <a style="margin-left: 1em; cursor: pointer;" onclick=${this._selectSpecCommit.bind(this, undefined, undefined)}>(summary)</a>
         </hbox>
         <vbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">

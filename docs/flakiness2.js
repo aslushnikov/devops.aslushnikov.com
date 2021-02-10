@@ -535,6 +535,17 @@ class Dashboard {
 
     console.time('rendering main');
 
+    const maybeHighlight = this._specFilter ? text => {
+      const tokens = text.split(this._specFilter);
+      if (tokens.length === 1)
+        return text;
+      return html`
+        ${tokens[0] || undefined}
+        <span style="${STYLE_SELECTED}">${this._specFilter}</span>
+        ${tokens[1] || undefined}
+      `;
+    } : text => text;
+
     const renderSpecRow = (spec) => html`
       <hbox>
         <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
@@ -547,7 +558,7 @@ class Dashboard {
           align-items: baseline;
           background: white;
         " data-specid="${spec.specId}">
-          <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
+          <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${maybeHighlight(spec.file)} - </span>${maybeHighlight(spec.title)}</span>
           <spacer></spacer>
           ${this._renderSpecAnnotations(spec)}
         </hbox>
@@ -556,7 +567,7 @@ class Dashboard {
     `;
 
     this._mainElement.textContent = '';
-    const RENDER_ROWS = Math.max(25, 1000 / commits.length);
+    const RENDER_ROWS = Math.min(Math.max(25, 1000 / commits.length), 100);
     this._mainElement.append(html`
       ${this._untilCommitsFilter ? html`
       <div style="

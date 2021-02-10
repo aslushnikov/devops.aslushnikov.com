@@ -375,6 +375,8 @@ class Dashboard {
     if (pendingCommits.length > 0) {
       loadingProgressElement = html`<div></div>`;
       const updateProgress = () => {
+        if (this._context.loadingProgressElement !== loadingProgressElement)
+          return;
         const complete = commits.filter(commit => commit.data.isLoaded());
         if (complete.length === commits.length) {
           this.render();

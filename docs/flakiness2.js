@@ -16,6 +16,8 @@ const CHAR_WARNING = '⚠';
 const CHAR_CROSS = '✖';
 const CHAR_INFINITY = '∞';
 const CHAR_RIGHT_ARROW = '➜';
+const CHAR_UP_ARROW = '↑';
+const CHAR_DOWN_ARROW = '↓';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -733,7 +735,27 @@ class Dashboard {
     let selectedDate = new Date(until);
 
     const table = html`<section style="white-space: pre;margin-top: 1ex;"></section>`;
-    const renderTable = () => {
+
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
+    const monthSelector = html`
+      <select style="margin-right: 1em;" oninput=${e => {
+        selectedDate.setMonth(e.target.value);
+        renderTable();
+      }}>
+        ${months.map((month, index) => html`<option selected=${index === selectedDate.getMonth()} value=${index}>${month}</option>`)}
+      </select>
+    `;
+    const yearSelector = html`<select oninput=${e => {
+      selectedDate.setFullYear(e.target.value);
+      renderTable();
+    }}></select>`;
+    for (let i = -10; i <= 10; ++i)
+      yearSelector.append(html`<option selected=${i === 0} value=${selectedDate.getFullYear() + i}>${selectedDate.getFullYear() + i}</option>`);
+
+    function renderTable() {
+      monthSelector.value = selectedDate.getMonth();
+      yearSelector.value = selectedDate.getFullYear();
+
       const rolling = new Date(selectedDate);
       rolling.setHours(23, 59, 0, 0);
       rolling.setDate(1);
@@ -750,8 +772,9 @@ class Dashboard {
           el.append(html`
             <a ${isSelectable ? `href=${amendURL({timestamp: +rolling})}` : undefined} class=${clazz} style="
               display: inline-block;
-              user-select: none;
               width: 3em;
+              box-sizing: border-box;
+              border: 1px solid white;
               text-align: center;
               background: white;
               ${!isSelectable ? 'cursor: not-allowed;' : ''}
@@ -771,29 +794,23 @@ class Dashboard {
     }
     renderTable();
 
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
-    const monthSelector = html`
-      <select style="margin-right: 1em;" oninput=${e => {
-        selectedDate.setMonth(e.target.value);
-        renderTable();
-      }}>
-        ${months.map((month, index) => html`<option selected=${index === selectedDate.getMonth()} value=${index}>${month}</option>`)}
-      </select>
-    `;
-    const yearSelector = html`<select oninput=${e => {
-      selectedDate.setFullYear(e.target.value);
+    const changeSelectedMonth = sign => {
+      selectedDate.setMonth(selectedDate.getMonth() + sign);
       renderTable();
-    }}></select>`;
-    for (let i = -10; i <= 10; ++i)
-      yearSelector.append(html`<option selected=${i === 0} value=${selectedDate.getFullYear() + i}>${selectedDate.getFullYear() + i}</option>`);
+    };
 
     return html`
       <vbox>
         <hbox style='margin-bottom: 1ex;'>
           ${monthSelector}
           ${yearSelector}
+          <spacer></spacer>
+          <span style="font-size: 16px; user-select: none;">
+            <span onclick=${e => { selectedDate.setMonth(selectedDate.getMonth() - 1); renderTable(); }} style="cursor: pointer; padding: 4px;">${CHAR_UP_ARROW}</span>
+            <span onclick=${e => { selectedDate.setMonth(selectedDate.getMonth() + 1); renderTable(); }} style="cursor: pointer; padding: 4px;">${CHAR_DOWN_ARROW}</span>
+          </span>
         </hbox>
-        <div>
+        <div style="user-select: none">
           ${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => html`
             <span style="
               display: inline-block;
@@ -803,6 +820,10 @@ class Dashboard {
           `)}
         </div>
         ${table}
+        <hbox>
+          <spacer></spacer>
+          <span onclick=${e => { selectedDate = new Date(today); renderTable(); }} style="cursor: pointer;">Today</span>
+        </hbox>
       </vbox>
     `;
   }

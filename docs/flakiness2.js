@@ -358,6 +358,7 @@ class Dashboard {
   setErrorIdFilter(value) { this._errorIdFilter = value; }
 
   render() {
+    this._popover.hide();
     console.time('preparing');
     const self = this;
     const sortedCommits = [...(this._branchSHAs.get(this._branchName) || [])].map(sha => this._allCommits.get(sha)).sort((c1, c2) => c2.timestamp - c1.timestamp);
@@ -577,7 +578,7 @@ class Dashboard {
           background-color: ${COLOR_SELECTION};
       ">
         <h4>
-          Showing state as of ${new Intl.DateTimeFormat("en-US", {month: "long", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',}).format(new Date(this._untilCommitsFilter))}
+          Showing state as of <b>${new Intl.DateTimeFormat("en-US", {month: "long", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',}).format(new Date(this._untilCommitsFilter))}</b>
           <a style="margin-left: 1ex;" href="${amendURL({timestamp: undefined})}">See latest</a>
         </h4>
       </div>
@@ -726,6 +727,8 @@ class Dashboard {
   _renderCalendar() {
     const {until} = this._context;
 
+    const today = new Date();
+    today.setHours(23, 59, 59, 0);
     const date = new Date(until);
     let selectedDate = new Date(until);
 
@@ -742,15 +745,16 @@ class Dashboard {
         table.append(el);
         for (let day = 0; day < 7; ++day) {
           rolling.setDate(rolling.getDate() + 1);
+          const isSelectable = rolling <= today;
+          const clazz = isSelectable ? 'hover-darken' : '';
           el.append(html`
-            <a href="${amendURL({timestamp: +rolling})}" onclick=${e => {
-              this._popover.hide();
-            }} class=hover-darken style="
+            <a ${isSelectable ? `href=${amendURL({timestamp: +rolling})}` : undefined} class=${clazz} style="
               display: inline-block;
+              user-select: none;
               width: 3em;
               text-align: center;
-              cursor: pointer;
               background: white;
+              ${!isSelectable ? 'cursor: not-allowed;' : ''}
               ${rolling.getMonth() !== selectedDate.getMonth() ? 'color: #9e9e9e;' : ''}
               ${rolling.getDate() === date.getDate() && rolling.getFullYear() === date.getFullYear() && rolling.getMonth() === date.getMonth() ? `
                 background: #2196f3;

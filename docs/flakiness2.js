@@ -15,7 +15,7 @@ const CHAR_PLUS_IN_CIRCLE = '⊕';
 const CHAR_WARNING = '⚠';
 const CHAR_CROSS = '✖';
 const CHAR_INFINITY = '∞';
-const CHAR_RIGHT_ARROW = '➜';
+const CHAR_RIGHT_ARROW = '⟶';
 const CHAR_UP_ARROW = '↑';
 const CHAR_DOWN_ARROW = '↓';
 
@@ -666,7 +666,10 @@ class Dashboard {
             margin-bottom: 1ex;
             padding-bottom: 4px;
         ">
-          <hbox style="width: 600px; min-width: 400px; margin-right: 1px;"></hbox>
+          <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
+            <spacer></spacer>
+            <span style="margin-right: 1em;">Commits: Newer ${CHAR_RIGHT_ARROW} Older</span>
+          </hbox>
           ${commits.map(commit => {
             let color = COLOR_GREY;
             if (commitTiles.has({sha: commit.sha, category: 'bad'}))

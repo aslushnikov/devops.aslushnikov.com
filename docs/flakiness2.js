@@ -777,7 +777,9 @@ class Dashboard {
                 <a style="padding-left: 1em;" href="${spec.url}"><away-link style="vertical-align: text-top;"></away-link></a>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title} (${commit.author})</span>
+              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title} (${commit.author})
+                              @ ${new Intl.DateTimeFormat("en-US", {month: "short", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(commit.timestamp))}
+                              </span>
                               <a style="padding-left: 1em;" href="${commit.url}"><away-link style="vertical-align: text-top;"></away-link></a>
               ` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
             </div>

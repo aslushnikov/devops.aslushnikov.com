@@ -562,13 +562,13 @@ class Dashboard {
             </select>
           </span>
           <span style="margin-left: 1em; margin-right: 1em;">
-            Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
+            <select oninput=${e => urlState.amend({commits: e.target.value})}>
               ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
                 <option value=${value} selected=${value === this._lastCommits}>${value}</option>
               `)}
             </select> commits
           </span>
-          <span style="width: 2em;"> ${loadingProgressElement}</span>
+          <span style="margin-right: 1em; width: ${COMMIT_RECT_SIZE}px;"> ${loadingProgressElement}</span>
           <span style="margin-right: 1em; display: inline-flex; align-items: center;">
             <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
             <label for=show-flaky-input-checkbox>Show flaky</label>

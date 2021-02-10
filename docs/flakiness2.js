@@ -11,9 +11,11 @@ import {humanId} from './humanid.js';
 
 const CHAR_MIDDLE_DOT = '·';
 const CHAR_BULLSEYE = '◎';
+const CHAR_PLUS_IN_CIRCLE = '⊕';
 const CHAR_WARNING = '⚠';
 const CHAR_CROSS = '✖';
 const CHAR_INFINITY = '∞';
+const CHAR_RIGHT_ARROW = '➜';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -489,9 +491,11 @@ class Dashboard {
     if (selectedElement)
       selectedElement.classList.remove('selected-element');
     if (this._selection.specId && this._selection.sha)
-      selectedElement = this._mainElement.$(`svg[data-specid="${this._selection.specId}"][data-commitsha="${this._selection.sha}"]`);
+      selectedElement = this._mainElement.$(`[data-specid="${this._selection.specId}"][data-commitsha="${this._selection.sha}"]`);
     else if (this._selection.specId)
-      selectedElement = this._mainElement.$(`hbox[data-specid="${this._selection.specId}"]`);
+      selectedElement = this._mainElement.$(`[data-specid="${this._selection.specId}"]:not([data-commitsha])`);
+    else if (this._selection.sha)
+      selectedElement = this._mainElement.$(`[data-commitsha="${this._selection.sha}"]:not([data-specid])`);
     else
       selectedElement = null;
     if (selectedElement)
@@ -517,18 +521,18 @@ class Dashboard {
         <hbox onclick=${this._selectSpecCommit.bind(this, spec.specId, undefined)} class=hover-darken style="
           ${STYLE_TEXT_OVERFLOW}
           width: 600px;
+          min-width: 400px;
           cursor: pointer;
           padding: 0 1em;
           margin-right: 1px;
           align-items: baseline;
           background: white;
-          min-width: 400px;
         " data-specid="${spec.specId}">
           <span style="overflow: hidden; text-overflow: ellipsis;"><span style="color: #9e9e9e;">${spec.file} - </span>${spec.title}</span>
           <spacer></spacer>
           ${this._renderSpecAnnotations(spec)}
         </hbox>
-        ${commitTiles.getAll({specId: spec.specId}).map(commitTile => this._renderCommitTile(commitTile, this._selectSpecCommit.bind(this, commitTile.specId, commitTile.sha)))}
+        ${commitTiles.getAll({specId: spec.specId}).map(commitTile => this._renderCommitTile(commitTile))}
       </hbox>
     `;
 
@@ -609,9 +613,43 @@ class Dashboard {
           <h2>${specs.size} problematic specs</h2>
           <a style="margin-left: 1em; cursor: pointer;" onclick=${this._selectSpecCommit.bind(this, undefined, undefined)}>(summary)</a>
         </hbox>
-        <vbox style="margin-bottom: 1em; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+        <vbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           ${this._renderStats()}
         </vbox>
+        ${commits.length && specs.size ? html`
+        <hbox style="
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1ex;
+            padding-bottom: 4px;
+        ">
+          <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
+            <spacer></spacer>
+            <span style="color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
+          </hbox>
+          ${commits.map(commit => {
+            let color = COLOR_GREY;
+            if (commitTiles.has({sha: commit.sha, category: 'bad'}))
+              color = COLOR_RED;
+            else if (commitTiles.has({sha: commit.sha, category: 'flaky'}))
+              color = COLOR_VIOLET;
+            else if (commitTiles.has({sha: commit.sha, category: 'good'}))
+              color = COLOR_GREEN;
+            return svg`
+              <svg onclick=${e => this._selectSpecCommit(undefined, commit.sha)}
+                   class=hover-darken
+                   style="cursor: pointer; margin: 1px; flex: none;"
+                   data-commitsha="${commit.sha}"
+                   viewbox="0 0 100 100"
+                   width="16" height="16">
+                <!--<circle cx="50" cy="50" r="50" />-->
+                <!-- <path d="M100,100 a1,1 0 0,0 -100,0" fill="${color}" /> -->
+                <rect x=0 y=20 width=100 height=60 fill="${color}"/>
+              </svg>
+            `;
+          })}
+        </hbox>
+        ` : undefined}
+
         ${specs.slice(0, RENDER_ROWS).map(renderSpecRow)}
         ${specs.size <= RENDER_ROWS ? undefined : html`
           <vbox style="position: relative;">
@@ -924,7 +962,7 @@ class Dashboard {
     return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
   }
 
-  _renderCommitTile(commitTile, onclick) {
+  _renderCommitTile(commitTile) {
     const color = {
       '': COLOR_GREY,
       'bad': COLOR_RED,
@@ -934,11 +972,11 @@ class Dashboard {
 
     return svg`
       <svg class=hover-darken style="cursor: pointer; flex: none; margin: 1px;" width="${COMMIT_RECT_SIZE}" height="${COMMIT_RECT_SIZE}"
-           data-specid="${commitTile.specId}"
+           data-specid="${commitTile.specId || ''}"
            data-commitsha="${commitTile.sha}"
-           onclick=${onclick}
+           onclick=${this._selectSpecCommit.bind(this, commitTile.specId, commitTile.sha)}
            viewbox="0 0 14 14">
-        <rect x=0 y=0 width=14 height=14 fill="${color}"/>
+        <rect x=0 y=0  width=14 height=14 fill="${color}"/>
       </svg>
     `;
   }

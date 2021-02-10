@@ -852,6 +852,7 @@ class Dashboard {
     console.time('rendering summary');
     const {tests, commits} = this._context;
 
+    const commitTimeFormatter = new Intl.DateTimeFormat("en-US", {month: "short", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'});
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
         <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
@@ -861,16 +862,24 @@ class Dashboard {
             background-color: var(--border-color);
             padding: 2px 1em;
         ">
-          <hbox onclick=${() => split.maximizeSidebar(this._mainSplitView)} style="cursor: pointer; flex: none; margin-right: 1ex; font-weight: bold">
-            ${svg`
-            <svg style="margin-right: 4px;" height="10px" version="1.1" viewBox="8 8 20 20" width="10px">
-              <path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z"></path>
-              <path d="m 20,10 0,2 4,0 0,4 2,0 L 26,10 l -6,0 0,0 z"></path>
-              <path d="m 24,24 -4,0 0,2 L 26,26 l 0,-6 -2,0 0,4 0,0 z"></path>
-              <path d="M 12,20 10,20 10,26 l 6,0 0,-2 -4,0 0,-4 0,0 z"></path>
-            </svg>
-            `}
-            <div>Details</div>
+          <hbox style="flex: auto;">
+            <hbox onclick=${() => split.maximizeSidebar(this._mainSplitView)} style="cursor: pointer; flex: none; margin-right: 1ex;">
+              ${svg`
+              <svg style="margin-right: 4px;" height="10px" version="1.1" viewBox="8 8 20 20" width="10px">
+                <path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z"></path>
+                <path d="m 20,10 0,2 4,0 0,4 2,0 L 26,10 l -6,0 0,0 z"></path>
+                <path d="m 24,24 -4,0 0,2 L 26,26 l 0,-6 -2,0 0,4 0,0 z"></path>
+                <path d="M 12,20 10,20 10,26 l 6,0 0,-2 -4,0 0,-4 0,0 z"></path>
+              </svg>
+              `}
+              <div style="font-weight: bold;">Details</div>
+            </hbox>
+            <spacer></spacer>
+            <div style="color: #9e9e9e;">
+              ${commit ? commitTimeFormatter.format(new Date(commit.timestamp))
+                : commitTimeFormatter.format(new Date(commits[commits.length - 1].timestamp)) + ' - ' + commitTimeFormatter.format(new Date(commits[0].timestamp))
+                }
+            </div>
           </hbox>
         </hbox>
       </vbox>
@@ -913,21 +922,21 @@ class Dashboard {
       <div style="flex: auto; overflow: auto; padding: 1em; position: relative;">
         <hbox style="margin-bottom: 1em;">
           <vbox style="align-items: flex-end;">
-            <div>spec:</div>
             <div>commit:</div>
+            <div>spec:</div>
             <div>test:</div>
           </vbox>
           <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>
-                <a style="padding-left: 1em;" href="${spec.url}"><away-link style="vertical-align: text-top;"></away-link></a>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
-            </div>
-            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
               ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title} (${commit.author})
-                              @ ${new Intl.DateTimeFormat("en-US", {month: "short", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(commit.timestamp))}
+                              
                               </span>
                               <a style="padding-left: 1em;" href="${commit.url}"><away-link style="vertical-align: text-top;"></away-link></a>
               ` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
+            </div>
+            <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
+              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>
+                <a style="padding-left: 1em;" href="${spec.url}"><away-link style="vertical-align: text-top;"></away-link></a>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
               ${this._selection.testName ? html`<span onclick=${() => this._selectTest(undefined)} style="cursor: pointer;">${CHAR_CROSS} ${this._selection.testName}</span>` : html`<span style="color: #999;">&lt;summary for all tests&gt;</span>`}

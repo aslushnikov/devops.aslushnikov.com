@@ -347,7 +347,7 @@ class Dashboard {
   mockData() { return this._dataURL.mockData(); }
 
   setLastCommits(value) {
-    if (isNaN(value) || value < 1 || value > 100) {
+    if (isNaN(value) || value < 1) {
       console.error(`DASHBOARD: Cannot set last commits number to "${value}"`);
       return;
     }

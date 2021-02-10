@@ -63,6 +63,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);
     dashboard.setErrorIdFilter(state.errorid === 'any' ? undefined : state.errorid);
     dashboard.setUntilCommits(state.timestamp);
+    dashboard.setBranchName(state.branch || 'master');
 
     dashboard.render();
   }));
@@ -81,12 +82,18 @@ class DataURL {
     return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/compressed_v1/${sha}.json`;
   }
 
-  commitsURL(untilTimestamp = undefined) {
+  branches() {
+    return 'https://api.github.com/repos/microsoft/playwright/branches';
+  }
+
+  commitsURL(untilTimestamp = undefined, branchName = undefined) {
     if (this._useMockData)
       return `/mockdata/commits.json`;
     let url = 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
     if (untilTimestamp)
       url += '&until=' + (new Date(untilTimestamp).toISOString());
+    if (branchName)
+      url += '&sha=' + branchName;
     return url;
   }
 
@@ -259,12 +266,31 @@ class Dashboard {
 
     this._showFlaky = false;
     this._lastCommits = 0;
+
+    this._branchName = 'master';
+    this._branches = ['master'];
+    this._branchSHAs = new Map();
+    this._initializeBranches();
   }
 
   setUntilCommits(timestamp) {
+    if (this._untilCommitsFilter === +timestamp)
+      return;
     this._untilCommitsFilter = +timestamp;
+    this._loadBranchCommits();
+  }
+
+  setBranchName(branchName) {
+    if (this._branchName === branchName)
+      return;
+    this._branchName = branchName;
+    this._loadBranchCommits();
+  }
+
+  _loadBranchCommits() {
+    const branchName = this._branchName;
     this._commitsThrottler.schedule(async () => {
-      const text = await rateLimitedFetch(this._dataURL.commitsURL(this._untilCommitsFilter));
+      const text = await rateLimitedFetch(this._dataURL.commitsURL(this._untilCommitsFilter, branchName));
       const rawCommits = JSON.parse(text);
       const commits = rawCommits.map(c => ({
         sha: c.sha,
@@ -275,13 +301,34 @@ class Dashboard {
         timestamp: +new Date(c.commit.committer.date),
         data: new CommitData(this._dataURL, c.sha),
       }));
+      let branchSHAs = this._branchSHAs.get(branchName);
+      if (!branchSHAs) {
+        branchSHAs = new Set();
+        this._branchSHAs.set(branchName, branchSHAs);
+      }
       for (const commit of commits) {
+        branchSHAs.add(commit.sha);
         if (!this._allCommits.has(commit.sha))
           this._allCommits.set(commit.sha, commit);
       }
       if (!this._commitsThrottler.isScheduled())
         this.render();
     });
+  }
+
+  async _initializeBranches() {
+    const text = await rateLimitedFetch(this._dataURL.branches());
+    const json = await JSON.parse(text);
+    this._branches = json.map(raw => raw.name).sort((b1, b2) => {
+      if (b1 === 'master' || b2 === 'master')
+        return b1 === 'master' ? -1 : 1;
+      if (b1.startsWith('release-') && b2.startsWith('release-'))
+        return parseFloat(b2.substring('release-'.length)) - parseFloat(b1.substring('release-'.length));
+      if (b1.startsWith('release-') !== b2.startsWith('release-'))
+        return b1.startsWith('release-') ? -1 : 1;
+      return b1 < b2 ? -1 : 1;
+    });
+    this.render();
   }
 
 
@@ -303,7 +350,7 @@ class Dashboard {
   render() {
     console.time('preparing');
     const self = this;
-    const sortedCommits = [...this._allCommits.values()].sort((c1, c2) => c2.timestamp - c1.timestamp);
+    const sortedCommits = [...(this._branchSHAs.get(this._branchName) || [])].map(sha => this._allCommits.get(sha)).sort((c1, c2) => c2.timestamp - c1.timestamp);
     const until = this._untilCommitsFilter ? this._untilCommitsFilter : Date.now();
     const commits = sortedCommits.filter(c => c.timestamp <= until).slice(0, this._lastCommits);
 
@@ -501,6 +548,13 @@ class Dashboard {
       ` : undefined}
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+          <span style="margin-left: 1em;">
+            branch <select style="${this._branchName !== 'master' ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({branch: e.target.value})}>
+              ${this._branches.map(branchName => html`
+                <option selected=${this._branchName === branchName} value="${branchName}">${branchName}</option>
+              `)}
+            </select>
+          </span>
           <span style="margin-left: 1em; margin-right: 1em;">
             Last <select oninput=${e => urlState.amend({commits: e.target.value})}>
               ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
@@ -541,7 +595,7 @@ class Dashboard {
             </select>
           </span>
           <span style="margin-right: 1em;">
-            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined})}">Reset All</a>
+            <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, branch: undefined})}">Reset All</a>
           </span>
           <spacer></spacer>
           <span style="margin-right: 1em;">

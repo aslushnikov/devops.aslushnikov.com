@@ -660,7 +660,7 @@ class Dashboard {
         ">
           <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
             <spacer></spacer>
-            <span onclick=${this._popover.onClickHandler(() => this._renderCalendar())} style="color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
+            <span onclick=${this._popover.onClickHandler(() => this._renderCalendar())} style="cursor: pointer; color: #9e9e9e; margin-right: 1ex; font-size: 10px;">${new Intl.DateTimeFormat("en-US", {month: "short", day: 'numeric', hour: 'numeric', minute: 'numeric'}).format(new Date(until))} ${CHAR_RIGHT_ARROW}</span>
           </hbox>
           ${commits.map(commit => {
             let color = COLOR_GREY;

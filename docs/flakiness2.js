@@ -66,6 +66,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setErrorIdFilter(state.errorid === 'any' ? undefined : state.errorid);
     dashboard.setUntilCommits(state.timestamp);
     dashboard.setBranchName(state.branch || 'master');
+    dashboard.setSpecFilter(state.filter_spec);
 
     dashboard.render();
   }));
@@ -266,6 +267,7 @@ class Dashboard {
     this._browserFilter = undefined;
     this._platformFilter = undefined;
     this._errorIdFilter = undefined;
+    this._specFilter = undefined;
 
     this._showFlaky = false;
     this._lastCommits = 0;
@@ -288,6 +290,10 @@ class Dashboard {
       return;
     this._branchName = branchName;
     this._loadBranchCommits();
+  }
+
+  setSpecFilter(specFilter) {
+    this._specFilter = specFilter;
   }
 
   _loadBranchCommits() {
@@ -380,13 +386,26 @@ class Dashboard {
       updateProgress();
     }
 
-    const prefilteredTests = this._errorIdFilter ?
-        new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat())
-        :
-        new SMap(commits.map(commit => [
-          ...commit.data.tests().getAll({category: 'bad'}),
-          ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
-        ]).flat());
+    let prefilteredTests;
+    if (!this._errorIdFilter && !this._specFilter) {
+      prefilteredTests = new SMap(commits.map(commit => [
+        ...commit.data.tests().getAll({category: 'bad'}),
+        ...(this._showFlaky ? commit.data.tests().getAll({category: 'flaky'}) : []),
+      ]).flat());
+    } else if (this._specFilter) {
+      const allSpecIds = new Set(commits.map(commit => commit.data.specs().filter(spec => spec.file.includes(this._specFilter) || spec.title.includes(this._specFilter)).map(spec => spec.specId)).flat());
+      let tests = [];
+      for (const specId of allSpecIds) {
+        for (const commit of commits)
+          tests.push(...commit.data.tests().getAll({specId}));
+      }
+      if (this._errorIdFilter)
+        tests = tests.filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))
+      prefilteredTests = new SMap(tests);
+    } else if (this._errorIdFilter) {
+      prefilteredTests = new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat());
+    }
+
     const faultySpecIds = new SMap(prefilteredTests.getAll({browserName: this._browserFilter, platform: this._platformFilter})).uniqueValues('specId');
     const tests = new SMap(commits.map(commit => {
       return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat().filter(test => {
@@ -555,7 +574,7 @@ class Dashboard {
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           <span style="margin-left: 1em;">
-            branch <select style="${this._branchName !== 'master' ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({branch: e.target.value})}>
+            <select style="${this._branchName !== 'master' ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({branch: e.target.value})}>
               ${this._branches.map(branchName => html`
                 <option selected=${this._branchName === branchName} value="${branchName}">${branchName}</option>
               `)}
@@ -564,9 +583,9 @@ class Dashboard {
           <span style="margin-left: 1em; margin-right: 1em;">
             <select oninput=${e => urlState.amend({commits: e.target.value})}>
               ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
-                <option value=${value} selected=${value === this._lastCommits}>${value}</option>
+                <option value=${value} selected=${value === this._lastCommits}>${value} commits</option>
               `)}
-            </select> commits
+            </select>
           </span>
           <span style="margin-right: 1em; width: ${COMMIT_RECT_SIZE}px;"> ${loadingProgressElement}</span>
           <span style="margin-right: 1em; display: inline-flex; align-items: center;">
@@ -599,6 +618,12 @@ class Dashboard {
                 <option selected=${this._errorIdFilter === errorId} value="${errorId}">${errorId}</option>
               `)}
             </select>
+          </span>
+          <span style="margin-right: 1em">
+            <input style="${this._specFilter ? STYLE_SELECTED : ''}" type=text placeholder="filter specs" value=${this._specFilter || ''} onkeydown=${e => {
+              if (e.key === 'Enter')
+                e.target.blur();
+            }} onblur=${e => urlState.amend({filter_spec: e.target.value})}>
           </span>
           <span style="margin-right: 1em;">
             <a href="${amendURL({browser: undefined, platform: undefined, errorid: undefined, branch: undefined})}">Reset All</a>

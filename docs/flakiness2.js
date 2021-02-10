@@ -761,6 +761,9 @@ class Dashboard {
                 color: white;
                 font-weight: bold;
               ` : ''}
+              ${rolling.getDate() === today.getDate() && rolling.getFullYear() === today.getFullYear() && rolling.getMonth() === today.getMonth() ? `
+                border: 1px solid black;
+              ` : ''}
             ">${rolling.getDate()}</a>
           `);
         }

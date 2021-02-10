@@ -304,7 +304,7 @@ class Dashboard {
     console.time('preparing');
     const self = this;
     const sortedCommits = [...this._allCommits.values()].sort((c1, c2) => c2.timestamp - c1.timestamp);
-    const until = this._untilCommitsFilter ? this._untilCommitsFilter : sortedCommits[0]?.timestamp || Date.now();
+    const until = this._untilCommitsFilter ? this._untilCommitsFilter : Date.now();
     const commits = sortedCommits.filter(c => c.timestamp <= until).slice(0, this._lastCommits);
 
     const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
@@ -486,6 +486,19 @@ class Dashboard {
     this._mainElement.textContent = '';
     const RENDER_ROWS = Math.max(25, 1000 / commits.length);
     this._mainElement.append(html`
+      ${this._untilCommitsFilter ? html`
+      <div style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: ${COLOR_SELECTION};
+      ">
+        <h4>
+          Showing state as of ${new Intl.DateTimeFormat("en-US", {month: "long", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',}).format(new Date(this._untilCommitsFilter))}
+          <a style="margin-left: 1ex;" href="${amendURL({timestamp: undefined})}">See latest</a>
+        </h4>
+      </div>
+      ` : undefined}
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           <span style="margin-left: 1em; margin-right: 1em;">
@@ -493,9 +506,7 @@ class Dashboard {
               ${[...new Set([2,5,10,15,20,30,50, this._lastCommits])].sort((a, b) => a - b).map(value => html`
                 <option value=${value} selected=${value === this._lastCommits}>${value}</option>
               `)}
-            </select> commits ${this._untilCommitsFilter ? html`
-              after <span style="${STYLE_SELECTED}; padding: 4px;">${new Date(this._untilCommitsFilter).toLocaleString()}</span>
-            `: undefined}
+            </select> commits
           </span>
           <span style="width: 2em;"> ${loadingProgressElement}</span>
           <span style="margin-right: 1em; display: inline-flex; align-items: center;">

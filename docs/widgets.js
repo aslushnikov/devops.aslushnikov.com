@@ -61,8 +61,8 @@ export class ExpandButton extends HTMLElement {
 customElements.define('expand-button', ExpandButton);
 
 export class Popover {
-  constructor(document) {
-    this._document = document;
+  constructor(container) {
+    this._container = container;
     this._element = null;
     this._anchor = null;
   }
@@ -78,8 +78,8 @@ export class Popover {
         <popover-arrow class=shadow></popover-arrow>
       </the-popover>
     `;
-    const scrollLeft = window.pageXOffset || this._document.documentElement.scrollLeft;
-    const scrollTop = window.pageYOffset || this._document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || this._container.scrollLeft;
+    const scrollTop = window.pageYOffset || this._container.scrollTop;
     const pointX = box.x + box.width / 2 + scrollLeft;
     const pointY = (class1 === 'up' ? box.y + box.height : box.y) + scrollTop;
     element.style.left = pointX + 'px';
@@ -90,7 +90,7 @@ export class Popover {
     if (this._element)
       this._element.replaceWith(element);
     else
-      this._document.body.appendChild(element);
+      this._container.appendChild(element);
     this._element = element;
     this._anchor = anchor;
   }

@@ -99,7 +99,6 @@ export class Throttler {
     if (this._runningOperation || !this._pendingOperation) {
       if (this._abortController)
         this._abortController.abort();
-      this._abortController = null;
       return;
     }
     const operation = this._pendingOperation;

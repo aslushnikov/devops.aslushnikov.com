@@ -625,7 +625,7 @@ class Dashboard {
             <input style="${this._specFilter ? STYLE_SELECTED : ''}" type=text placeholder="filter specs" value=${this._specFilter || ''} onkeydown=${e => {
               if (e.key === 'Enter')
                 e.target.blur();
-            }} onblur=${e => urlState.amend({filter_spec: e.target.value})}>
+            }} onblur=${e => urlState.amend({filter_spec: e.target.value.trim() || undefined})}>
           </span>
           <span style="margin-right: 1em;">
             errorId:

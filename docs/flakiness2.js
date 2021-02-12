@@ -477,6 +477,11 @@ class Dashboard {
 
     console.timeEnd('preparing');
 
+    const isFirstRender = !this._context;
+
+    if (isFirstRender && this._errorIdFilter)
+      split.showSidebar(this._mainSplitView);
+
     this._context = {
       loadingProgressElement,
       until,
@@ -493,6 +498,9 @@ class Dashboard {
     this._renderMainElement();
     this._renderSidebar();
     this._updateMainElementSelection();
+
+    if (isFirstRender && this._errorIdFilter)
+      this._tabstrip.selectTab(this._errorsTab);
   }
 
   _selectSpecCommit(specId, sha) {
@@ -853,6 +861,12 @@ class Dashboard {
     const {tests, commits} = this._context;
 
     const commitTimeFormatter = new Intl.DateTimeFormat("en-US", {month: "short", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'});
+    let selectionTimeRange = ''
+    if (commit)
+      selectionTimeRange = commitTimeFormatter.format(new Date(commit.timestamp));
+    else if (commits.length)
+      selectionTimeRange = commitTimeFormatter.format(new Date(commits[commits.length - 1].timestamp)) + ' - ' + commitTimeFormatter.format(new Date(commits[0].timestamp));
+
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">
         <hbox onzrender=${e => split.registerResizer(this._mainSplitView, e)} style="
@@ -876,9 +890,7 @@ class Dashboard {
             </hbox>
             <spacer></spacer>
             <div style="color: #9e9e9e;">
-              ${commit ? commitTimeFormatter.format(new Date(commit.timestamp))
-                : commitTimeFormatter.format(new Date(commits[commits.length - 1].timestamp)) + ' - ' + commitTimeFormatter.format(new Date(commits[0].timestamp))
-                }
+              ${selectionTimeRange}
             </div>
           </hbox>
         </hbox>
@@ -1190,7 +1202,9 @@ class Dashboard {
         <h3 style="
           display: flex;
           align-items: center;
-        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : ''}error <a href="${amendURL({errorid: stackId === this._errorIdFilter ? 'any' : stackId})}">${stackId}</a></h3>
+        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : 'selected '}error: ${stackId === this._errorIdFilter ? html`${stackId}` : html`
+            <a href="${amendURL({errorid: stackId})}">${stackId}</a>
+          `}</h3>
         <div style="margin-left: 1em;">
           <div style="margin-left: 1em; margin-bottom: 1em;">
             ${!this._selection.specId && html`<div>different specs: ${specIds.size}</div>`}

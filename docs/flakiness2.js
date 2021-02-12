@@ -552,11 +552,15 @@ class Dashboard {
       const tokens = text.split(this._specFilter);
       if (tokens.length === 1)
         return text;
-      return html`
-        ${tokens[0] || undefined}
-        <span style="${STYLE_SELECTED}">${this._specFilter}</span>
-        ${tokens[1] || undefined}
-      `;
+      const fragment = html``;
+      for (let i = 0; i < tokens.length - 1; ++i) {
+        fragment.append(html`${tokens[i] || undefined}`);
+        fragment.append(html`
+          <span style="${STYLE_SELECTED}">${this._specFilter}</span>
+        `);
+      }
+      fragment.append(html`${tokens[tokens.length - 1]}`);
+      return fragment;
     } : text => text;
 
     const renderSpecRow = (spec) => html`

@@ -869,7 +869,7 @@ class Dashboard {
     if (commit)
       selectionTimeRange = commitTimeFormatter.format(new Date(commit.timestamp));
     else if (commits.length)
-      selectionTimeRange = commitTimeFormatter.format(new Date(commits[commits.length - 1].timestamp)) + ' - ' + commitTimeFormatter.format(new Date(commits[0].timestamp));
+      selectionTimeRange = commitTimeFormatter.format(new Date(commits[0].timestamp)) + ` ${CHAR_RIGHT_ARROW} ` + commitTimeFormatter.format(new Date(commits[commits.length - 1].timestamp));
 
     const content = html`
       <vbox style="${STYLE_FILL}; overflow: hidden;">

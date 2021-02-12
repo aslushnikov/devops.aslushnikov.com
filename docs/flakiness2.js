@@ -718,7 +718,7 @@ class Dashboard {
               top: -80px;
             "></div>
             <div class=hover-darken onclick=${e => {
-              e.target.parentElement.replaceWith(html`${specs.slice(40).map(renderSpecRow)}`);
+              e.target.parentElement.replaceWith(html`${specs.slice(RENDER_ROWS).map(renderSpecRow)}`);
             }} style="
                 display: flex;
                 align-items: center;

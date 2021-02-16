@@ -221,12 +221,9 @@ class Dashboard {
       this._updateMainElementSelection();
     };
 
-    let editorTabScrollTop = 0;
     this._editorTab = {
       titleElement: html`<span></span>`,
-      contentElement: html`<z-widget
-          onconnected=${w => w.scrollTop = editorTabScrollTop}
-          onscroll=${e => editorTabScrollTop = e.target.scrollTop} style="${STYLE_FILL}; overflow: auto;"></z-widget>`,
+      contentElement: html`<section style="${STYLE_FILL}"></section>`,
     };
     this._errorsTab = {
       titleElement: html`<span></span>`,
@@ -1024,8 +1021,16 @@ class Dashboard {
     const editorSourceLoadingElement = html`<div></div>`;
     setTimeout(() => editorSourceLoadingElement.textContent = 'Loading...', 777);
 
+    let editorTabScrollTop = -1;
+    const contentElement = html`<z-widget
+      onconnected=${w => editorTabScrollTop === -1 ? scrollToCoords() : w.scrollTop = editorTabScrollTop}
+      onscroll=${e => editorTabScrollTop = e.target.scrollTop} style="${STYLE_FILL}; overflow: auto;">
+        ${editorSourceLoadingElement}
+      </z-widget>
+    `;
+
     this._editorTab.contentElement.textContent = '';
-    this._editorTab.contentElement.append(editorSourceLoadingElement);
+    this._editorTab.contentElement.append(contentElement);
 
     const cacheKey = JSON.stringify({sha: spec.sha, file: spec.file});
     let textPromise = this._fileContentsCache.get(cacheKey);
@@ -1059,8 +1064,8 @@ class Dashboard {
         </div>
         </div>
       `;
-      this._editorTab.contentElement.textContent = '';
-      this._editorTab.contentElement.append(html`
+      contentElement.textContent = '';
+      contentElement.append(html`
         <div style="display: flex;
                     white-space: pre;
                     overflow: auto;

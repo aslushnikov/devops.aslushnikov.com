@@ -750,6 +750,7 @@ class Dashboard {
     today.setHours(23, 59, 59, 0);
     const date = new Date(until);
     let selectedDate = new Date(until);
+    selectedDate.setDate(1);
 
     const table = html`<section style="white-space: pre;margin-top: 1ex;"></section>`;
 
@@ -810,11 +811,6 @@ class Dashboard {
       }
     }
     renderTable();
-
-    const changeSelectedMonth = sign => {
-      selectedDate.setMonth(selectedDate.getMonth() + sign);
-      renderTable();
-    };
 
     return html`
       <vbox>

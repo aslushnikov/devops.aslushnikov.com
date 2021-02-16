@@ -680,7 +680,7 @@ class Dashboard {
         ">
           <hbox style="width: 600px; min-width: 400px; margin-right: 1px;">
             <spacer></spacer>
-            <span style="margin-right: 1em;">Commits: Newer ${CHAR_RIGHT_ARROW} Older</span>
+            <span style="color: #9e9e9e; margin-right: 1em;">Commits: Newer ${CHAR_RIGHT_ARROW} Older</span>
           </hbox>
           ${commits.map(commit => {
             let color = COLOR_GREY;

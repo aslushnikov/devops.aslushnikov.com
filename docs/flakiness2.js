@@ -1211,7 +1211,7 @@ class Dashboard {
         <h3 style="
           display: flex;
           align-items: center;
-        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : 'selected '}error: ${stackId === this._errorIdFilter ? html`${stackId}` : html`
+        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : html`<span class=hover-darken style="background: white; cursor: pointer;" onclick=${() => urlState.amend({errorid: undefined})}>${CHAR_CROSS} </span>selected `}error: ${stackId === this._errorIdFilter ? html`${stackId}` : html`
             <a href="${amendURL({errorid: stackId})}">${stackId}</a>
           `}</h3>
         <div style="margin-left: 1em;">

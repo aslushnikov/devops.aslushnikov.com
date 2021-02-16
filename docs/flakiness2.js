@@ -940,18 +940,27 @@ class Dashboard {
           </vbox>
           <vbox style="margin-left: 1ex; align-items: flex-start; overflow: hidden;">
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${commit ? html`<span onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer;">${CHAR_CROSS} ${commit.title} (${commit.author})
-                              
-                              </span>
-                              <a style="padding-left: 1em;" href="${commit.url}"><away-link style="vertical-align: text-top;"></away-link></a>
+              ${commit ? html`
+                              <span class=hover-darken onclick=${() => this._selectSpecCommit(this._selection.specId, undefined)} style="cursor: pointer; background: white;">${CHAR_CROSS} </span>
+                              <a href="${commit.url}" style="${STYLE_TEXT_OVERFLOW}">
+                                ${commit.title} (${commit.author})
+                                <away-link style="vertical-align: text-top;"></away-link>
+                              </a>
               ` : html`<span style="color: #999;">&lt;summary for ${this._context.commits.length} commits&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${spec ? html`<span onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer;">${CHAR_CROSS} ${spec.file} - ${spec.title}</span>
-                <a style="padding-left: 1em;" href="${spec.url}"><away-link style="vertical-align: text-top;"></away-link></a>` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
+              ${spec ? html`
+                  <span class=hover-darken onclick=${() => this._selectSpecCommit(undefined, this._selection.sha)} style="cursor: pointer; background: white;">${CHAR_CROSS} </span>
+                  <a style="${STYLE_TEXT_OVERFLOW}" href="${spec.url}">
+                    ${spec.file} - ${spec.title}
+                    <away-link style="vertical-align: text-top;"></away-link>
+                  </a>
+                ` : html`<span style="color: #999;">&lt;summary for ${this._context.specs.size} specs&gt;</span>`}
             </div>
             <div style="${STYLE_TEXT_OVERFLOW}; max-width: 100%;">
-              ${this._selection.testName ? html`<span onclick=${() => this._selectTest(undefined)} style="cursor: pointer;">${CHAR_CROSS} ${this._selection.testName}</span>` : html`<span style="color: #999;">&lt;summary for all tests&gt;</span>`}
+              ${this._selection.testName ? html`
+                <span class=hover-darken onclick=${() => this._selectTest(undefined)} style="background: white; cursor: pointer;">${CHAR_CROSS} </span>${this._selection.testName}
+              ` : html`<span style="color: #999;">&lt;summary for all tests&gt;</span>`}
             </div>
           </vbox>
         </hbox>

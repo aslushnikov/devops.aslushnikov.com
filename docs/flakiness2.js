@@ -430,6 +430,11 @@ class Dashboard {
           return result;
       }
     }).sort((spec1, spec2) => {
+      const firstFailing1 = specIdToFirstFailingCommit.get(spec1.specId);
+      const firstFailing2 = specIdToFirstFailingCommit.get(spec2.specId);
+      if (firstFailing1 !== firstFailing2)
+        return firstFailing1 - firstFailing2;
+
       const bad1 = commitTiles.getAll({specId: spec1.specId, category: 'bad'}).length;
       const bad2 = commitTiles.getAll({specId: spec2.specId, category: 'bad'}).length;
       if (bad1 !== bad2)
@@ -440,10 +445,6 @@ class Dashboard {
       if (flaky1 !== flaky2)
         return flaky2 - flaky1;
 
-      const firstFailing1 = specIdToFirstFailingCommit.get(spec1.specId);
-      const firstFailing2 = specIdToFirstFailingCommit.get(spec2.specId);
-      if (firstFailing1 !== firstFailing2)
-        return firstFailing1 - firstFailing2;
       if (spec1.file !== spec2.file)
         return spec1.file < spec2.file ? -1 : 1;
       return spec1.line - spec2.line;

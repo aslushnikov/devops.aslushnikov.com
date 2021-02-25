@@ -44,17 +44,11 @@ const urlState = new URLState();
 
 window.addEventListener('DOMContentLoaded', async () => {
   const criticalSection = new CriticalSection();
-  let dashboard = null;
+  const dashboard = new Dashboard();
+  document.body.append(dashboard.element);
 
   urlState.startListening(() => criticalSection.run('nav', async () => {
     const state = urlState.state();
-
-    const useMockData = StringToBool(state.mockdata || 'false');
-    if (!dashboard || useMockData !== dashboard.mockData()) {
-      document.body.textContent = '';
-      dashboard = new Dashboard(useMockData);
-      document.body.append(dashboard.element);
-    }
 
     const showFlaky = StringToBool(state.show_flaky || 'true');
     dashboard.setShowFlaky(showFlaky);
@@ -73,15 +67,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 }, false);
 
 class DataURL {
-  constructor(useMockData = false) {
-    this._useMockData = useMockData;
-  }
-
-  mockData() { return this._useMockData; }
-
   dashboardURL(sha) {
-    if (this._useMockData)
-      return `/mockdata/${sha}.json`;
     return `https://folioflakinessdashboard.blob.core.windows.net/dashboards/compressed_v1/${sha}.json`;
   }
 
@@ -90,8 +76,6 @@ class DataURL {
   }
 
   commitsURL(untilTimestamp = undefined, branchName = undefined) {
-    if (this._useMockData)
-      return `/mockdata/commits.json`;
     let url = 'https://api.github.com/repos/microsoft/playwright/commits?per_page=100';
     if (untilTimestamp)
       url += '&until=' + (new Date(untilTimestamp).toISOString());
@@ -101,8 +85,6 @@ class DataURL {
   }
 
   sourceURL(sha, testFile) {
-    if (this._useMockData)
-      return `/mockdata/page-basic.spec.ts`;
     return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${testFile}`;
   }
 }
@@ -202,8 +184,8 @@ class CommitData {
 }
 
 class Dashboard {
-  constructor(useMockData) {
-    this._dataURL = new DataURL(useMockData);
+  constructor() {
+    this._dataURL = new DataURL();
     this._allCommits = new Map();
 
     this._commitsThrottler = new Throttler();
@@ -339,9 +321,6 @@ class Dashboard {
     });
     this.render();
   }
-
-
-  mockData() { return this._dataURL.mockData(); }
 
   setLastCommits(value) {
     if (isNaN(value) || value < 1) {

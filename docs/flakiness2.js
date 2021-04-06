@@ -85,7 +85,7 @@ class DataURL {
   }
 
   sourceURL(sha, testFile) {
-    return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/test/${testFile}`;
+    return `https://raw.githubusercontent.com/microsoft/playwright/${sha}/tests/${testFile}`;
   }
 }
 
@@ -135,7 +135,7 @@ class CommitData {
         const specObject = {
           specId,
           sha: this._sha,
-          url: `https://github.com/microsoft/playwright/blob/${this._sha}/test/${entry.file}#L${spec.line}`,
+          url: `https://github.com/microsoft/playwright/blob/${this._sha}/tests/${entry.file}#L${spec.line}`,
           file: entry.file,
           title: spec.title,
           line: spec.line,

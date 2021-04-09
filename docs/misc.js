@@ -49,6 +49,7 @@ const LOGO_URLS = {
   firefox: '/ff.svg',
   webkit: '/wk.svg',
   chromium: '/cr.svg',
+  electron: '/electron.svg',
 };
 
 export function browserLogoURL(browserName) {
@@ -73,6 +74,7 @@ export function commitURL(repoName, sha) {
     webkit: 'https://github.com/WebKit/webkit/commit/',
     playwright: 'https://github.com/microsoft/playwright/commit/',
     chromium: 'https://crrev.com/',
+    electron: 'https://github.com/electron/electron/commit/',
   }[repoName.toLowerCase()];
   if (!base)
     return '';

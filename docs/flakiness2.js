@@ -1235,7 +1235,7 @@ class Dashboard {
 
 function getTestCategory(test) {
   const hasGoodRun = test.runs[test.expectedStatus] > 0;
-  const hasBadRun = (test.expectedStatus !== 'failed' && test.runs.failed > 0) || (test.expectedStatus !== 'passed' && test.runs.passed > 0) || (test.expectedStatus !== 'timedOut' && test.runs.timedOut > 0);
+  const hasBadRun = (test.expectedStatus !== 'failed' && test.runs.failed > 0) || (test.expectedStatus !== 'timedOut' && test.runs.timedOut > 0);
   if (hasGoodRun && hasBadRun)
     return 'flaky';
   if (hasBadRun)

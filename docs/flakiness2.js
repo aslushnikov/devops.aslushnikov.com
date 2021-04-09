@@ -1244,13 +1244,17 @@ function getTestCategory(test) {
 }
 
 function getTestName(test) {
-  return Object.entries(test.parameters).filter(([key, value]) => !!value).map(([key, value]) => {
+  const browserName = test.parameters.browserName || 'N/A';
+  const browserVersion = test.parameters.browserVersion || '';
+  const platform = test.parameters.platform;
+  const prefix = browserName && browserVersion ? browserName + ' ' + browserVersion : browserName;
+  return [prefix, platform, ...Object.entries(test.parameters).filter(([key, value]) => !!value && key !== 'platform' && key !== 'browserName' && key !== 'browserVersion').map(([key, value]) => {
     if (typeof value === 'string')
       return value;
     if (typeof value === 'boolean')
       return key;
     return `${key}=${value}`;
-  }).join(' / ');
+  })].join(' / ');
 }
 
 function svgPie({ratio, color = '#bbb', size = COMMIT_RECT_SIZE}) {

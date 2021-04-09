@@ -402,7 +402,7 @@ class Dashboard {
         category = 'bad';
       else if (categories.has('flaky') && this._showFlaky)
         category = 'flaky';
-      else if (categories.size || commit.data.specs().has({specId}))
+      else if (categories.has('good'))
         category = 'good';
       return {
         specId,

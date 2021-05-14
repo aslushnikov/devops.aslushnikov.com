@@ -432,13 +432,11 @@ class Dashboard {
     }).sort((spec1, spec2) => {
       const bad1 = commitTiles.getAll({specId: spec1.specId, category: 'bad'}).length;
       const bad2 = commitTiles.getAll({specId: spec2.specId, category: 'bad'}).length;
-      if (bad1 !== bad2)
-        return bad2 - bad1;
 
       const flaky1 = commitTiles.getAll({specId: spec1.specId, category: 'flaky'}).length;
       const flaky2 = commitTiles.getAll({specId: spec2.specId, category: 'flaky'}).length;
-      if (flaky1 !== flaky2)
-        return flaky2 - flaky1;
+      if (flaky1 + bad1 !== flaky2 + bad2)
+        return flaky2 + bad2 - flaky1 - bad1;
 
       const firstFailing1 = specIdToFirstFailingCommit.get(spec1.specId);
       const firstFailing2 = specIdToFirstFailingCommit.get(spec2.specId);

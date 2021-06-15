@@ -32,6 +32,8 @@ jobs:
     - run: npm run build
     - name: Build
       run: bash utils/docker/build.sh ${{ matrix.tag }} playwright:localbuild-${{ matrix.tag }}
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Test
       run: |
         npm run clean

@@ -37,9 +37,9 @@ jobs:
         npm run clean
         rm -rf node_modules/
         CONTAINER_ID="$(docker run --rm -v $(pwd):/root/playwright --name playwright-docker-test -d -t playwright:localbuild-${{ matrix.tag }} /bin/bash)"
-        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" apt-get remove -y nodejs
-        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
-        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" apt-get install -y nodejs
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" sudo apt-get remove -y nodejs
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" curl -fsSL https://deb.nodesource.com/setup_14.x | sudo bash -
+        docker exec --workdir /root/playwright/ "${CONTAINER_ID}" sudo apt-get install -y nodejs
         docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm ci
         docker exec --workdir /root/playwright/ "${CONTAINER_ID}" npm run build
         docker exec -e CI=1 --workdir /root/playwright/ "${CONTAINER_ID}" xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" npm run test

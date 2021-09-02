@@ -371,12 +371,18 @@ class Dashboard {
 
   _filterTest(test) {
     for (const [name, valueFilters] of this._testParameterFilters) {
+      let satisfiesSomeInclude = false;
+      let hasIncludeFilter = false;
       for (const [value, op] of valueFilters) {
-        if (op === 'include' && test.parameters[name] !== value)
-          return false;
         if (op === 'exclude' && test.parameters[name] === value)
           return false;
+        if (op === 'include') {
+          hasIncludeFilter = true;
+          satisfiesSomeInclude ||= test.parameters[name] === value;
+        }
       }
+      if (hasIncludeFilter && !satisfiesSomeInclude)
+        return false;
     }
     if (!test.hasErrors || !this._errorIdFilter)
       return true;
@@ -1139,28 +1145,30 @@ class Dashboard {
         allValues.add(filterValue);
     }
 
-    const onChipClick = (e, name, value) => {
-      let parameterFilters = this._testParameterFilters.get(name);
+    const onChipClick = (e, chip, value) => {
+      let parameterFilters = this._testParameterFilters.get(chip.chipName);
       if (!parameterFilters) {
         parameterFilters = new Map();
-        this._testParameterFilters.set(name, parameterFilters);
+        this._testParameterFilters.set(chip.chipName, parameterFilters);
       }
-      const newOperation = e.metaKey || e.ctrlKey ? 'exclude' : 'include';
+
+      const newOperation = e.altKey ? 'exclude' : 'include';
       let currentOperation = parameterFilters.get(value);
 
-      if (!e.shiftKey)
+      if (!e.ctrlKey && !e.metaKey)
         parameterFilters.clear();
       if (currentOperation !== newOperation)
         parameterFilters.set(value, newOperation);
       else
         parameterFilters.delete(value);
       if (!parameterFilters.size)
-        this._testParameterFilters.delete(name);
+        this._testParameterFilters.delete(chip.chipName);
+
       urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
     };
 
-    const renderChipValue = (name, value, operator) => html`
-      <span onclick=${(e) => onChipClick(e, name, value)} style="
+    const renderChipValue = (chip, value, operator) => html`
+      <span onclick=${(e) => onChipClick(e, chip, value)} style="
           user-select: none;
           white-space: nowrap;
           border: 1px solid ${{'include': 'green', 'exclude': 'red'}[operator] || '#9e9e9e'};
@@ -1181,7 +1189,7 @@ class Dashboard {
       return html`
           <fieldset style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center;">
             <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${() => onFieldsetTitleClick(chip.chipName)}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${chip.chipName}</legend>
-            ${chip.values.map(value => renderChipValue(chip.chipName, value, this._testParameterFilters.get(chip.chipName)?.get(value)))}
+            ${chip.values.map(value => renderChipValue(chip, value, this._testParameterFilters.get(chip.chipName)?.get(value)))}
           </fieldset>
       `;
     };

@@ -1130,80 +1130,62 @@ class Dashboard {
         allValues.add(filterValue);
     }
 
-    const onChipClick = (e, chip, value) => {
-      let parameterFilters = this._testParameterFilters.get(chip.chipName);
-      if (!parameterFilters) {
-        parameterFilters = new Map();
-        this._testParameterFilters.set(chip.chipName, parameterFilters);
+    const onFilterStripStateChanged = (stripName, newState) => {
+      let allValues = this._testParameterFilters.get(stripName);
+      if (!allValues) {
+        allValues = new Map();
+        this._testParameterFilters.set(stripName, allValues);
       }
-
-      const newOperation = e.altKey ? 'exclude' : 'include';
-      let currentOperation = parameterFilters.get(value);
-
-      if (!e.ctrlKey && !e.metaKey)
-        parameterFilters.clear();
-      if (currentOperation !== newOperation)
-        parameterFilters.set(value, newOperation);
-      else
-        parameterFilters.delete(value);
-      if (!parameterFilters.size)
-        this._testParameterFilters.delete(chip.chipName);
-
+      for (const [name, value] of newState) {
+        if (value)
+          allValues.set(name, value);
+        else
+          allValues.delete(name);
+      }
+      if (!allValues.size)
+        this._testParameterFilters.delete(stripName);
       urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
     };
 
-    const renderChipValue = (chip, value, operator) => html`
-      <span onclick=${(e) => onChipClick(e, chip, value)} style="
-          user-select: none;
-          white-space: nowrap;
-          border: 1px solid ${{'include': 'green', 'exclude': 'red'}[operator] || '#9e9e9e'};
-          background-color: ${{'include': '#c8e6c9', 'exclude': '#f8bbd0'}[operator] || '#f5f5f5'};
-          padding: 1px 4px;
-          margin: 0 2px;
-          cursor: pointer;
-      ">${value === true ? '[enabled]' : value}</span>
-    `;
+    const browserNameStrip = allTestParameters.has('browserName') && createFilterStrip('browserName', allTestParameters.get('browserName'), this._testParameterFilters.get('browserName'), onFilterStripStateChanged);
+    const platformStrip = allTestParameters.has('platform') && createFilterStrip('platform', allTestParameters.get('platform'), this._testParameterFilters.get('platform'), onFilterStripStateChanged);
 
-    const onFieldsetTitleClick = (name) => {
-      this._testParameterFilters.delete(name);
-      urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
-    };
-
-    const renderChip = (chip) => {
-      const hasEnabledFilters = this._testParameterFilters.has(chip.chipName);
-      return html`
-          <fieldset style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center;">
-            <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${() => onFieldsetTitleClick(chip.chipName)}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${chip.chipName}</legend>
-            ${chip.values.map(value => renderChipValue(chip, value, this._testParameterFilters.get(chip.chipName)?.get(value)))}
-          </fieldset>
-      `;
-    };
-    const chips = [];
-    for (const [name, values] of allTestParameters) {
-      if (values.has(true) || values.has(false))
-        chips.push({ chipName: name, type: Boolean, values: [true] });
-      else
-        chips.push({ chipName: name, values: [...values].sort() });
+    const boolPairs = [...allTestParameters].filter(([name, values]) => values.has(true)).sort(([name1], [name2]) => name1 < name2 ? -1 : 1);
+    const boolState = new Map();
+    for (const [name] of boolPairs) {
+      const value = this._testParameterFilters.get(name)?.get(true);
+      if (value)
+        boolState.set(name, value);
     }
-    chips.sort((a, b) => {
-      if (b.values.length !== a.values.length)
-        return b.values.length - a.values.length;
-      return a.chipName < b.chipName ? -1 : 1;
+    const boolStrip = createFilterStrip('Boolean', boolPairs.map(([name]) => name), boolState, (stripName, stateUpdate) => {
+      for (const [name, value] of stateUpdate) {
+        let allValues = this._testParameterFilters.get(name);
+        if (!allValues) {
+          allValues = new Map();
+          this._testParameterFilters.set(name, allValues);
+        }
+        if (value)
+          allValues.set(true, value);
+        else
+          allValues.delete(true);
+        if (!allValues.size)
+          this._testParameterFilters.delete(name);
+      }
+      urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
     });
-    const browserNameChip = chips.find(chip => chip.chipName === 'browserName');
-    const platformChip = chips.find(chip => chip.chipName === 'platform');
-    const otherChips = chips.filter(chip => chip.chipName !== 'browserName' && chip.chipName !== 'platform');
+    const otherPairs = [...allTestParameters].filter(([name, values]) => name !== 'browserName' && name !== 'platform' && !values.has(true)).sort(([name1, values1], [name2, values2]) => {
+      if (values1.size !== values2.size)
+        return values2.size - values1.size;
+      return name1 < name2 ? -1 : 1;
+    });
+    const otherStrips = otherPairs.map(([name, values]) => createFilterStrip(name, values, this._testParameterFilters.get(name), onFilterStripStateChanged));
+
+
     return html`
       <vbox>
-        <hbox style="display: flex; flex-wrap: wrap;">
-          ${browserNameChip && renderChip(browserNameChip)}
-        </hbox>
-        <hbox style="display: flex; flex-wrap: wrap;">
-          ${platformChip && renderChip(platformChip)}
-        </hbox>
-        <hbox style="display: flex; flex-wrap: wrap;">
-          ${otherChips.map(renderChip)}
-        </hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">${browserNameStrip}</hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">${platformStrip}</hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">${otherStrips}${boolStrip}</hbox>
       </vbox>
     `;
   }
@@ -1488,6 +1470,48 @@ function renderAnnotation(annotationType) {
   `;
 }
 
+function createFilterStrip(stripName, values, state, onFilterStateChanged = (stripName, state) => {}) {
+  state = new Map(state);
+
+  const onChipClick = (event, chipName) => {
+    const newOperation = event.altKey ? 'exclude' : 'include';
+    const currentOperation = state.get(chipName);
+
+    if (!event.ctrlKey && !event.metaKey) {
+      for (const name of state.keys())
+        state.set(name, null);
+    }
+    if (currentOperation !== newOperation)
+      state.set(chipName, newOperation);
+    else
+      state.set(chipName, null);
+    onFilterStateChanged(stripName, state);
+  };
+
+  const onFieldsetTitleClick = () => {
+    for (const name of state.keys())
+      state.set(name, null);
+    onFilterStateChanged(stripName, state);
+  };
+
+  const hasEnabledFilters = state.size > 0;
+  return html`
+    <fieldset style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center;">
+      <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${() => onFieldsetTitleClick()}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${stripName}</legend>
+      ${[...values].sort().map(chipName => html`
+        <span onclick=${(e) => onChipClick(e, chipName)} style="
+            user-select: none;
+            white-space: nowrap;
+            border: 1px solid ${{'include': 'green', 'exclude': 'red'}[state.get(chipName)] || '#9e9e9e'};
+            background-color: ${{'include': '#c8e6c9', 'exclude': '#f8bbd0'}[state.get(chipName)] || '#f5f5f5'};
+            padding: 1px 4px;
+            margin: 0 2px;
+            cursor: pointer;
+        ">${chipName}</span>
+      `)}
+    </fieldset>
+  `;
+}
 
 class TabStrip {
   constructor() {

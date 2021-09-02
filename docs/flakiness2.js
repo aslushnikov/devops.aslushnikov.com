@@ -394,18 +394,13 @@ class Dashboard {
     console.time('preparing');
     const self = this;
 
-    console.time('step1');
     const sortedCommits = [...(this._branchSHAs.get(this._branchName) || [])].map(sha => this._allCommits.get(sha)).sort((c1, c2) => c2.timestamp - c1.timestamp);
     const until = this._untilCommitsFilter ? this._untilCommitsFilter : Date.now();
     const commits = sortedCommits.filter(c => c.timestamp <= until).slice(0, this._lastCommits);
-    console.timeEnd('step1');
 
-    console.time('step2');
     const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
     const allPlatforms = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('platform')).flat(), this._platformFilter].filter(Boolean))].sort();
-    console.timeEnd('step2');
 
-    console.time('step3');
     let loadingProgressElement = null;
     const pendingCommits = commits.filter(commit => !commit.data.isLoaded());
     if (pendingCommits.length > 0) {
@@ -425,9 +420,7 @@ class Dashboard {
         pending.data.ensureLoaded().then(() => updateProgress());
       updateProgress();
     }
-    console.timeEnd('step3');
 
-    console.time('step4');
     let prefilteredTests;
     if (!this._errorIdFilter && !this._specFilter) {
       prefilteredTests = new SMap(commits.map(commit => [
@@ -447,23 +440,16 @@ class Dashboard {
     } else if (this._errorIdFilter) {
       prefilteredTests = new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat());
     }
-    console.log('prefilteredTests.size', prefilteredTests.size);
-    console.timeEnd('step4');
 
-    console.time('step5');
-    console.time('step5.1');
     const faultySpecIds = new SMap(prefilteredTests.filter(test => this._filterTest(test))).uniqueValues('specId');
-    console.timeEnd('step5.1');
-    console.time('step5.2');
 
+    console.time('-- filtering all selected tests');
     const tests = new SMap(commits.map(commit => {
       return faultySpecIds.map(specId => commit.data.tests().getAll({ specId })).flat().filter(test => this._filterTest(test));
     }).flat());
-    console.timeEnd('step5.2');
-    console.timeEnd('step5');
-    console.log(tests.size);
+    console.timeEnd('-- filtering all selected tests');
 
-    console.time('step6');
+    console.time('-- generating commit tiles');
     const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
       let category = '';
       const categories = new Set(tests.getAll({specId, sha: commit.sha}).map(test => test.category));
@@ -479,8 +465,7 @@ class Dashboard {
         category,
       };
     })).flat());
-    console.log('commitTiles.size', commitTiles.size);
-    console.timeEnd('step6');
+    console.timeEnd('-- generating commit tiles');
 
     const specIdToFirstFailingCommit = new Map();
     for (const specId of faultySpecIds) {
@@ -1173,8 +1158,8 @@ class Dashboard {
           white-space: nowrap;
           border: 1px solid ${{'include': 'green', 'exclude': 'red'}[operator] || '#9e9e9e'};
           background-color: ${{'include': '#c8e6c9', 'exclude': '#f8bbd0'}[operator] || '#f5f5f5'};
-          padding: 2px;
-          margin: 2px;
+          padding: 1px 4px;
+          margin: 0 2px;
           cursor: pointer;
       ">${value === true ? '[enabled]' : value}</span>
     `;

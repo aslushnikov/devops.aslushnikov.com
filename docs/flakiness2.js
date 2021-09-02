@@ -61,6 +61,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setUntilCommits(state.timestamp);
     dashboard.setBranchName(state.branch || 'master');
     dashboard.setSpecFilter(state.filter_spec);
+    dashboard.setTestParameterFilters(state.test_parameter_filters);
 
     dashboard.render();
   }));
@@ -89,6 +90,8 @@ class DataURL {
   }
 }
 
+const TestSymbol = Symbol('TestSymbol');
+
 class CommitData {
   constructor(dataURL, sha) {
     this._dataURL = dataURL;
@@ -98,12 +101,16 @@ class CommitData {
 
     this._specs = new SMap();
     this._tests = new SMap();
+    this._testFilter = new SMap();
+    this._testParameters = new Map();
     this._isLoaded = false;
   }
 
   isLoaded() { return this._isLoaded; }
   specs() { return this._specs; }
   tests() { return this._tests; }
+  testFilter() { return this._testFilter; }
+  testParameters() { return this._testParameters; }
 
   async ensureLoaded() {
     if (!this._loadingPromise)
@@ -128,6 +135,7 @@ class CommitData {
 
     const specs = [];
     const tests = [];
+    const testFilter = [];
 
     for (const entry of json) {
       for (const spec of entry.specs) {
@@ -143,6 +151,10 @@ class CommitData {
         };
         specs.push(specObject);
         for (const test of spec.tests || []) {
+          if (test.parameters.channel) {
+            test.parameters.browserName = test.parameters.channel;
+            delete test.parameters.channel;
+          }
           const testObject = {
             specId,
             spec: specObject,
@@ -168,6 +180,18 @@ class CommitData {
           };
           testObject.category = getTestCategory(testObject);
           tests.push(testObject);
+          testFilter.push({
+            [TestSymbol]: testObject,
+            ...testObject.parameters,
+          });
+          for (const [name, value] of Object.entries(test.parameters)) {
+            let values = this._testParameters.get(name);
+            if (!values) {
+              values = new Set();
+              this._testParameters.set(name, values);
+            }
+            values.add(value);
+          }
         }
       }
     }
@@ -179,6 +203,7 @@ class CommitData {
     });
     this._specs = new SMap(specs);
     this._tests = new SMap(tests);
+    this._testFilter = new SMap(testFilter);
     this._isLoaded = true;
   }
 }
@@ -249,6 +274,7 @@ class Dashboard {
     this._platformFilter = undefined;
     this._errorIdFilter = undefined;
     this._specFilter = undefined;
+    this._testParameterFilters = new Map();
 
     this._showFlaky = false;
     this._lastCommits = 0;
@@ -259,10 +285,18 @@ class Dashboard {
     this._initializeBranches();
   }
 
+  setTestParameterFilters(testParameterFilters) {
+    //TODO: parse test parameters from URL
+    this._testParameterFilters = deserializeTestParameterFilters(testParameterFilters);
+  }
+
   setUntilCommits(timestamp) {
-    if (this._untilCommitsFilter === +timestamp)
+    timestamp = +timestamp;
+    if (isNaN(timestamp))
+      timestamp = 0;
+    if (this._untilCommitsFilter === timestamp)
       return;
-    this._untilCommitsFilter = +timestamp;
+    this._untilCommitsFilter = timestamp;
     this._loadBranchCommits();
   }
 
@@ -335,17 +369,37 @@ class Dashboard {
   setPlatformFilter(value) { this._platformFilter = value; }
   setErrorIdFilter(value) { this._errorIdFilter = value; }
 
+  _filterTest(test) {
+    for (const [name, valueFilters] of this._testParameterFilters) {
+      for (const [value, op] of valueFilters) {
+        if (op === 'include' && test.parameters[name] !== value)
+          return false;
+        if (op === 'exclude' && test.parameters[name] === value)
+          return false;
+      }
+    }
+    if (!test.hasErrors || !this._errorIdFilter)
+      return true;
+    return test.errors.some(error => error.errorId === this._errorIdFilter);
+  }
+
   render() {
     this._popover.hide();
     console.time('preparing');
     const self = this;
+
+    console.time('step1');
     const sortedCommits = [...(this._branchSHAs.get(this._branchName) || [])].map(sha => this._allCommits.get(sha)).sort((c1, c2) => c2.timestamp - c1.timestamp);
     const until = this._untilCommitsFilter ? this._untilCommitsFilter : Date.now();
     const commits = sortedCommits.filter(c => c.timestamp <= until).slice(0, this._lastCommits);
+    console.timeEnd('step1');
 
+    console.time('step2');
     const allBrowserNames = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('browserName')).flat(), this._browserFilter].filter(Boolean))].sort();
     const allPlatforms = [...new Set([...commits.map(commit => commit.data.tests().uniqueValues('platform')).flat(), this._platformFilter].filter(Boolean))].sort();
+    console.timeEnd('step2');
 
+    console.time('step3');
     let loadingProgressElement = null;
     const pendingCommits = commits.filter(commit => !commit.data.isLoaded());
     if (pendingCommits.length > 0) {
@@ -365,7 +419,9 @@ class Dashboard {
         pending.data.ensureLoaded().then(() => updateProgress());
       updateProgress();
     }
+    console.timeEnd('step3');
 
+    console.time('step4');
     let prefilteredTests;
     if (!this._errorIdFilter && !this._specFilter) {
       prefilteredTests = new SMap(commits.map(commit => [
@@ -385,16 +441,23 @@ class Dashboard {
     } else if (this._errorIdFilter) {
       prefilteredTests = new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat());
     }
+    console.log('prefilteredTests.size', prefilteredTests.size);
+    console.timeEnd('step4');
 
-    const faultySpecIds = new SMap(prefilteredTests.getAll({browserName: this._browserFilter, platform: this._platformFilter})).uniqueValues('specId');
+    console.time('step5');
+    console.time('step5.1');
+    const faultySpecIds = new SMap(prefilteredTests.filter(test => this._filterTest(test))).uniqueValues('specId');
+    console.timeEnd('step5.1');
+    console.time('step5.2');
+
     const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId, browserName: this._browserFilter, platform: this._platformFilter})).flat().filter(test => {
-        if (!test.hasErrors || !this._errorIdFilter)
-          return true;
-        return test.errors.some(error => error.errorId === this._errorIdFilter);
-      });
+      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId })).flat().filter(test => this._filterTest(test));
     }).flat());
+    console.timeEnd('step5.2');
+    console.timeEnd('step5');
+    console.log(tests.size);
 
+    console.time('step6');
     const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
       let category = '';
       const categories = new Set(tests.getAll({specId, sha: commit.sha}).map(test => test.category));
@@ -410,6 +473,8 @@ class Dashboard {
         category,
       };
     })).flat());
+    console.log('commitTiles.size', commitTiles.size);
+    console.timeEnd('step6');
 
     const specIdToFirstFailingCommit = new Map();
     for (const specId of faultySpecIds) {
@@ -447,7 +512,11 @@ class Dashboard {
       return spec1.line - spec2.line;
     }));
 
-    const allErrorIds = [...new Set([...tests.map(test => test.errors.map(error => error.errorId)).flat(), this._errorIdFilter].filter(Boolean))].sort();
+    const allErrorIdsSet = new Set();
+    for (let test of tests.getAll({hasErrors: true})) {
+      for (const error of test.errors)
+        allErrorIdsSet.add(error.errorId);
+    }
 
     console.timeEnd('preparing');
 
@@ -465,7 +534,7 @@ class Dashboard {
       specs,
       allPlatforms,
       allBrowserNames,
-      allErrorIds,
+      allErrorIds: [...allErrorIdsSet],
       commitTiles,
     };
 
@@ -558,7 +627,7 @@ class Dashboard {
     `;
 
     this._mainElement.textContent = '';
-    const RENDER_ROWS = Math.min(Math.max(25, 1000 / commits.length), 100);
+    const RENDER_ROWS = Math.min(Math.max(25, 1000 / commits.length), 50);
     this._mainElement.append(html`
       ${this._untilCommitsFilter ? html`
       <div style="
@@ -576,6 +645,7 @@ class Dashboard {
         </h4>
       </div>
       ` : undefined}
+
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           <span style="margin-left: 1em;">
@@ -596,24 +666,6 @@ class Dashboard {
           <span style="margin-right: 1em; display: inline-flex; align-items: center;">
             <input checked=${this._showFlaky} oninput=${e => urlState.amend({show_flaky: e.target.checked})} id=show-flaky-input-checkbox type=checkbox>
             <label for=show-flaky-input-checkbox>Show flaky</label>
-          </span>
-          <span style="margin-right: 1em;">
-            browser:
-            <select style="${this._browserFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({browser: e.target.value})}>
-                <option selected=${this._browserFilter === undefined}} value="any">any</option>
-              ${allBrowserNames.map(browserName => html`
-                <option selected=${this._browserFilter === browserName} value="${browserName}">${browserName}</option>
-              `)}
-            </select>
-          </span>
-          <span style="margin-right: 1em;">
-            platform:
-            <select style="${this._platformFilter ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({platform: e.target.value})}>
-                <option selected=${this._platformFilter === undefined}} value="any">any</option>
-              ${allPlatforms.map(platform => html`
-                <option selected=${this._platformFilter === platform} value="${platform}">${platform}</option>
-              `)}
-            </select>
           </span>
           <span style="margin-right: 1em">
             <input style="${this._specFilter ? STYLE_SELECTED : ''}" type=text placeholder="filter specs" value=${this._specFilter || ''} onkeydown=${e => {
@@ -639,13 +691,19 @@ class Dashboard {
             <a href="${amendURL({timestamp: until})}">Permalink</a>
           </span>` : undefined}
         </hbox>
+        <hbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
+          ${this._renderFilterChips()}
+        </hbox>
         <hbox style="margin-left: 1em;">
           <h2>${specs.size} ${this._specFilter ? '' : 'problematic'} specs</h2>
           <a style="margin-left: 1em; cursor: pointer;" onclick=${this._selectSpecCommit.bind(this, undefined, undefined)}>(summary)</a>
         </hbox>
+
+
         <vbox style="margin-bottom: 5px; padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
-          ${this._renderStats()}
         </vbox>
+
+
         ${commits.length && specs.size ? html`
         <hbox style="
             border-bottom: 1px solid var(--border-color);
@@ -1056,6 +1114,108 @@ class Dashboard {
     });
   }
 
+  _renderFilterChips() {
+    const {commits} = this._context;
+    const allTestParameters = new Map();
+    for (const commit of commits) {
+      for (const [name, values] of [...commit.data.testParameters()]) {
+        let allValues = allTestParameters.get(name);
+        if (!allValues) {
+          allValues = new Set();
+          allTestParameters.set(name, allValues);
+        }
+        for (const value of values)
+          allValues.add(value);
+      }
+    }
+    // add test parameter filters
+    for (const [name, filterValues] of this._testParameterFilters) {
+      let allValues = allTestParameters.get(name);
+      if (!allValues) {
+        allValues = new Set();
+        allTestParameters.set(name, allValues);
+      }
+      for (const filterValue of filterValues.keys())
+        allValues.add(filterValue);
+    }
+
+    const onChipClick = (e, name, value) => {
+      let parameterFilters = this._testParameterFilters.get(name);
+      if (!parameterFilters) {
+        parameterFilters = new Map();
+        this._testParameterFilters.set(name, parameterFilters);
+      }
+      const newOperation = e.metaKey || e.ctrlKey ? 'exclude' : 'include';
+      let currentOperation = parameterFilters.get(value);
+
+      if (!e.shiftKey)
+        parameterFilters.clear();
+      if (currentOperation !== newOperation)
+        parameterFilters.set(value, newOperation);
+      else
+        parameterFilters.delete(value);
+      if (!parameterFilters.size)
+        this._testParameterFilters.delete(name);
+      urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
+    };
+
+    const renderChipValue = (name, value, operator) => html`
+      <span onclick=${(e) => onChipClick(e, name, value)} style="
+          user-select: none;
+          white-space: nowrap;
+          border: 1px solid ${{'include': 'green', 'exclude': 'red'}[operator] || '#9e9e9e'};
+          background-color: ${{'include': '#c8e6c9', 'exclude': '#f8bbd0'}[operator] || '#f5f5f5'};
+          padding: 2px;
+          margin: 2px;
+          cursor: pointer;
+      ">${value === true ? '[enabled]' : value}</span>
+    `;
+
+    const onFieldsetTitleClick = (name) => {
+      this._testParameterFilters.delete(name);
+      urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
+    };
+
+    const renderChip = (chip) => {
+      const hasEnabledFilters = this._testParameterFilters.has(chip.chipName);
+      return html`
+          <fieldset style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center;">
+            <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${() => onFieldsetTitleClick(chip.chipName)}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${chip.chipName}</legend>
+            ${chip.values.map(value => renderChipValue(chip.chipName, value, this._testParameterFilters.get(chip.chipName)?.get(value)))}
+          </fieldset>
+      `;
+    };
+    const chips = [];
+    for (const [name, values] of allTestParameters) {
+      if (values.has(true) || values.has(false))
+        chips.push({ chipName: name, type: Boolean, values: [true] });
+      else
+        chips.push({ chipName: name, values: [...values].sort() });
+    }
+    chips.sort((a, b) => {
+      if (b.values.length !== a.values.length)
+        return b.values.length - a.values.length;
+      return a.chipName < b.chipName ? -1 : 1;
+    });
+    const browserNameChip = chips.find(chip => chip.chipName === 'browserName');
+    const platformChip = chips.find(chip => chip.chipName === 'platform');
+    const otherChips = chips.filter(chip => chip.chipName !== 'browserName' && chip.chipName !== 'platform');
+    return html`
+      <vbox>
+        <hbox style="display: flex; flex-wrap: wrap;">
+          ${browserNameChip && renderChip(browserNameChip)}
+        </hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">
+          ${platformChip && renderChip(platformChip)}
+        </hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">
+          ${otherChips.map(renderChip)}
+        </hbox>
+      </vbox>
+    `;
+  }
+
+  //TODO: remove??
   _renderStats() {
     const {allBrowserNames, allPlatforms, prefilteredTests} = this._context;
     const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
@@ -1067,7 +1227,7 @@ class Dashboard {
     };
 
     return html`
-      <hbox>
+      <hbox style="flex: none">
       <div style="
         display: grid;
         grid-template-rows: ${'auto '.repeat(allPlatforms.length + 1).trim()};
@@ -1084,7 +1244,7 @@ class Dashboard {
               border-bottom: 1px solid var(--border-color);
               background-color: ${browserName === this._browserFilter ? COLOR_SELECTION : 'none'};
           ">
-            <a href="${getFilterURL(browserName, undefined)}">${browserLogo(browserName, 18)}</a>
+            <a href="${getFilterURL(browserName, undefined)}">${browserLogo(browserName, 25)}</a>
           </div>
         `)}
         ${allPlatforms.map(platform => html`
@@ -1424,6 +1584,25 @@ class TabStrip {
     }
     return true;
   }
+}
+
+function deserializeTestParameterFilters(string) {
+  try {
+    const json = JSON.parse(string);
+    const result = new Map();
+    for (const [name, valueFilters] of json)
+      result.set(name, new Map(valueFilters));
+    return result;
+  } catch (e) {
+    return new Map();
+  }
+}
+
+function serializeTestParameterFilters(testParameterFilters) {
+  const result = [];
+  for (const [name, valueFilters] of testParameterFilters)
+    result.push([name, [...valueFilters]]);
+  return JSON.stringify(result);
 }
 
 function createStackSignature(stack) {

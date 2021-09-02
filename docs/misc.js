@@ -46,10 +46,16 @@ export function humanReadableSize(bytes) {
 }
 
 const LOGO_URLS = {
-  firefox: '/ff.svg',
-  webkit: '/wk.svg',
-  chromium: '/cr.svg',
-  electron: '/electron.svg',
+  'firefox': '/firefox.svg',
+  'firefox-beta': '/firefox-beta.svg',
+  'webkit': '/webkit.svg',
+  'msedge': '/msedge.svg',
+  'msedge-beta': '/msedge-beta.svg',
+  'msedge-dev': '/msedge-dev.svg',
+  'chromium': '/chromium.svg',
+  'chrome': '/chrome.svg',
+  'chrome-beta': '/chrome-beta.svg',
+  'electron': '/electron.svg',
 };
 
 export function browserLogoURL(browserName) {
@@ -59,10 +65,8 @@ export function browserLogoURL(browserName) {
 export function browserLogo(browserName, width = 30, height) {
   if (height === undefined)
     height = width;
-  if (browserName === 'N/A')
-    return html`<span>N/A</span>`;
   if (!browserLogoURL(browserName))
-    return html`<span>⦻</span>`;
+    return html`<span>${browserName}</span>`;
   return html`
     <img src="${browserLogoURL(browserName)}" width=${width} height=${height}>
   `;

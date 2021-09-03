@@ -456,12 +456,11 @@ class Dashboard {
     console.time('-- generating commit tiles');
     const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
       let category = '';
-      const categories = new Set(tests.getAll({specId, sha: commit.sha}).map(test => test.category));
-      if (categories.has('bad'))
+      if (commit.data.tests().getAll({ specId, category: 'bad' }).some(test => this._filterTest(test)))
         category = 'bad';
-      else if (categories.has('flaky') && this._showFlaky)
+      else if (this._showFlaky && commit.data.tests().getAll({ specId, category: 'flaky' }).some(test => this._filterTest(test)))
         category = 'flaky';
-      else if (categories.has('good'))
+      else if (commit.data.tests().getAll({ specId, category: 'good' }).some(test => this._filterTest(test)))
         category = 'good';
       return {
         specId,
@@ -485,9 +484,9 @@ class Dashboard {
 
     const specs = new SMap(faultySpecIds.map(specId => {
       for (const commit of commits) {
-        let result = commit.data.specs().get({specId});
-        if (result)
-          return result;
+        const spec = commit.data.specs().get({specId});
+        if (spec)
+          return spec;
       }
     }).sort((spec1, spec2) => {
       const bad1 = commitTiles.getAll({specId: spec1.specId, category: 'bad'}).length;
@@ -507,11 +506,19 @@ class Dashboard {
       return spec1.line - spec2.line;
     }));
 
+    console.time('errors');
     const allErrorIdsSet = new Set();
-    for (let test of tests.getAll({hasErrors: true})) {
-      for (const error of test.errors)
-        allErrorIdsSet.add(error.errorId);
+    for (const commit of commits) {
+      for (const specId of faultySpecIds) {
+        for (const test of commit.data.tests().getAll({specId, hasErrors: true})) {
+          if (!this._filterTest(test))
+            continue;
+          for (const error of test.errors)
+            allErrorIdsSet.add(error.errorId);
+        }
+      }
     }
+    console.timeEnd('errors');
 
     console.timeEnd('preparing');
 
@@ -540,6 +547,7 @@ class Dashboard {
     if (isFirstRender && this._errorIdFilter)
       this._tabstrip.selectTab(this._errorsTab);
   }
+
 
   _selectSpecCommit(specId, sha) {
     if (this._selection.specId === specId && this._selection.sha === sha) {

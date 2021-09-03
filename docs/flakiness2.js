@@ -1356,53 +1356,83 @@ class Dashboard {
     else
       this._errorsTab.titleElement.textContent = `Errors: ${stackIdToInfo.size}`;
     this._errorsTab.contentElement.textContent = '';
-    this._errorsTab.contentElement.append(html`
-      ${[...stackIdToInfo.values()].sort((info1, info2) => {
-        if (info1.specIds.size !== info2.specIds.size)
-          return info2.specIds.size - info1.specIds.size;
-        if (info1.commitSHAs.size !== info2.commitSHAs.size)
-          return info2.commitSHAs.size - info1.commitSHAs.size;
-        return info2.errors.length - info1.errors.length;
-      }).map(({stackId, specIds, commitSHAs, errors}, index) => html`
-        <h3 style="
-          display: flex;
-          align-items: center;
-        ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : html`<span class=hover-darken style="background: white; cursor: pointer;" onclick=${() => urlState.amend({errorid: undefined})}>${CHAR_CROSS} </span>selected `}error: ${stackId === this._errorIdFilter ? html`${stackId}` : html`
-            <a href="${amendURL({errorid: stackId})}">${stackId}</a>
-          `}</h3>
-        <div style="margin-left: 1em;">
-          <div style="margin-left: 1em; margin-bottom: 1em;">
-            ${!this._selection.specId && html`<div>different specs: ${specIds.size}</div>`}
-            ${!this._selection.sha && html`<div>different commits: ${commitSHAs.size}</div>`}
-            <div>occurrences: ${errors.length}</div>
-          </div>
-          ${(() => {
-            const terminal = html`<pre style="overflow: auto;">${highlightANSIText(errors[0].stack)}</pre>`;
-            return html`
-                <div style="
-                  background-color: #333;
-                  color: #eee;
-                  padding: 1em;
-                ">
-                  <div>Occurence <select style="background-color: #333; color: white;" oninput=${e => {
-                      terminal.textContent = '';
-                      terminal.append(highlightANSIText(e.target.selectedOptions[0].error.stack));
-                    }}>
-                      ${errors.map((error, index) => html`
-                        <option onzrender=${e => e.error = error}>#${index + 1}</option>
-                      `)}
-                    </select>
-                  </div>
-                  <hr/>
-                  ${terminal}
-                </div>
-            `;
-          })()}
+
+    const stackInfosToRender = [...stackIdToInfo.values()].sort((info1, info2) => {
+      if (info1.specIds.size !== info2.specIds.size)
+        return info2.specIds.size - info1.specIds.size;
+      if (info1.commitSHAs.size !== info2.commitSHAs.size)
+        return info2.commitSHAs.size - info1.commitSHAs.size;
+      return info2.errors.length - info1.errors.length;
+    });
+
+    const renderStackInfo = ({stackId, specIds, commitSHAs, errors}, index) => html`
+      <h3 style="
+        display: flex;
+        align-items: center;
+      ">${stackId !== this._errorIdFilter ? index + 1 + ') ' : html`<span class=hover-darken style="background: white; cursor: pointer;" onclick=${() => urlState.amend({errorid: undefined})}>${CHAR_CROSS} </span>selected `}error: ${stackId === this._errorIdFilter ? html`${stackId}` : html`
+          <a href="${amendURL({errorid: stackId})}">${stackId}</a>
+        `}</h3>
+      <div style="margin-left: 1em;">
+        <div style="margin-left: 1em; margin-bottom: 1em;">
+          ${!this._selection.specId && html`<div>different specs: ${specIds.size}</div>`}
+          ${!this._selection.sha && html`<div>different commits: ${commitSHAs.size}</div>`}
+          <div>occurrences: ${errors.length}</div>
         </div>
-      `)}
+        ${(() => {
+          const terminal = html`<pre style="overflow: auto;">${highlightANSIText(errors[0].stack)}</pre>`;
+          return html`
+              <div style="
+                background-color: #333;
+                color: #eee;
+                padding: 1em;
+              ">
+                <div>Occurence <select style="background-color: #333; color: white;" oninput=${e => {
+                    terminal.textContent = '';
+                    terminal.append(highlightANSIText(e.target.selectedOptions[0].error.stack));
+                  }}>
+                    ${errors.map((error, index) => html`
+                      <option onzrender=${e => e.error = error}>#${index + 1}</option>
+                    `)}
+                  </select>
+                </div>
+                <hr/>
+                ${terminal}
+              </div>
+          `;
+        })()}
+      </div>
+    `;
+    const STACKINFOS_TO_RENDER = 10;
+
+    this._errorsTab.contentElement.append(html`
+      ${stackInfosToRender.slice(0, STACKINFOS_TO_RENDER).map((stackInfo, index) => renderStackInfo(stackInfo, index))};
+      ${stackInfosToRender.length < STACKINFOS_TO_RENDER ? undefined : html`
+        <vbox style="position: relative;">
+          <div style="
+            height: 80px;
+            width: 100%;
+            background: linear-gradient(#ffffff00, #ffffff);
+            position: absolute;
+            pointer-events: none;
+            top: -80px;
+          "></div>
+          <div class=hover-darken onclick=${e => {
+            e.target.parentElement.replaceWith(html`${stackInfosToRender.slice(STACKINFOS_TO_RENDER).map((stackInfo, index) => renderStackInfo(stackInfo, index + STACKINFOS_TO_RENDER))}`);
+          }} style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              height: 50px;
+              font-size: 12px;
+              color: #9e9e9e;
+              cursor: pointer;
+              background-color: white;
+              margin-top: 1em;
+          ">Show all ${stackInfosToRender.length} errors</div>
+        </vbox>
+      `}
     `);
   }
-
 }
 
 function getTestCategory(test) {

@@ -155,6 +155,9 @@ class CommitData {
             test.parameters.browserName = test.parameters.channel;
             delete test.parameters.channel;
           }
+          // By default, all tests are run under "default" mode unless marked differently.
+          if (!test.parameters.mode)
+            test.parameters.mode = 'default';
           const testObject = {
             specId,
             spec: specObject,
@@ -1119,6 +1122,7 @@ class Dashboard {
           allValues.add(value);
       }
     }
+
     // add test parameter filters
     for (const [name, filterValues] of this._testParameterFilters) {
       let allValues = allTestParameters.get(name);
@@ -1130,62 +1134,96 @@ class Dashboard {
         allValues.add(filterValue);
     }
 
-    const onFilterStripStateChanged = (stripName, newState) => {
-      let allValues = this._testParameterFilters.get(stripName);
+    const setTestParameterFilter = (parameterName, parameterValue, predicate) => {
+      let allValues = this._testParameterFilters.get(parameterName);
       if (!allValues) {
         allValues = new Map();
-        this._testParameterFilters.set(stripName, allValues);
+        this._testParameterFilters.set(parameterName, allValues);
       }
-      for (const [name, value] of newState) {
-        if (value)
-          allValues.set(name, value);
-        else
-          allValues.delete(name);
-      }
+      if (predicate)
+        allValues.set(parameterValue, predicate);
+      else
+        allValues.delete(parameterValue);
       if (!allValues.size)
-        this._testParameterFilters.delete(stripName);
+        this._testParameterFilters.delete(parameterName);
+    }
+
+    const onFilterStripStateChanged = (stripName, stripState) => {
+      for (const [value, predicate] of stripState) {
+        if (predicate === '+')
+          setTestParameterFilter(stripName, value, 'include');
+        else if (predicate === '-')
+          setTestParameterFilter(stripName, value, 'exclude');
+        else
+          setTestParameterFilter(stripName, value, undefined);
+      }
       urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
     };
 
-    const browserNameStrip = allTestParameters.has('browserName') && createFilterStrip('browserName', allTestParameters.get('browserName'), this._testParameterFilters.get('browserName'), onFilterStripStateChanged);
-    const platformStrip = allTestParameters.has('platform') && createFilterStrip('platform', allTestParameters.get('platform'), this._testParameterFilters.get('platform'), onFilterStripStateChanged);
+    const createFilterStripState = testParameterName => {
+      const state = new Map();
+      for (const value of allTestParameters.get(testParameterName)) {
+        const predicate = this._testParameterFilters.get(testParameterName)?.get(value);
+        state.set(value, {'include': '+', 'exclude': '-'}[predicate]);
+      }
+      return state;
+    };
 
-    const boolPairs = [...allTestParameters].filter(([name, values]) => values.has(true)).sort(([name1], [name2]) => name1 < name2 ? -1 : 1);
-    const boolState = new Map();
-    for (const [name] of boolPairs) {
-      const value = this._testParameterFilters.get(name)?.get(true);
-      if (value)
-        boolState.set(name, value);
+    const createBoolStripState = testParameterName => {
+      const state = new Map();
+      const predicate = this._testParameterFilters.get(testParameterName)?.get(true);
+      if (predicate === 'include')
+        state.set(testParameterName, '+');
+      else if (predicate === 'exclude')
+        state.set(testParameterName, '-');
+      else
+        state.set(testParameterName, undefined);
+      return state;
     }
-    const boolStrip = createFilterStrip('Boolean', boolPairs.map(([name]) => name), boolState, (stripName, stateUpdate) => {
-      for (const [name, value] of stateUpdate) {
-        let allValues = this._testParameterFilters.get(name);
-        if (!allValues) {
-          allValues = new Map();
-          this._testParameterFilters.set(name, allValues);
-        }
-        if (value)
-          allValues.set(true, value);
+
+    const onBoolFilterStripStateChanged = (stripName, boolState) => {
+      for (const [name, value] of boolState) {
+        if (value === '+')
+          setTestParameterFilter(name, true, 'include');
+        else if (value === '-')
+          setTestParameterFilter(name, true, 'exclude');
         else
-          allValues.delete(true);
-        if (!allValues.size)
-          this._testParameterFilters.delete(name);
+          setTestParameterFilter(name, true, undefined);
       }
       urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
-    });
-    const otherPairs = [...allTestParameters].filter(([name, values]) => name !== 'browserName' && name !== 'platform' && !values.has(true)).sort(([name1, values1], [name2, values2]) => {
-      if (values1.size !== values2.size)
-        return values2.size - values1.size;
-      return name1 < name2 ? -1 : 1;
-    });
-    const otherStrips = otherPairs.map(([name, values]) => createFilterStrip(name, values, this._testParameterFilters.get(name), onFilterStripStateChanged));
+    }
 
+    let browserNameStrip = null;
+    let platformStrip = null;
+    const boolStrips = [];
+    const otherStrips = [];
+
+    const boolFilterStripState = new Map();
+    for (const [name, values] of allTestParameters) {
+      if (name === 'browserName') {
+        browserNameStrip = createFilterStrip('browserName', createFilterStripState('browserName'), onFilterStripStateChanged);
+      } else if (name === 'platform') {
+        platformStrip = createFilterStrip('platform', createFilterStripState('platform'), onFilterStripStateChanged);
+      } else if (values.has(true) || values.has(false)) {
+        boolStrips.push(createFilterStrip(name, createBoolStripState(name), onBoolFilterStripStateChanged));
+      } else {
+        otherStrips.push(createFilterStrip(name, createFilterStripState(name), onFilterStripStateChanged));
+      }
+    }
+
+    const stripSorter = (a, b) => {
+      if (a.__state.size !== b.__state.size)
+        return b.__state.size - a.__state.size;
+      return a.__name < b.__name ? -1 : 1;
+    }
+    boolStrips.sort(stripSorter);
+    otherStrips.sort(stripSorter);
 
     return html`
       <vbox>
         <hbox style="display: flex; flex-wrap: wrap;">${browserNameStrip}</hbox>
         <hbox style="display: flex; flex-wrap: wrap;">${platformStrip}</hbox>
-        <hbox style="display: flex; flex-wrap: wrap;">${otherStrips}${boolStrip}</hbox>
+        <hbox style="display: flex; flex-wrap: wrap;">${otherStrips}${boolStrips}</hbox>
       </vbox>
     `;
   }
@@ -1470,40 +1508,43 @@ function renderAnnotation(annotationType) {
   `;
 }
 
-function createFilterStrip(stripName, values, state, onFilterStateChanged = (stripName, state) => {}) {
-  state = new Map(state);
-
-  const onChipClick = (event, chipName) => {
-    const newOperation = event.altKey ? 'exclude' : 'include';
-    const currentOperation = state.get(chipName);
+function createFilterStrip(stripName, state, onFilterStateChanged = (stripName, state) => {}) {
+  const onChipClick = (event, isRightClick, chipName) => {
+    consumeDOMEvent(event);
+    const newPredicate = event.altKey || isRightClick ? '-' : '+';
+    const currentPredicate = state.get(chipName);
 
     if (!event.ctrlKey && !event.metaKey) {
       for (const name of state.keys())
         state.set(name, null);
     }
-    if (currentOperation !== newOperation)
-      state.set(chipName, newOperation);
+    if (currentPredicate !== newPredicate)
+      state.set(chipName, newPredicate);
     else
       state.set(chipName, null);
     onFilterStateChanged(stripName, state);
   };
 
-  const onFieldsetTitleClick = () => {
+  const onFieldsetTitleClick = (event) => {
+    consumeDOMEvent(event);
     for (const name of state.keys())
       state.set(name, null);
     onFilterStateChanged(stripName, state);
   };
 
-  const hasEnabledFilters = state.size > 0;
-  return html`
-    <fieldset style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center;">
-      <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${() => onFieldsetTitleClick()}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${stripName}</legend>
-      ${[...values].sort().map(chipName => html`
-        <span onclick=${(e) => onChipClick(e, chipName)} style="
+  const hasEnabledFilters = [...state.values()].some(Boolean);
+  const element = html`
+    <fieldset class=filter-strip style="display: flex; border: 1px solid #e0e0e0; padding: 4px; align-items: center; margin: 0 10px;">
+      <legend style="${ hasEnabledFilters ? 'cursor: pointer;' : '' }" onclick=${onFieldsetTitleClick}><span style="visibility: ${hasEnabledFilters ? 'visible;' : 'hidden;'}">${CHAR_CROSS} </span>${stripName}</legend>
+      ${[...state.keys()].sort().map(chipName => html`
+        <span
+          onclick=${(e) => onChipClick(e, false /* isRightClick */, chipName)}
+          oncontextmenu=${(e) => onChipClick(e, true /* isRightClick */, chipName)}
+          style="
             user-select: none;
             white-space: nowrap;
-            border: 1px solid ${{'include': 'green', 'exclude': 'red'}[state.get(chipName)] || '#9e9e9e'};
-            background-color: ${{'include': '#c8e6c9', 'exclude': '#f8bbd0'}[state.get(chipName)] || '#f5f5f5'};
+            border: 1px solid ${{'+': 'green', '-': 'red'}[state.get(chipName)] || '#9e9e9e'};
+            background-color: ${{'+': '#c8e6c9', '-': '#f8bbd0'}[state.get(chipName)] || '#f5f5f5'};
             padding: 1px 4px;
             margin: 0 2px;
             cursor: pointer;
@@ -1511,6 +1552,10 @@ function createFilterStrip(stripName, values, state, onFilterStateChanged = (str
       `)}
     </fieldset>
   `;
+
+  element.__name = stripName;
+  element.__state = state;
+  return element;
 }
 
 class TabStrip {

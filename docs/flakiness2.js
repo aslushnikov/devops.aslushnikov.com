@@ -90,7 +90,6 @@ class DataURL {
   }
 }
 
-const TestSymbol = Symbol('TestSymbol');
 
 class CommitData {
   constructor(dataURL, sha) {
@@ -109,7 +108,6 @@ class CommitData {
   isLoaded() { return this._isLoaded; }
   specs() { return this._specs; }
   tests() { return this._tests; }
-  testFilter() { return this._testFilter; }
   testParameters() { return this._testParameters; }
 
   async ensureLoaded() {
@@ -135,7 +133,6 @@ class CommitData {
 
     const specs = [];
     const tests = [];
-    const testFilter = [];
 
     for (const entry of json) {
       for (const spec of entry.specs) {
@@ -183,10 +180,6 @@ class CommitData {
           };
           testObject.category = getTestCategory(testObject);
           tests.push(testObject);
-          testFilter.push({
-            [TestSymbol]: testObject,
-            ...testObject.parameters,
-          });
           for (const [name, value] of Object.entries(test.parameters)) {
             let values = this._testParameters.get(name);
             if (!values) {
@@ -206,7 +199,6 @@ class CommitData {
     });
     this._specs = new SMap(specs);
     this._tests = new SMap(tests);
-    this._testFilter = new SMap(testFilter);
     this._isLoaded = true;
   }
 }
@@ -447,12 +439,6 @@ class Dashboard {
 
     const faultySpecIds = new SMap(prefilteredTests.filter(test => this._filterTest(test))).uniqueValues('specId');
 
-    console.time('-- filtering all selected tests');
-    const tests = new SMap(commits.map(commit => {
-      return faultySpecIds.map(specId => commit.data.tests().getAll({ specId })).flat().filter(test => this._filterTest(test));
-    }).flat());
-    console.timeEnd('-- filtering all selected tests');
-
     console.time('-- generating commit tiles');
     const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
       let category = '';
@@ -531,8 +517,6 @@ class Dashboard {
       loadingProgressElement,
       until,
       commits,
-      prefilteredTests, // these are tests without browser/platform filtering.
-      tests,
       specs,
       allPlatforms,
       allBrowserNames,
@@ -548,6 +532,15 @@ class Dashboard {
       this._tabstrip.selectTab(this._errorsTab);
   }
 
+  _getTests(sha, specId) {
+    let commits = [];
+    if (sha)
+      commits.push(this._allCommits.get(sha));
+    else
+      commits = this._context.commits;
+    const result = commits.map(commit => commit.data.tests().getAll({ specId }).filter(test => this._filterTest(test))).flat();
+    return result;
+  }
 
   _selectSpecCommit(specId, sha) {
     if (this._selection.specId === specId && this._selection.sha === sha) {
@@ -893,7 +886,7 @@ class Dashboard {
 
   _renderSummary(commit, spec) {
     console.time('rendering summary');
-    const {tests, commits} = this._context;
+    const {commits} = this._context;
 
     const commitTimeFormatter = new Intl.DateTimeFormat("en-US", {month: "short", year: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'});
     let selectionTimeRange = ''
@@ -933,7 +926,7 @@ class Dashboard {
     `;
 
     const testNameToStats = new Map();
-    for (const test of tests.getAll({sha: this._selection.sha, specId: this._selection.specId})) {
+    for (const test of this._getTests(this._selection.sha, this._selection.specId)) {
       let stats = testNameToStats.get(test.name);
       if (!stats) {
         stats = {
@@ -1237,69 +1230,8 @@ class Dashboard {
     `;
   }
 
-  //TODO: remove??
-  _renderStats() {
-    const {allBrowserNames, allPlatforms, prefilteredTests} = this._context;
-    const faultySpecCount = (browserName, platform) => new SMap(prefilteredTests.getAll({browserName, platform})).uniqueValues('specId').length;
-
-    const getFilterURL = (browserName, platform) => {
-      if (browserName === this._browserFilter && platform === this._platformFilter)
-        return amendURL({browser: 'any', platform: 'any'});
-      return amendURL({browser: browserName || 'any', platform: platform || 'any'});
-    };
-
-    return html`
-      <hbox style="flex: none">
-      <div style="
-        display: grid;
-        grid-template-rows: ${'auto '.repeat(allPlatforms.length + 1).trim()};
-        grid-template-columns: ${'auto '.repeat(allBrowserNames.length + 1).trim()};
-        border: 1px solid var(--border-color);
-      ">
-        <div style="
-            border-right: 1px solid var(--border-color);
-            border-bottom: 1px solid var(--border-color);
-          "></div>
-        ${allBrowserNames.map(browserName => html`
-          <div style="
-              padding: 4px 1em;
-              border-bottom: 1px solid var(--border-color);
-              background-color: ${browserName === this._browserFilter ? COLOR_SELECTION : 'none'};
-          ">
-            <a href="${getFilterURL(browserName, undefined)}">${browserLogo(browserName, 25)}</a>
-          </div>
-        `)}
-        ${allPlatforms.map(platform => html`
-          <div style="
-              padding: 0 1em;
-              border-right: 1px solid var(--border-color);
-              background-color: ${platform === this._platformFilter ? COLOR_SELECTION : 'none'};
-          ">
-            <a href="${getFilterURL(undefined, platform)}">${platform}</a>
-          </div>
-          ${allBrowserNames.map(browserName => {
-            let isHighlighted = false;
-            if (this._platformFilter && this._browserFilter)
-              isHighlighted = platform === this._platformFilter && browserName === this._browserFilter;
-            else
-              isHighlighted = platform === this._platformFilter || browserName === this._browserFilter;
-            return html`
-              <div style="
-                  text-align: center;
-                  padding: 0 1em;
-                  background-color: ${isHighlighted ? COLOR_SELECTION : 'none'};
-              "><a style="color: var(--text-color);" href="${getFilterURL(browserName, platform)}">${faultySpecCount(browserName, platform) || CHAR_MIDDLE_DOT}</a></div>
-            `;
-          })}
-        `)}
-      </div>
-      </hbox>
-    `;
-  }
-
   _renderSpecAnnotations(spec) {
-    const {tests} = this._context;
-    const annotations = tests.getAll({specId: spec.specId, sha: spec.sha}).map(test => test.annotations).flat();
+    const annotations = this._getTests(spec.sha, spec.specId).map(test => test.annotations).flat();
     const types = new SMap(annotations).uniqueValues('type').sort();
     return html`<hbox style="align-self: center;">${types.map(renderAnnotation)}</hbox>`;
   }
@@ -1324,9 +1256,7 @@ class Dashboard {
   }
 
   _renderErrorsTab() {
-    const {tests} = this._context;
-
-    const viewTests = tests.getAll({sha: this._selection.sha, specId: this._selection.specId, name: this._selection.testName});
+    const viewTests = this._getTests(this._selection.sha, this._selection.specId).filter(test => !this._selection.testName || test.name === this._selection.testName);
     const runsWithErrors = viewTests.map(test => test.errors.map(error => ({
       test,
       error,

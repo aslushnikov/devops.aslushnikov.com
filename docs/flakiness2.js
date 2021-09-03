@@ -61,7 +61,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setUntilCommits(state.timestamp);
     dashboard.setBranchName(state.branch || 'master');
     dashboard.setSpecFilter(state.filter_spec);
-    dashboard.setTestParameterFilters(state.test_parameter_filters);
+    if (state.test_parameter_filters) {
+      dashboard.setTestParameterFilters(deserializeTestParameterFilters(state.test_parameter_filters));
+    } else {
+      dashboard.setTestParameterFilters(new Map([
+        ['browserName', new Map([['electron', 'exclude']]) ],
+        ['platform', new Map([['Android', 'exclude']]) ],
+        ['video', new Map([[true, 'exclude']]) ],
+      ]));
+    }
 
     dashboard.render();
   }));
@@ -281,8 +289,7 @@ class Dashboard {
   }
 
   setTestParameterFilters(testParameterFilters) {
-    //TODO: parse test parameters from URL
-    this._testParameterFilters = deserializeTestParameterFilters(testParameterFilters);
+    this._testParameterFilters = testParameterFilters;
   }
 
   setUntilCommits(timestamp) {

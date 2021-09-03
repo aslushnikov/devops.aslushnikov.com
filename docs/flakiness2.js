@@ -347,11 +347,12 @@ class Dashboard {
   async _initializeBranches() {
     const text = await rateLimitedFetch(this._dataURL.branches());
     const json = await JSON.parse(text);
+    const semverToNumber = text => text.split('.').reverse().map((token, index) => +token * Math.pow(1000, index)).reduce((a, b) => a + b);
     this._branches = json.map(raw => raw.name).sort((b1, b2) => {
       if (b1 === 'master' || b2 === 'master')
         return b1 === 'master' ? -1 : 1;
       if (b1.startsWith('release-') && b2.startsWith('release-'))
-        return parseFloat(b2.substring('release-'.length)) - parseFloat(b1.substring('release-'.length));
+        return semverToNumber(b2.substring('release-'.length)) - semverToNumber(b1.substring('release-'.length));
       if (b1.startsWith('release-') !== b2.startsWith('release-'))
         return b1.startsWith('release-') ? -1 : 1;
       return b1 < b2 ? -1 : 1;

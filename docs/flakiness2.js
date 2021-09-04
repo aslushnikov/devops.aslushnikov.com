@@ -1209,9 +1209,10 @@ class Dashboard {
       display: inline-block;
       line-height: 14px;
       text-align: center;
+      white-space: pre;
     ">${count}</count>`;
-    const filterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(stripName)?.get(chipName)?.size || CHAR_SLASHED_ZERO)} ${chipName}`;
-    const boolFilterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(chipName)?.get(true)?.size || CHAR_SLASHED_ZERO)} ${chipName}`;
+    const filterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(stripName)?.get(chipName)?.size || ' ')} ${chipName}`;
+    const boolFilterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(chipName)?.get(true)?.size || ' ')} ${chipName}`;
 
     const createFilterStripState = testParameterName => {
       const state = new Map();
@@ -1537,10 +1538,10 @@ function createFilterStrip(stripName, state, onFilterStateChanged = (stripName, 
       for (const name of state.keys())
         state.set(name, null);
     }
-    if (currentPredicate !== newPredicate)
-      state.set(chipName, newPredicate);
-    else
+    if (currentPredicate)
       state.set(chipName, null);
+    else
+      state.set(chipName, newPredicate);
     onFilterStateChanged(stripName, state);
   };
 

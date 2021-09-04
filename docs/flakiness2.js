@@ -18,6 +18,7 @@ const CHAR_INFINITY = '∞';
 const CHAR_RIGHT_ARROW = '⟶';
 const CHAR_UP_ARROW = '↑';
 const CHAR_DOWN_ARROW = '↓';
+const CHAR_SLASHED_ZERO = '⌀';
 
 const COMMIT_RECT_SIZE = 16;
 
@@ -64,6 +65,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (state.test_parameter_filters) {
       dashboard.setTestParameterFilters(deserializeTestParameterFilters(state.test_parameter_filters));
     } else {
+      // pre-exclude certain filters.
       dashboard.setTestParameterFilters(new Map([
         ['browserName', new Map([['electron', 'exclude']]) ],
         ['platform', new Map([['Android', 'exclude']]) ],
@@ -424,6 +426,32 @@ class Dashboard {
       updateProgress();
     }
 
+    console.time('-- test parameters');
+    const allTestParameters = new Map();
+    for (const commit of commits) {
+      for (const [name, values] of [...commit.data.testParameters()]) {
+        let allValues = allTestParameters.get(name);
+        if (!allValues) {
+          allValues = new Set();
+          allTestParameters.set(name, allValues);
+        }
+        for (const value of values)
+          allValues.add(value);
+      }
+    }
+
+    // add test parameter filters
+    for (const [name, filterValues] of this._testParameterFilters) {
+      let allValues = allTestParameters.get(name);
+      if (!allValues) {
+        allValues = new Set();
+        allTestParameters.set(name, allValues);
+      }
+      for (const filterValue of filterValues.keys())
+        allValues.add(filterValue);
+    }
+    console.timeEnd('-- test parameters');
+
     let prefilteredTests;
     if (!this._errorIdFilter && !this._specFilter) {
       prefilteredTests = new SMap(commits.map(commit => [
@@ -444,7 +472,28 @@ class Dashboard {
       prefilteredTests = new SMap(commits.map(commit => commit.data.tests().getAll({hasErrors: true}).filter(test => test.errors.some(error => error.errorId === this._errorIdFilter))).flat());
     }
 
-    const faultySpecIds = new SMap(prefilteredTests.filter(test => this._filterTest(test))).uniqueValues('specId');
+    const filteredTests = prefilteredTests.filter(test => this._filterTest(test));
+    const testParameterNameToParameterValueToSpecIds = new Map();
+    const faultySpecIdsSet = new Set();
+    console.time('-- computing filters');
+    for (const test of filteredTests) {
+      faultySpecIdsSet.add(test.specId);
+      for (const [paramName, paramValue] of Object.entries(test.parameters)) {
+        let valueMap = testParameterNameToParameterValueToSpecIds.get(paramName);
+        if (!valueMap) {
+          valueMap = new Map();
+          testParameterNameToParameterValueToSpecIds.set(paramName, valueMap);
+        }
+        let specSet = valueMap.get(paramValue);
+        if (!specSet) {
+          specSet = new Set();
+          valueMap.set(paramValue, specSet);
+        }
+        specSet.add(test.specId);
+      }
+    }
+    const faultySpecIds = [...faultySpecIdsSet];
+    console.timeEnd('-- computing filters');
 
     console.time('-- generating commit tiles');
     const commitTiles = new SMap(faultySpecIds.map(specId => commits.map(commit => {
@@ -521,6 +570,8 @@ class Dashboard {
       split.showSidebar(this._mainSplitView);
 
     this._context = {
+      allTestParameters,
+      testParameterNameToParameterValueToSpecIds,
       loadingProgressElement,
       until,
       commits,
@@ -1118,30 +1169,7 @@ class Dashboard {
   }
 
   _renderFilterChips() {
-    const {commits} = this._context;
-    const allTestParameters = new Map();
-    for (const commit of commits) {
-      for (const [name, values] of [...commit.data.testParameters()]) {
-        let allValues = allTestParameters.get(name);
-        if (!allValues) {
-          allValues = new Set();
-          allTestParameters.set(name, allValues);
-        }
-        for (const value of values)
-          allValues.add(value);
-      }
-    }
-
-    // add test parameter filters
-    for (const [name, filterValues] of this._testParameterFilters) {
-      let allValues = allTestParameters.get(name);
-      if (!allValues) {
-        allValues = new Set();
-        allTestParameters.set(name, allValues);
-      }
-      for (const filterValue of filterValues.keys())
-        allValues.add(filterValue);
-    }
+    const {commits, allTestParameters, testParameterNameToParameterValueToSpecIds} = this._context;
 
     const setTestParameterFilter = (parameterName, parameterValue, predicate) => {
       let allValues = this._testParameterFilters.get(parameterName);
@@ -1168,6 +1196,22 @@ class Dashboard {
       }
       urlState.amend({test_parameter_filters: serializeTestParameterFilters(this._testParameterFilters)});
     };
+
+    const renderFilterCount = count => html`<span style="
+      background-color: white;
+      border: 1px solid #bdbdbd;
+      padding: 0px 3px;
+      font-size: 10px;
+      border-radius: 3px;
+      margin: 0 2px 0 0;
+      min-width: 2ch;
+      box-sizing: content-box;
+      display: inline-block;
+      line-height: 14px;
+      text-align: center;
+    ">${count}</count>`;
+    const filterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(stripName)?.get(chipName)?.size || CHAR_SLASHED_ZERO)} ${chipName}`;
+    const boolFilterChipRenderer = (stripName, chipName) => html`${renderFilterCount(testParameterNameToParameterValueToSpecIds.get(chipName)?.get(true)?.size || CHAR_SLASHED_ZERO)} ${chipName}`;
 
     const createFilterStripState = testParameterName => {
       const state = new Map();
@@ -1209,15 +1253,14 @@ class Dashboard {
 
     const boolFilterStripState = new Map();
     for (const [name, values] of allTestParameters) {
-      if (name === 'browserName') {
-        browserNameStrip = createFilterStrip('browserName', createFilterStripState('browserName'), onFilterStripStateChanged);
-      } else if (name === 'platform') {
-        platformStrip = createFilterStrip('platform', createFilterStripState('platform'), onFilterStripStateChanged);
-      } else if (values.has(true) || values.has(false)) {
-        boolStrips.push(createFilterStrip(name, createBoolStripState(name), onBoolFilterStripStateChanged));
-      } else {
-        otherStrips.push(createFilterStrip(name, createFilterStripState(name), onFilterStripStateChanged));
-      }
+      if (name === 'browserName')
+        browserNameStrip = createFilterStrip('browserName', createFilterStripState('browserName'), onFilterStripStateChanged, filterChipRenderer);
+      else if (name === 'platform')
+        platformStrip = createFilterStrip('platform', createFilterStripState('platform'), onFilterStripStateChanged, filterChipRenderer);
+      else if (values.has(true) || values.has(false))
+        boolStrips.push(createFilterStrip(name, createBoolStripState(name), onBoolFilterStripStateChanged, boolFilterChipRenderer));
+      else
+        otherStrips.push(createFilterStrip(name, createFilterStripState(name), onFilterStripStateChanged, filterChipRenderer));
     }
 
     const stripSorter = (a, b) => {
@@ -1484,7 +1527,7 @@ function renderAnnotation(annotationType) {
   `;
 }
 
-function createFilterStrip(stripName, state, onFilterStateChanged = (stripName, state) => {}) {
+function createFilterStrip(stripName, state, onFilterStateChanged = (stripName, state) => {}, customChipRenderer = undefined) {
   const onChipClick = (event, isRightClick, chipName) => {
     consumeDOMEvent(event);
     const newPredicate = event.altKey || isRightClick ? '-' : '+';
@@ -1524,7 +1567,7 @@ function createFilterStrip(stripName, state, onFilterStateChanged = (stripName, 
             padding: 1px 4px;
             margin: 0 2px;
             cursor: pointer;
-        ">${chipName}</span>
+        ">${customChipRenderer ? customChipRenderer(stripName, chipName) : chipName}</span>
       `)}
     </fieldset>
   `;

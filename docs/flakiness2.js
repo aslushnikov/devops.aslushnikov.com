@@ -580,6 +580,7 @@ class Dashboard {
       allBrowserNames,
       allErrorIds: [...allErrorIdsSet],
       commitTiles,
+      isLoading: pendingCommits.length > 0,
     };
 
     this._renderMainElement();
@@ -641,7 +642,7 @@ class Dashboard {
   }
 
   _renderMainElement() {
-    const {until, allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement, commitTiles} = this._context;
+    const {until, allBrowserNames, allPlatforms, allErrorIds, specs, commits, loadingProgressElement, commitTiles, isLoading} = this._context;
 
     console.time('rendering main');
 
@@ -749,7 +750,7 @@ class Dashboard {
           ${this._renderFilterChips()}
         </hbox>
         <hbox style="margin-left: 1em;">
-          <h2>${specs.size} ${this._specFilter ? '' : 'problematic'} specs</h2>
+        <h2>${isLoading ? `Loading...` : `${specs.size} ${this._specFilter ? '' : 'problematic'} specs`}</h2>
           <a style="margin-left: 1em; cursor: pointer;" onclick=${this._selectSpecCommit.bind(this, undefined, undefined)}>(summary)</a>
         </hbox>
 

@@ -184,7 +184,7 @@ class CommitData {
               // Sometimes we get an error object like this:
               // { "value: "Worker process exited unexpectedly" }
               stack: error.stack || error.value,
-              errorId: humanId(createStackSignature(error.stack || error.value)),
+              errorId: humanId(createStackSignature(error.stack || error.message || error.value)),
             })),
             hasErrors: test.failed?.length > 0,
             maxTime: test.maxTime, // max time with test passing

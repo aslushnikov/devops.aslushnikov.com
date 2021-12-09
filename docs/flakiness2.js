@@ -60,7 +60,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);
     dashboard.setErrorIdFilter(state.errorid === 'any' ? undefined : state.errorid);
     dashboard.setUntilCommits(state.timestamp);
-    dashboard.setBranchName(state.branch || 'master');
+    dashboard.setBranchName(state.branch || 'main');
     dashboard.setSpecFilter(state.filter_spec);
     if (state.test_parameter_filters) {
       dashboard.setTestParameterFilters(deserializeTestParameterFilters(state.test_parameter_filters));
@@ -286,8 +286,8 @@ class Dashboard {
     this._showFlaky = false;
     this._lastCommits = 0;
 
-    this._branchName = 'master';
-    this._branches = ['master'];
+    this._branchName = 'main';
+    this._branches = ['main'];
     this._branchSHAs = new Map();
     this._initializeBranches();
   }
@@ -352,8 +352,8 @@ class Dashboard {
     const json = await JSON.parse(text);
     const semverToNumber = text => text.split('.').reverse().map((token, index) => +token * Math.pow(1000, index)).reduce((a, b) => a + b);
     this._branches = json.map(raw => raw.name).sort((b1, b2) => {
-      if (b1 === 'master' || b2 === 'master')
-        return b1 === 'master' ? -1 : 1;
+      if (b1 === 'main' || b2 === 'main')
+        return b1 === 'main' ? -1 : 1;
       if (b1.startsWith('release-') && b2.startsWith('release-'))
         return semverToNumber(b2.substring('release-'.length)) - semverToNumber(b1.substring('release-'.length));
       if (b1.startsWith('release-') !== b2.startsWith('release-'))
@@ -706,7 +706,7 @@ class Dashboard {
       <div style="padding: 1em;">
         <hbox style="padding-bottom: 1em; border-bottom: 1px solid var(--border-color);">
           <span style="margin-left: 1em;">
-            <select style="${this._branchName !== 'master' ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({branch: e.target.value})}>
+            <select style="${this._branchName !== 'main' ? STYLE_SELECTED : ''}" oninput=${e => urlState.amend({branch: e.target.value})}>
               ${this._branches.map(branchName => html`
                 <option selected=${this._branchName === branchName} value="${branchName}">${branchName}</option>
               `)}

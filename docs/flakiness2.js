@@ -68,7 +68,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       // pre-exclude certain filters.
       dashboard.setTestParameterFilters(new Map([
         ['browserName', new Map([['electron', 'exclude']]) ],
-        ['platform', new Map([['Android', 'exclude']]) ],
         ['video', new Map([[true, 'exclude']]) ],
       ]));
     }

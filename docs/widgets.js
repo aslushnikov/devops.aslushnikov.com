@@ -67,6 +67,8 @@ export class Popover {
     this._anchor = null;
   }
 
+  element() { return this._element; }
+
   show(anchor, content) {
     const box = anchor.getBoundingClientRect();
     const class1 = box.y + box.height / 2 < window.innerHeight / 2 ? 'up' : 'down';

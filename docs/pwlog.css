@@ -1,0 +1,51 @@
+@import url("./typography.css");
+@import url("./popover.css");
+
+body {
+  font-size: 14px;
+  --popover-color: #fff9c4;
+}
+
+.log-row-icon {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: var(--regular);
+  font-weight: bold;
+  font-size: 9px;
+  flex: none;
+}
+
+  .log-row-icon.msg-type-send {
+    background-color: #ff9800;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-recv {
+    background-color: #2196f3;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-raw {
+    background-color: gray;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-cmd-good {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-cmd-bad {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-event-good {
+    background-color: #3f51b5;
+    color: white;
+  }
+
+  .log-row-icon.msg-type-event-bad {
+    background-color: #f44336
+    color: white;
+  }

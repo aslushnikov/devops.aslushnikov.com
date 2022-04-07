@@ -21,6 +21,27 @@ export function humanReadableTimeInterval(diff) {
   return aggr === 1 ? 'Just Now' :  fraction + ' ' + time + (fraction > 1 ? 's' : '');
 }
 
+export function humanReadableTimeIntervalShort(diff) {
+  const intervals = [
+    [1000, 's'],
+    [60, 'm'],
+    [60, 'h'],
+    [24, 'd'],
+    [7, 'w'],
+    [52, 'y'],
+  ];
+  let aggr = 1;
+  let time = 'Just Now';
+  for (let i = 0; i < intervals.length; ++i) {
+    if (diff < aggr * intervals[i][0])
+      break;
+    aggr = aggr * intervals[i][0];
+    time = intervals[i][1];
+  }
+  const fraction = Math.floor(diff / aggr);
+  return aggr === 1 ? diff + 'ms' : fraction + time;
+}
+
 export function humanReadableDate(date) {
   return date.toLocaleString('default', {month: 'short'}) + ', ' + date.getDate();
 }
@@ -121,3 +142,7 @@ export function highlightANSIText(text) {
   })}`;
 }
 
+const ansiRegex = new RegExp('[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))', 'g');
+export function stripAnsi(str) {
+  return str.replace(ansiRegex, '');
+}

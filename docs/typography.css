@@ -1,6 +1,7 @@
 /* Mini CSS reset and basic typography  */
 :root {
   --monospace: Consolas, Menlo, monospace;
+  --regular: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Droid Sans, Helvetica Neue, Fira Sans, sans-serif;
   --text-color: #24292e;
   --background-color: #fff;
   --link-color: #0366d6;
@@ -18,7 +19,7 @@ html {
 
 body {
     margin: 0;
-    font: 1em/1.6 system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Droid Sans, Helvetica Neue, Fira Sans, sans-serif;
+    font: 1em/1.6 var(--regular);
     font-weight: 400;
     font-style: normal;
     text-rendering: optimizeLegibility;

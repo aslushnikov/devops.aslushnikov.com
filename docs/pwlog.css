@@ -2,7 +2,7 @@
 @import url("./popover.css");
 
 body {
-  font-size: 14px;
+  font-size: 10px;
   --popover-color: #fff9c4;
 }
 
@@ -11,7 +11,7 @@ body {
   border-radius: 6px;
   font-family: var(--regular);
   font-weight: bold;
-  font-size: 9px;
+  font-size: 60%;
   flex: none;
 }
 

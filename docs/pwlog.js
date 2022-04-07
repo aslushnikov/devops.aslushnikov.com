@@ -51,7 +51,7 @@ class PWLog {
     this._showAck = false;
     this._showStdout = true;
     this._messages = [];
-    this.element = html`<vbox style='min-width: fit-content;'></vbox>`;
+    this.element = html`<vbox style='min-height: 100%; min-width: fit-content;'></vbox>`;
   }
 
   setShowAck(value) {
@@ -90,6 +90,14 @@ class PWLog {
         </hbox>
         ${this._logElement}
     `);
+    if (!this._messages.length) {
+      this.element.append(html`
+        <vbox style="justify-content: center; align-items: center; flex: auto;">
+          <h1>Paste pw:protocol text</h1>
+        </vbox>
+      `);
+      return;
+    }
 
     this._logElement.textContent = '';
     let lastTimestamp = this._messages[0]?.timestamp() ?? 0;

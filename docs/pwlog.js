@@ -9,6 +9,7 @@ const CHAR_ELLIPSIS = '…';
 const CHAR_LONG_DASH = '—';
 const CHAR_ARROW_RIGHT = '►';
 const CHAR_ARROW_LEFT = '◀';
+const CHAR_ARROW_BOTTOM = '▼';
 const CHAR_WARN = '⚠';
 const CHAR_QUESTION = '�'
 const ICON_WARN = (width = 24, height = 24, fill = 'black') => svg`<svg fill=${fill} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${width}" height="${height}"><path fill-rule="evenodd" d="M1 12C1 5.925 5.925 1 12 1s11 4.925 11 11-4.925 11-11 11S1 18.075 1 12zm8.036-4.024a.75.75 0 00-1.06 1.06L10.939 12l-2.963 2.963a.75.75 0 101.06 1.06L12 13.06l2.963 2.964a.75.75 0 001.061-1.06L13.061 12l2.963-2.964a.75.75 0 10-1.06-1.06L12 10.939 9.036 7.976z"></path></svg>`;
@@ -47,7 +48,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 class PWLog {
   constructor() {
     this._rawLog = '';
-    this._logElement = html`<vbox></vbox>`;
     this._showAck = false;
     this._showStdout = true;
     this._messages = [];
@@ -88,7 +88,6 @@ class PWLog {
             <label for=show-raw-messages>Show stdout</label>
           </hbox>
         </hbox>
-        ${this._logElement}
     `);
     if (!this._messages.length) {
       this.element.append(html`
@@ -99,25 +98,55 @@ class PWLog {
       return;
     }
 
-    this._logElement.textContent = '';
+    const logElement = html`<vbox style='
+        display: grid;
+        grid-column-gap: 5px;
+        grid-template-columns: [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
+      '></vbox>
+    `;
+    this.element.append(logElement);
     let lastTimestamp = this._messages[0]?.timestamp() ?? 0;
     for (const msg of this._messages) {
       if (msg.isAck() && !this._showAck)
         continue;
       if (msg.type() === msgTypes.STDOUT && !this._showStdout)
         continue;
-      msg.renderAsCommand(!this._showAck);
+      logElement.append(html`
+        <hbox style='
+            grid-column: icon;
+            align-items: center;
+            justify-content: center;
+          '
+        >
+          ${msg.renderIcon(!this._showAck)}
+        </hbox>
+      `);
+      logElement.append(html`
+        <hbox style='grid-column: warn'>
+          ${msg.renderWarnElement()}
+        </hbox>
+      `);
+
       if (msg.timestamp() !== undefined) {
-        msg.updateDeltaMs(lastTimestamp);
+        const delta = msg.timestamp() - lastTimestamp;
         lastTimestamp = msg.timestamp();
+        logElement.append(html`
+          <hbox style='grid-column: msdelta; justify-content: end;'>+${humanReadableTimeIntervalShort(delta)}</hbox>
+        `);
       }
-      this._logElement.append(msg.element);
+      const line1 = msg.renderFirstLine();
+      const line2 = msg.renderSecondLine();
+      logElement.append(html`
+        ${line1 && html`<hbox style='grid-column: message; white-space: nowrap;'>${line1}</hbox>`}
+        ${line2 && html`<hbox style='grid-column: message; white-space: nowrap;'>${line2}</hbox>`}
+      `);
     }
   }
 
   setLog(log) {
     if (this._rawLog === log)
       return;
+    this._rawLog = log;
     if (!log) {
       this._messages = [];
       this.render();
@@ -127,13 +156,20 @@ class PWLog {
     const sendMessages = new Map();
     const recvMessages = new Map();
     const parsedLines = [];
+    let lastParsed = undefined;
     for (const line of lines) {
       const parsed = LogMessage.parse(line);
       if (parsed.json && parsed.json.id && parsed.type === msgTypes.SEND)
         sendMessages.set(parsed.json.id, parsed.json);
       else if (parsed.json && parsed.json.id && parsed.type === msgTypes.RECV)
         recvMessages.set(parsed.json.id, parsed.json);
-      parsedLines.push(parsed);
+
+      if (parsed.type === msgTypes.STDOUT && lastParsed?.type === msgTypes.STDOUT && !parsed.parseError) {
+        lastParsed.raw += '\n' + parsed.raw;
+      } else {
+        parsedLines.push(parsed);
+        lastParsed = parsed;
+      }
     }
     this._messages = [];
     let currentTimestamp = 0;
@@ -201,13 +237,15 @@ class LogMessage {
     }
   }
 
-  constructor({ raw, type, json, parseError, timestamp, sendMessages = new Map(), recvMessages = new Map(), showAsCommand = false }) {
-    this._raw = raw;
+  constructor({ raw, type, json, parseError, timestamp, sendMessages = new Map(), recvMessages = new Map() }) {
+    this._rawLines = raw.trim().split('\n');
     this._type = type;
     this._json = json;
     this._timestamp = timestamp;
     this._parseError = parseError;
-    this._showAsCommand = showAsCommand;
+    this._jsonView = json?.params ? new JSONView(json.params, json.method + '(', ')') : null;
+    this._sendMessages = sendMessages;
+    this._recvMessages = recvMessages;
 
     this._errorText = '';
     if (this._parseError) {
@@ -218,114 +256,56 @@ class LogMessage {
       else if (this._type === msgTypes.SEND && !recvMessages.has(this._json.id))
         this._errorText = `ERROR: this protocol command is missing a matching protocol ack response`;
     }
-
-    this._updateIcon();
-    this._deltaMsElement = html`<span></span>`;
-    this.element = this._render(sendMessages, recvMessages);
   }
 
   timestamp() { return this._timestamp; }
-
-  updateDeltaMs(lastTimestamp) {
-    this._deltaMsElement.textContent = `+${humanReadableTimeIntervalShort(this._timestamp - lastTimestamp)}`;
-  }
-
-  renderAsCommand(value) {
-    this._showAsCommand = value;
-    this._updateIcon();
-  }
-
-  _updateIcon() {
-    const icon = this._showAsCommand ? this._renderCmdIcon() : this._renderClassicIcon();
-    if (this._icon)
-      this._icon.replaceWith(icon);
-    this._icon = icon;
-  }
-
-  _renderCmdIcon() {
-    let iconClass = 'msg-type-raw';
-    let iconText = 'stdout';
-    if (this._type === msgTypes.SEND) {
-      iconClass = this._errorText ? 'msg-type-cmd-bad' : 'msg-type-cmd-good';
-      iconText = 'CMD';
-    } else if (this._type === msgTypes.RECV) {
-      iconClass = this._errorText ? 'msg-type-event-bad' : 'msg-type-event-good';
-      iconText = 'EVENT';
-    }
-    return html`<span class="${iconClass} log-row-icon">${iconText}</span>`;
-  }
-
-  _renderClassicIcon() {
-    const iconClass = {
-      [msgTypes.SEND]: 'msg-type-send',
-      [msgTypes.RECV]: 'msg-type-recv',
-      [msgTypes.STDOUT]: 'msg-type-raw',
-    }[this._type];
-    const iconText = {
-      [msgTypes.SEND]: `SEND ${CHAR_ARROW_RIGHT}`,
-      [msgTypes.RECV]: `${CHAR_ARROW_LEFT} RECV`,
-      [msgTypes.STDOUT]: `STDOUT`,
-    }[this._type];
-    return html`<span class="${iconClass} log-row-icon">${iconText}</span>`;
-  }
 
   json() { return this._json; }
   isAck() { return this._json && !this._json.method; }
   parseError() { return this._parseError; }
   type() { return this._type; }
 
-  /**
-   * @param {Map<number, any>} sendMessages
-   * @param {Map<number, any>} recvMessages
-   */
-  _render(sendMessages = new Map(), recvMessages = new Map()) {
-    const element = html`
-      <hbox style='
-          display: grid;
-          grid-template-columns: 7ch 3ch 7ch 1fr;
-          grid-template-areas:
-            "icon warn  ms  title"
-            "noop noop noop json";
-          font-family: var(--monospace);
-          white-space: nowrap;
-          border-bottom: 1px solid #eee;
-          padding: 4px 0;
-      '>
-        <hbox style="grid-area: icon; justify-content: center;">${this._icon}</hbox>
+  renderIcon(showAsCommand) {
+    if (this._type === msgTypes.STDOUT)
+      return undefined;
+    const iconClass = {
+      [msgTypes.SEND]: showAsCommand ? 'msg-type-cmd' : 'msg-type-send',
+      [msgTypes.RECV]: showAsCommand ? 'msg-type-event' : 'msg-type-recv',
+    }[this._type];
+    const iconText = {
+      [msgTypes.SEND]: showAsCommand ? 'cmd' : `SEND ${CHAR_ARROW_RIGHT}`,
+      [msgTypes.RECV]: showAsCommand ? 'event' : `${CHAR_ARROW_LEFT} RECV`,
+    }[this._type];
+    return html`<span class="${iconClass} log-row-icon">${iconText}</span>`;
+  }
+
+  renderWarnElement() {
+    if (!this._errorText)
+      return html``;
+    return html`
+      <hbox style="grid-area: warn;" onclick=${popover.onClickHandler(() => html`<div style='font: 1em/1.6 var(--regular);'>${this._errorText}</div>`)}>
+        ${ICON_EXCLAMATION(15, 15)}
       </hbox>
     `;
-    const logMessageTitle = html`<hbox style="grid-area: title;"></hbox>`;
-    element.append(logMessageTitle);
-    if (this._errorText) {
-      element.append(html`
-        <hbox style="grid-area: warn;" onclick=${popover.onClickHandler(() => html`<div style='font: 1em/1.6 var(--regular);'>${this._errorText}</div>`)}>
-          ${ICON_EXCLAMATION(15, 15)}
-        </hbox>
-      `);
-    }
-    element.append(html`
-      <hbox style="justify-content: end; padding-right: 10px;  grid-area: ms;">${this._deltaMsElement}</hbox>
-    `);
-    if (!this._json) {
-      logMessageTitle.append(html`${this._raw.trim()}`);
-      return element;
-    }
+  }
+
+  renderFirstLine() {
+    if (!this._json)
+      return html`${this._rawLines[0] ?? ''}`;
 
     if (!this._json.method) {
-      const ackReference = this._json.id && this._type === msgTypes.RECV ? sendMessages.get(this._json.id)?.method : undefined;
-      logMessageTitle.append(html`<span style='color: #7f7f7f'>&lt;ACK ${CHAR_LONG_DASH} ${ackReference || 'Unknown'}&gt;</span>`);
-      return element;
+      const ackReference = this._json.id && this._type === msgTypes.RECV ? this._sendMessages.get(this._json.id)?.method : undefined;
+      return html`<span style='color: #7f7f7f'>&lt;ACK ${CHAR_LONG_DASH} ${ackReference || 'Unknown'}&gt;</span>`;
     }
-    const logMessageJson = html`<hbox style="grid-area: json;"></hbox>`;
-    element.append(logMessageJson);
-    if (this._json.params) {
-      const jsonView = new JSONView(this._json.params, this._json.method + '(', ')');
-      logMessageTitle.append(jsonView.preview);
-      logMessageJson.append(jsonView.expanded);
-    } else {
-      logMessageTitle.append(html`<span>${this._json.method}()</span>`);
-    }
-    return element;
+    if (this._jsonView)
+      return this._jsonView.preview;
+    return html`<span>${this._json.method}()</span>`;
+  }
+
+  renderSecondLine() {
+    if (!this._json)
+      return html`<div style='white-space: pre;'>${this._rawLines.slice(1).join('\n')}</div>`;
+    return this._jsonView?.expanded;
   }
 }
 
@@ -418,9 +398,19 @@ class JSONView {
     return typeof this._json === 'object';
   }
 
+  _renderExpandIcon() {
+    return html`<span style='
+        font-size: 80%;
+        position: absolute;
+        color: ${this.isExpandable() ? '#aaa' : 'transparent'};
+      '>${this._isExpanded ? CHAR_ARROW_BOTTOM : CHAR_ARROW_RIGHT}</span>
+    `;
+  }
+
   collapse() {
     this._isExpanded = false;
     this.preview.textContent = '';
+    // this.preview.append(this._renderExpandIcon());
     this.preview.append(this._prefix);
     this.preview.append(renderJSONPreview(this._json, 30, false /* recurse */));
     this.preview.append(this._suffix);
@@ -433,6 +423,7 @@ class JSONView {
     this._isExpanded = true;
     const isArray = Array.isArray(this._json);
     this.preview.textContent = '';
+    // this.preview.append(this._renderExpandIcon());
     this.preview.append(this._prefix);
     this.preview.append(isArray ? '[' : '{');
 

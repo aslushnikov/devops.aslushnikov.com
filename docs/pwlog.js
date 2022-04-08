@@ -105,7 +105,7 @@ class PWLog {
     if (!this._messages.length) {
       this._logContainer.append(html`
         <vbox style="justify-content: center; align-items: center; flex: auto;">
-          <h1>Paste pw:protocol text</h1>
+          <h3>Paste pw:protocol text</h3>
         </vbox>
       `);
       return;

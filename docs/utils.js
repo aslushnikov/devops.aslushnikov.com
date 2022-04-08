@@ -58,7 +58,6 @@ export function scrollIntoViewIfNeeded(element) {
 /**
  * Serializing async operations one-by-one.
  */
-const criticalSectionSymbol = Symbol('criticalSection');
 export class CriticalSection {
   static wrap(func) {
     const section = new CriticalSection();

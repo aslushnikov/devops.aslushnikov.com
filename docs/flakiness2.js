@@ -44,11 +44,10 @@ const testRunColors = {
 const urlState = new URLState();
 
 window.addEventListener('DOMContentLoaded', async () => {
-  const criticalSection = new CriticalSection();
   const dashboard = new Dashboard();
   document.body.append(dashboard.element);
 
-  urlState.startListening(() => criticalSection.run('nav', async () => {
+  urlState.startListening(CriticalSection.wrap(async () => {
     const state = urlState.state();
 
     const showFlaky = StringToBool(state.show_flaky || 'true');

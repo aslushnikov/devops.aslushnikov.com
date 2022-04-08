@@ -54,10 +54,17 @@ export function scrollIntoViewIfNeeded(element) {
   });
 }
 
+
 /**
  * Serializing async operations one-by-one.
  */
+const criticalSectionSymbol = Symbol('criticalSection');
 export class CriticalSection {
+  static wrap(func) {
+    const section = new CriticalSection();
+    return (...args) => section.run('', () => func(...args));
+  }
+
   constructor() {
     this._rollingPromises = new Map();
   }
@@ -168,6 +175,26 @@ export class Table {
     }
     set.add(value);
   }
+}
+
+export function observable(value, callback) {
+  const eventHandler = createEvent();
+  const result = {
+    get() { return value; },
+    set(newValue) {
+      if (newValue === value)
+        return;
+      value = newValue;
+      emitEvent(eventHandler, value);
+    },
+    observe: listener => {
+      eventHandler(listener);
+      listener(value);
+    },
+  };
+  if (callback)
+    result.observe(callback);
+  return result;
 }
 
 export class ZWidget extends HTMLElement {

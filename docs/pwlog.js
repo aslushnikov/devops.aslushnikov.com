@@ -1,6 +1,6 @@
 import { html, svg } from './zhtml.js';
 import { stripAnsi, humanReadableTimeIntervalShort } from './misc.js';
-import { CriticalSection, consumeDOMEvent } from './utils.js';
+import { CriticalSection, consumeDOMEvent, preventTextSelectionOnDBLClick, createEvent, observable } from './utils.js';
 import { URLState, newURL, amendURL } from './urlstate.js';
 import { Popover } from './widgets.js';
 
@@ -26,51 +26,34 @@ document.documentElement.addEventListener('click', event => {
 }, true);
 
 window.addEventListener('DOMContentLoaded', async () => {
-  const criticalSection = new CriticalSection();
-  window.addEventListener('paste', e => {
-    const log = e.clipboardData.getData('text/plain')
-    urlState.amend({ log });
-  }, false);
 
   const pwlog = new PWLog();
   document.body.append(html`
     ${pwlog.element}
   `);
 
-  urlState.startListening(() => criticalSection.run('nav', async () => {
+  urlState.startListening(CriticalSection.wrap(async () => {
     const state = urlState.state();
-    pwlog.setLog(state.log);
-    pwlog.setShowStdout(JSON.parse(state.stdout ?? 'false'));
-    pwlog.setShowAck(JSON.parse(state.ack ?? 'false'));
+    pwlog.log.set(state.log || '');
+    pwlog.filter.set(state.filter || '');
+    pwlog.showStdout.set(JSON.parse(state.stdout ?? 'false'));
+    pwlog.showAck.set(JSON.parse(state.ack ?? 'false'));
   }));
 }, false);
 
 class PWLog {
   constructor() {
-    this._rawLog = '';
-    this._showAck = false;
-    this._showStdout = true;
+    this.render = CriticalSection.wrap(this._doRender.bind(this));
+
+    this.log = observable('', value => this._setLog(value));
+    this.showStdout = observable(true, () => this.render());
+    this.showAck = observable(false, () => this.render());
+    this.filter = observable('', () => this.render());
+
     this._messages = [];
-    this.element = html`<vbox style='min-height: 100%; min-width: fit-content;'></vbox>`;
-  }
 
-  setShowAck(value) {
-    if (this._showAck === value)
-      return;
-    this._showAck = value;
-    this.render();
-  }
-
-  setShowStdout(value) {
-    if (this._showStdout === value)
-      return;
-    this._showStdout = value;
-    this.render();
-  }
-
-  render() {
-    this.element.textContent = '';
-    this.element.append(html`
+    this.element = html`
+      <vbox style='min-height: 100%; min-width: fit-content;'>
         <hbox style='
             padding: 4px 1em;
             position: sticky;
@@ -80,17 +63,47 @@ class PWLog {
         '>
           <a href="${amendURL({ log: undefined })}"><h4 style='margin: 0 1em 0 0;'>PWLog</h4></a>
           <hbox>
-            <input type=checkbox id=show-ack checked=${this._showAck} oninput=${e => urlState.amend({ ack: !!e.target.checked })}>
+            <input
+              type=checkbox
+              onzrender=${e => this.showAck.observe(value => e.checked = value)}
+              oninput=${e => urlState.amend({ ack: !!e.target.checked })}
+              id=show-ack
+            >
             <label for=show-ack>Show ACKs</label>
           </hbox>
           <hbox style='margin-left: 1em;'>
-            <input type=checkbox id=show-raw-messages checked=${this._showStdout} oninput=${e => urlState.amend({ stdout: !!e.target.checked })}>
+            <input
+              type=checkbox
+              onzrender=${e => this.showStdout.observe(value => e.checked = value)}
+              oninput=${e => urlState.amend({ stdout: !!e.target.checked })}
+              id=show-raw-messages
+            >
             <label for=show-raw-messages>Show stdout</label>
           </hbox>
+          <hbox style='margin-left: 1em;'>
+            <input
+              type=text
+              placeholder="filter.."
+              onzrender=${e => this.filter.observe(value => e.value = value)}
+              oninput=${e => urlState.amend({ filter: e.target.value })}
+            >
+          </hbox>
         </hbox>
-    `);
+        <vbox onzrender=${e => this._logContainer = e}></vbox>
+      </vbox>
+    `;
+    window.addEventListener('paste', e => {
+      if (this._messages.length)
+        return;
+      const log = e.clipboardData.getData('text/plain');
+      urlState.amend({ log });
+    }, false);
+  }
+
+  _doRender() {
+    this._logContainer.textContent = '';
     if (!this._messages.length) {
-      this.element.append(html`
+      this._logContainer.append(html`
         <vbox style="justify-content: center; align-items: center; flex: auto;">
           <h1>Paste pw:protocol text</h1>
         </vbox>
@@ -101,16 +114,27 @@ class PWLog {
     const logElement = html`<vbox style='
         display: grid;
         grid-column-gap: 5px;
-        grid-template-columns: [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
+        grid-template-columns: [namespace] fit-content(200px) [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
       '></vbox>
     `;
-    this.element.append(logElement);
+    this._logContainer.append(logElement);
     let lastTimestamp = this._messages[0]?.timestamp() ?? 0;
     for (const msg of this._messages) {
-      if (msg.isAck() && !this._showAck)
+      if (msg.isAck() && !this.showAck.get())
         continue;
-      if (msg.type() === msgTypes.STDOUT && !this._showStdout)
+      if (msg.type() === msgTypes.STDOUT && !this.showStdout.get())
         continue;
+      if (!msg.raw().toLowerCase().includes(this.filter.get().toLowerCase()))
+        continue;
+      logElement.append(html`
+        <hbox style='
+            grid-column: namespace;
+            align-items: center;
+            justify-content: center;
+            margin-left: 5px;
+          '
+        >${msg.renderNamespace()}</hbox>
+      `);
       logElement.append(html`
         <hbox style='
             grid-column: icon;
@@ -118,7 +142,7 @@ class PWLog {
             justify-content: center;
           '
         >
-          ${msg.renderIcon(!this._showAck)}
+          ${msg.renderIcon(!this.showAck.get())}
         </hbox>
       `);
       logElement.append(html`
@@ -134,19 +158,22 @@ class PWLog {
           <hbox style='grid-column: msdelta; justify-content: end;'>+${humanReadableTimeIntervalShort(delta)}</hbox>
         `);
       }
-      const line1 = msg.renderFirstLine();
-      const line2 = msg.renderSecondLine();
-      logElement.append(html`
-        ${line1 && html`<hbox style='grid-column: message; white-space: nowrap;'>${line1}</hbox>`}
-        ${line2 && html`<hbox style='grid-column: message; white-space: nowrap;'>${line2}</hbox>`}
-      `);
+      for (const line of [msg.renderFirstLine(), msg.renderSecondLine()]) {
+        if (!line)
+          continue;
+        logElement.append(html`
+          <hbox style='
+              grid-column: message;
+              white-space: nowrap;
+              border-left: 1px solid #bdbdbd;
+              padding-left: 5px;
+            '>${line}</hbox>
+        `);
+      }
     }
   }
 
-  setLog(log) {
-    if (this._rawLog === log)
-      return;
-    this._rawLog = log;
+  _setLog(log) {
     if (!log) {
       this._messages = [];
       this.render();
@@ -190,15 +217,14 @@ class PWLog {
         timestamp,
         sendMessages,
         recvMessages,
-        showAsCommand: !this._showAck,
       }));
     }
     this.render();
   }
 }
 
-const MSG_REGEX = /(SEND ►|◀ RECV)\s+({.*})\s+(\+\d+\w+)\s*/;
-const MSG_REGEX_2 = /(\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ)\s+pw:protocol\s+(SEND ►|◀ RECV)\s+({.*})/;
+const MSG_REGEX = /([\w:]+)\s+(SEND ►|◀ RECV)\s+({.*})\s+(\+\d+\w+)\s*/;
+const MSG_REGEX_2 = /(\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\dZ)\s+([\w:]+)\s+(SEND ►|◀ RECV)\s+({.*})/;
 
 const msgTypes = {
   SEND: 'SEND ►',
@@ -208,11 +234,12 @@ const msgTypes = {
 
 class LogMessage {
   static parse(raw) {
-    let match, type, jsonText, msDelta, timestamp;
+    let match, type, namespace, jsonText, msDelta, timestamp;
     if (match = raw.match(MSG_REGEX)) {
-      type = match[1];
-      jsonText = match[2];
-      const deltaText = match[3];
+      namespace = match[1];
+      type = match[2];
+      jsonText = match[3];
+      const deltaText = match[4];
       msDelta = 0;
       if (deltaText.endsWith('ms'))
         msDelta = Number.parseInt(deltaText);
@@ -224,22 +251,25 @@ class LogMessage {
         return { raw, type: msgTypes.STDOUT, parseError: 'Failed to parse timestamp' };
     } else if (match = raw.match(MSG_REGEX_2)) {
       timestamp = +(new Date(match[1]));
-      type = match[2];
-      jsonText = match[3];
+      namespace = match[2];
+      type = match[3];
+      jsonText = match[4];
     } else {
       return { raw, type: msgTypes.STDOUT };
     }
     try {
       const json = JSON.parse(jsonText);
-      return { raw, type, msDelta, json, timestamp };
+      return { raw, type, namespace, msDelta, json, timestamp };
     } catch(error) {
-      return { raw, type: msgTypes.STDOUT, msDelta, timestamp, parseError: error };
+      return { raw, type: msgTypes.STDOUT, namespace, msDelta, timestamp, parseError: error };
     }
   }
 
-  constructor({ raw, type, json, parseError, timestamp, sendMessages = new Map(), recvMessages = new Map() }) {
+  constructor({ raw, type, namespace, json, parseError, timestamp, sendMessages = new Map(), recvMessages = new Map() }) {
+    this._raw = raw;
     this._rawLines = raw.trim().split('\n');
     this._type = type;
+    this._namespace = namespace;
     this._json = json;
     this._timestamp = timestamp;
     this._parseError = parseError;
@@ -264,6 +294,7 @@ class LogMessage {
   isAck() { return this._json && !this._json.method; }
   parseError() { return this._parseError; }
   type() { return this._type; }
+  raw() { return this._raw; }
 
   renderIcon(showAsCommand) {
     if (this._type === msgTypes.STDOUT)
@@ -277,6 +308,20 @@ class LogMessage {
       [msgTypes.RECV]: showAsCommand ? 'event' : `${CHAR_ARROW_LEFT} RECV`,
     }[this._type];
     return html`<span class="${iconClass} log-row-icon">${iconText}</span>`;
+  }
+
+  renderNamespace() {
+    return html`
+      <hbox style='
+          align-items: center;
+          justify-content: center;
+          background-color: #9e9e9e;
+          padding: 0px 4px;
+          border-radius: 5px;
+          font-size: 10px;
+          color: white;
+        '>${this._namespace}</hbox>
+    `;
   }
 
   renderWarnElement() {
@@ -382,6 +427,7 @@ class JSONView {
 
     if (this.isExpandable()) {
       this.preview.style.setProperty('cursor', 'pointer');
+      preventTextSelectionOnDBLClick(this.preview);
       this.preview.addEventListener('click', event => {
         if (window.getSelection().type === 'Range')
           return;

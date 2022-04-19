@@ -34,7 +34,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   urlState.startListening(CriticalSection.wrap(async () => {
     const state = urlState.state();
-    pwlog.log.set(state.log || '');
     pwlog.filter.set(state.filter || '');
     pwlog.showStdout.set(JSON.parse(state.stdout ?? 'false'));
     pwlog.showAck.set(JSON.parse(state.ack ?? 'false'));
@@ -61,7 +60,7 @@ class PWLog {
             background-color: #f5f5f5;
             border-bottom: 1px solid #333;
         '>
-          <a href="${amendURL({ log: undefined })}"><h4 style='margin: 0 1em 0 0;'>PWLog</h4></a>
+          <a onclick="${() => this.log.set('')}"><h4 style='margin: 0 1em 0 0;'>PWLog</h4></a>
           <hbox>
             <input
               type=checkbox
@@ -96,7 +95,7 @@ class PWLog {
       if (this._messages.length)
         return;
       const log = e.clipboardData.getData('text/plain');
-      urlState.amend({ log });
+      this.log.set(log);
     }, false);
   }
 

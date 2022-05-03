@@ -163,6 +163,16 @@ class CommitData {
           // By default, all tests are run under "default" mode unless marked differently.
           if (!test.parameters.mode)
             test.parameters.mode = 'default';
+
+          // Cleanup a bunch of values that we don't use.
+          delete test.parameters['timestamp'];
+          delete test.parameters['ci.link'];
+          delete test.parameters['revision.id'];
+          delete test.parameters['revision.author'];
+          delete test.parameters['revision.email'];
+          delete test.parameters['revision.subject'];
+          delete test.parameters['revision.timestamp'];
+          delete test.parameters['revision.link'];
           const testObject = {
             specId,
             spec: specObject,

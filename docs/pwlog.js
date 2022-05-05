@@ -1,6 +1,6 @@
 import { html, svg } from './zhtml.js';
 import { stripAnsi, humanReadableTimeIntervalShort } from './misc.js';
-import { CriticalSection, consumeDOMEvent, preventTextSelectionOnDBLClick, createEvent, observable } from './utils.js';
+import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable } from './utils.js';
 import { URLState, newURL, amendURL } from './urlstate.js';
 import { Popover } from './widgets.js';
 
@@ -32,7 +32,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     ${pwlog.element}
   `);
 
-  urlState.startListening(CriticalSection.wrap(async () => {
+  urlState.startListening(Throttler.wrap(async () => {
     const state = urlState.state();
     pwlog.filter.set(state.filter || '');
     pwlog.showStdout.set(JSON.parse(state.stdout ?? 'false'));
@@ -42,9 +42,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 class PWLog {
   constructor() {
-    this.render = CriticalSection.wrap(this._doRender.bind(this));
+    this.render = Throttler.wrap(this._doRender.bind(this));
 
-    this.log = observable('', value => this._setLog(value));
+    this.log = observable(localStorage.getItem('log') || '', value => this._setLog(value));
     this.showStdout = observable(true, () => this.render());
     this.showAck = observable(false, () => this.render());
     this.filter = observable('', () => this.render());
@@ -173,6 +173,7 @@ class PWLog {
   }
 
   _setLog(log) {
+    localStorage.setItem('log', log);
     if (!log) {
       this._messages = [];
       this.render();
@@ -272,7 +273,16 @@ class LogMessage {
     this._json = json;
     this._timestamp = timestamp;
     this._parseError = parseError;
-    this._jsonView = json?.params ? new JSONView(json.params, json.method + '(', ')') : null;
+    const jsonData = json?.params ?? json?.result;
+
+    if (json?.method) {
+      this._jsonView = new JSONView(json.params ?? {}, json.method + '(', ')');
+    } else if (json?.id) {
+      const ackReference = type === msgTypes.RECV ? sendMessages.get(json.id)?.method : undefined;
+      const prefix = html`<span style='color: #7f7f7f'>&lt;ACK ${CHAR_LONG_DASH} ${ackReference || 'Unknown'}&gt;(</span>`;
+      this._jsonView = new JSONView(json.result, prefix, ')');
+    }
+
     this._sendMessages = sendMessages;
     this._recvMessages = recvMessages;
 
@@ -337,10 +347,6 @@ class LogMessage {
     if (!this._json)
       return html`${this._rawLines[0] ?? ''}`;
 
-    if (!this._json.method) {
-      const ackReference = this._json.id && this._type === msgTypes.RECV ? this._sendMessages.get(this._json.id)?.method : undefined;
-      return html`<span style='color: #7f7f7f'>&lt;ACK ${CHAR_LONG_DASH} ${ackReference || 'Unknown'}&gt;</span>`;
-    }
     if (this._jsonView)
       return this._jsonView.preview;
     return html`<span>${this._json.method}()</span>`;

@@ -12,9 +12,11 @@ export function createEvent() {
   const listeners = new Set();
   const subscribeFunction = listener => {
     listeners.add(listener);
-    return () => listeners.remove(listener);
+    return subscribeFunction.removeListener.bind(subscribeFunction, listener);
   }
   subscribeFunction[listenersSymbol] = listeners;
+  subscribeFunction.addListener = subscribeFunction;
+  subscribeFunction.removeListener = (listener) => listeners.delete(listener);;
   return subscribeFunction;
 }
 
@@ -81,6 +83,11 @@ export class CriticalSection {
 }
 
 export class Throttler {
+  static wrap(func, timeout = 0) {
+    const throttler = new Throttler(timeout);
+    return () => throttler.schedule(func);
+  }
+
   constructor(timeout = 0) {
     this._pendingOperation = null;
     this._runningOperation = null;
@@ -177,18 +184,22 @@ export class Table {
 }
 
 export function observable(value, callback) {
-  const eventHandler = createEvent();
+  const event = createEvent();
   const result = {
     get() { return value; },
     set(newValue) {
       if (newValue === value)
         return;
       value = newValue;
-      emitEvent(eventHandler, value);
+      emitEvent(event, value);
     },
     observe: listener => {
-      eventHandler(listener);
+      const unobserve = event.addListener(listener);
       listener(value);
+      return unobserve;
+    },
+    unobserve: listener => {
+      event.removeListener(listener);
     },
   };
   if (callback)

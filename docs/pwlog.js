@@ -122,13 +122,13 @@ class PWLog {
       return;
     }
 
-    const logElement = html`<vbox style='
+    const logElement = html`<section id=grid style='
         display: grid;
         grid-column-gap: 5px;
         grid-template-columns:
             [namespace] fit-content(200px)
             [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
-      '></vbox>
+      '></section>
     `;
     this._logContainer.append(logElement);
     let lastTimestamp = this._messages[0]?.timestamp() ?? 0;
@@ -177,6 +177,7 @@ class PWLog {
         logElement.append(html`
           <hbox style='
               grid-column: message;
+              overflow: hidden; /* override default min-size: auto; behavior in grid items */
               white-space: nowrap;
               border-left: 1px solid #bdbdbd;
               padding-left: 5px;
@@ -396,7 +397,7 @@ function renderJSONKey(key) {
   return html`<span style="color: #757575">${key}</span>`;
 }
 
-function renderJSONPreview(json, maxValueSize = 30, recurse = true) {
+function renderJSONPreview(json, maxValueSize = 30) {
   const element = html`<hbox></hbox>`;
   if (typeof json !== 'object') {
     element.append(renderJSONValue(json, maxValueSize));
@@ -409,24 +410,24 @@ function renderJSONPreview(json, maxValueSize = 30, recurse = true) {
   const entries = Object.entries(json || {});
 
   element.append(punct(isArray ? '[' : '{', 0, entries.length ? '1ex' : 0));
+  const shrinkable = html`<span text_overflow></span>`;
+  element.append(shrinkable);
   for (let i = 0; i < entries.length; ++i) {
     const [key, value] = entries[i];
     if (i > 0)
-      element.append(punct(', ', 0, '1ex'));
+      shrinkable.append(punct(', ', 0, '1ex'));
     // Do not render keys for arrays.
     if (!isArray) {
-      element.append(renderJSONKey(key));
-      element.append(punct(': ', 0, '1ex'));
+      shrinkable.append(renderJSONKey(key));
+      shrinkable.append(punct(': ', 0, '1ex'));
     }
     if (typeof value === 'object') {
-      if (recurse)
-        element.append(renderJSONPreview(value, maxValueSize, recurse));
-      else if (Array.isArray(value))
-        element.append(html`[${CHAR_ELLIPSIS}]`);
+      if (Array.isArray(value))
+        shrinkable.append(html`[${CHAR_ELLIPSIS}]`);
       else
-        element.append(html`{${CHAR_ELLIPSIS}}`);
+        shrinkable.append(html`{${CHAR_ELLIPSIS}}`);
     } else {
-      element.append(renderJSONValue(value, maxValueSize));
+      shrinkable.append(renderJSONValue(value, maxValueSize));
     }
   }
   element.append(punct(isArray ? ']' : '}', entries.length ? '1ex' : 0, 0));
@@ -477,7 +478,7 @@ class JSONView {
     this.preview.textContent = '';
     // this.preview.append(this._renderExpandIcon());
     this.preview.append(this._prefix);
-    this.preview.append(renderJSONPreview(this._json, 30, false /* recurse */));
+    this.preview.append(renderJSONPreview(this._json, 30));
     this.preview.append(this._suffix);
     this.expanded.textContent = '';
   }
@@ -495,12 +496,12 @@ class JSONView {
     this.expanded.textContent = '';
     const entries = Object.entries(this._json);
     for (const [key, value] of Object.entries(this._json)) {
-      const jsonRow = html`<hbox style='padding-left: ${this._nesting * 2 + 2}ch'></hbox>`;
+      const jsonRow = html`<span text_overflow style='padding-left: ${this._nesting * 2 + 2}ch;'></span>`;
       const prefix = !isArray ? html`
-        <hbox>
+        <span>
           ${renderJSONKey(key)}
-          <span style='margin-right: 1ex'>: </span>
-        </hbox>
+          <span style='margin-right: 1ex'>:</span>
+        </span>
       ` : '';
       if (typeof value === 'object') {
         const jsonView = new JSONView(value, prefix, '', this._nesting + 1);

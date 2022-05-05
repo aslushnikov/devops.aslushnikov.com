@@ -1,9 +1,18 @@
 @import url("./typography.css");
 @import url("./popover.css");
 
+hbox, vbox {
+  overflow: hidden; /* opt-out of default min-width: fit-content and min-height: fit-content; */
+}
+
 body {
   font-size: 12px;
   --popover-color: #fff9c4;
+}
+
+[text_overflow] {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .log-row-icon {

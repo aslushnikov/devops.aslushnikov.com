@@ -44,7 +44,7 @@ class PWLog {
   constructor() {
     this.render = Throttler.wrap(this._doRender.bind(this));
 
-    this.log = observable(localStorage.getItem('log') || '', value => this._setLog(value));
+    this.log = observable(localStorage.getItem('log') || '');
     this.showStdout = observable(true, () => this.render());
     this.showAck = observable(false, () => this.render());
     this.filter = observable('', () => this.render());
@@ -60,7 +60,17 @@ class PWLog {
             background-color: #f5f5f5;
             border-bottom: 1px solid #333;
         '>
-          <a onclick="${() => this.log.set('')}"><h4 style='margin: 0 1em 0 0;'>PWLog</h4></a>
+          <h4 style='
+                margin: 0 1em 0 0;
+                color: var(--link-color);
+              '
+          >PWLog</h4>
+          <hbox>
+            <button
+              onclick=${() => this.log.set('')}
+              onzrender=${node => this.log.observe(log => node.disabled = !log)}
+            >Clear</button>
+          </hbox>
           <hbox>
             <input
               type=checkbox
@@ -97,6 +107,8 @@ class PWLog {
       const log = e.clipboardData.getData('text/plain');
       this.log.set(log);
     }, false);
+
+    this.log.observe(log => this._setLog(log));
   }
 
   _doRender() {
@@ -113,7 +125,9 @@ class PWLog {
     const logElement = html`<vbox style='
         display: grid;
         grid-column-gap: 5px;
-        grid-template-columns: [namespace] fit-content(200px) [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
+        grid-template-columns:
+            [namespace] fit-content(200px)
+            [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
       '></vbox>
     `;
     this._logContainer.append(logElement);

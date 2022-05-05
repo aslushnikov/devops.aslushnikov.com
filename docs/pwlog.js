@@ -65,12 +65,10 @@ class PWLog {
                 color: var(--link-color);
               '
           >PWLog</h4>
-          <hbox>
-            <button
-              onclick=${() => this.log.set('')}
-              onzrender=${node => this.log.observe(log => node.disabled = !log)}
-            >Clear</button>
-          </hbox>
+          <button
+            onclick=${() => this.log.set('')}
+            onzrender=${node => this.log.observe(log => node.disabled = !log)}
+          >Clear</button>
           <hbox>
             <input
               type=checkbox
@@ -140,50 +138,45 @@ class PWLog {
       if (!msg.raw().toLowerCase().includes(this.filter.get().toLowerCase()))
         continue;
       logElement.append(html`
-        <hbox style='
+        <div style='
             grid-column: namespace;
-            align-items: center;
-            justify-content: center;
             margin-left: 5px;
           '
-        >${msg.renderNamespace()}</hbox>
+        >${msg.renderNamespace()}</div>
       `);
       logElement.append(html`
-        <hbox style='
+        <div style='
             grid-column: icon;
-            align-items: center;
-            justify-content: center;
           '
         >
           ${msg.renderIcon(!this.showAck.get())}
-        </hbox>
+        </div>
       `);
       logElement.append(html`
-        <hbox style='grid-column: warn'>
+        <div style='grid-column: warn'>
           ${msg.renderWarnElement()}
-        </hbox>
+        </div>
       `);
 
       if (msg.timestamp() !== undefined) {
         const delta = msg.timestamp() - lastTimestamp;
         lastTimestamp = msg.timestamp();
         logElement.append(html`
-          <hbox style='grid-column: msdelta; justify-content: end;'>+${humanReadableTimeIntervalShort(delta)}</hbox>
+          <div style='
+                grid-column: msdelta;
+                text-align: right;
+                justify-content: end;
+              '>+${humanReadableTimeIntervalShort(delta)}</div>
         `);
       }
-      for (const line of [msg.renderFirstLine(), msg.renderSecondLine()]) {
-        if (!line)
-          continue;
-        logElement.append(html`
-          <hbox style='
-              grid-column: message;
-              overflow: hidden; /* override default min-size: auto; behavior in grid items */
-              white-space: nowrap;
-              border-left: 1px solid #bdbdbd;
-              padding-left: 5px;
-            '>${line}</hbox>
-        `);
-      }
+      logElement.append(html`
+        <div text_overflow style='
+            grid-column: message;
+            white-space: nowrap;
+            border-left: 1px solid #bdbdbd;
+            padding-left: 5px;
+          '>${msg.renderFirstLine()}${msg.renderSecondLine()}</div>
+      `);
     }
   }
 
@@ -398,7 +391,7 @@ function renderJSONKey(key) {
 }
 
 function renderJSONPreview(json, maxValueSize = 30) {
-  const element = html`<hbox></hbox>`;
+  const element = html`<hbox text_overflow></hbox>`;
   if (typeof json !== 'object') {
     element.append(renderJSONValue(json, maxValueSize));
     return element;
@@ -441,8 +434,8 @@ class JSONView {
     this._suffix = suffix;
     this._nesting = nesting;
     this._isExpanded = false;
-    this.preview = html`<hbox></hbox>`;
-    this.expanded = html`<vbox></vbox>`;
+    this.preview = html`<hbox text_overflow></hbox>`;
+    this.expanded = html`<vbox text_overflow></vbox>`;
     this.collapse();
 
     if (this.isExpandable()) {

@@ -26,8 +26,32 @@ document.documentElement.addEventListener('click', event => {
   popover.hide();
 }, true);
 
-window.addEventListener('DOMContentLoaded', async () => {
+function generatePalette(amount) {
+  const result = [];
+  const hueStep = 360 / amount;
+  for (let i = 0; i < amount; ++i)
+    result.push(`hsl(${hueStep * i}, 100%, 85%)`);
+  return result;
+}
 
+function colorsPie(colors) {
+  const N = 400 / colors.length;
+  return html`
+    <hbox style="justify-content: center; width: 100%; height: 100%;">
+      <div style="
+          width: 400px;
+          height: 400px;
+          border-radius: 50%;
+          border: 1px solid black;
+          background: conic-gradient(
+            ${colors.map((color, index) => `${color} ${N * index}grad, ${color} ${N * index + N}grad`).join(',')}
+          );
+        "></div>
+    </hbox>
+  `;
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
   const pwlog = new PWLog();
   document.body.append(html`
     ${pwlog.element}
@@ -35,7 +59,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   urlState.startListening(Throttler.wrap(async () => {
     const state = urlState.state();
+
+    const excludeDomains = [];
+    for (const [key, value] of Object.entries(state)) {
+      if (key.startsWith('domain-'))
+        excludeDomains.push(key.substring('domain-'.length).toLowerCase());
+    }
+    pwlog.excludeDomains.set(new Set(excludeDomains));
     pwlog.filter.set(state.filter || '');
+    pwlog.colorCoding.set(!state.color_coding);
   }));
 }, false);
 
@@ -45,6 +77,12 @@ class PWLog {
 
     this.log = observable(localStorage.getItem('log') || '');
     this.filter = observable('', () => this.render());
+    // This comes from user toggling buttons.
+    this.excludeDomains = observable(new Set(), () => this.render());
+    this.colorCoding = observable(true, () => this.render());
+
+    // This comes from the set of messages in the log.
+    this._allDomains = observable([]);
 
     this._messages = [];
 
@@ -71,9 +109,19 @@ class PWLog {
               type=text
               placeholder="filter.."
               onzrender=${e => this.filter.observe(value => e.value = value)}
-              oninput=${e => urlState.amend({ filter: e.target.value })}
+              oninput=${e => urlState.amend({ filter: e.target.value || undefined })}
             >
           </hbox>
+          <hbox style='margin-left: 1em;'>
+            <input
+              id=label-color-coding
+              type=checkbox
+              onzrender=${e => this.colorCoding.observe(value => e.checked = value)}
+              oninput=${e => urlState.amend({ color_coding: e.target.checked ? undefined : '0' })}
+            >
+            <label for=label-color-coding>Color Coding</label>
+          </hbox>
+          <hbox onzrender=${node => this._allDomains.observe(domains => this._renderDomains(node, domains))}></hbox>
         </hbox>
         <vbox onzrender=${e => this._logContainer = e}></vbox>
       </vbox>
@@ -86,6 +134,37 @@ class PWLog {
     }, false);
 
     this.log.observe(log => this._setLog(log));
+  }
+
+  _renderDomains(container, domains) {
+    container.textContent = '';
+    domains.sort((a, b) => a < b ? -1 : 1);
+    if (!domains.length)
+      return;
+
+    const fieldset = html`
+      <fieldset style="
+        padding: 0 5px;
+        margin: 0 5px;
+        border: 1px solid #333;
+        display: flex;
+      ">
+        <legend>Domains</legend>
+      </fieldset>
+    `;
+    container.append(fieldset);
+    for (const domain of domains) {
+      const id = `option-domain-` + domain;
+      const optionName = `domain-` + domain.toLowerCase();
+      fieldset.append(html`
+        <hbox>
+          <input type=checkbox id=${id}
+                 onzrender=${node => this.excludeDomains.observe(excluded => node.checked = !excluded.has(domain.toLowerCase()))}
+                 oninput=${e => urlState.amend({ [optionName]: e.target.checked ? undefined : 0 })}>
+          <label for=${id}>${domain}</label>
+        </hbox>
+      `);
+    }
   }
 
   _doRender() {
@@ -123,18 +202,17 @@ class PWLog {
         recvMessages.set(msg.id(), msg);
     }
 
-    const domainToColor = {
-      '': 'transparent',
+    const domainToColor = this.colorCoding.get() ? {
       'Page': '#fff9c4',
-      'Target': '#ede7f6',
+      'Browser': '#d7ccc8',
       'Network': '#e3f2fd',
       'Runtime': '#fff3e0',
-      'Browser': '#eceff1',
-      'Input': '#f1f8e9',
+      'Target': '#e1bee7',
+      'Input': '#b2dfdb',
       'Log': '#e0e0e0',
-      'Emulation': '#fbe9e7',
-      'DOM': '#e1f5fe'
-    };
+      'Emulation': '#ffccbc',
+      'DOM': '#c8e6c9'
+    } : {};
 
     const renderMessage = (msg, bgColor = 'transparent') => html`
       <div text_overflow style='
@@ -151,33 +229,33 @@ class PWLog {
         continue;
       if (msg.type() === msgTypes.STDOUT)
         continue;
-      const rowWrapper = html`<div hoverable style="display: contents;"></div>`;
-      logElement.append(rowWrapper);
+      if (msg.domain() && this.excludeDomains.get().has(msg.domain().toLowerCase()))
+        continue;
 
       const command = msg.type() === msgTypes.SEND ? msg : undefined;
       const response = command ? recvMessages.get(msg.id()) : undefined;
       const event = msg.type() === msgTypes.RECV && !msg.id() ? msg : undefined;
 
       if (command) {
-        rowWrapper.append(renderMessage(command, domainToColor[command.domain()]));
+        logElement.append(renderMessage(command, domainToColor[command.domain()] ?? 'transparent'));
         if (response) {
-          rowWrapper.append(html`
+          logElement.append(html`
             <vbox style='
                 grid-column: duration;
                 padding: 0 10px;
                 text-align: right;
                 font-size: 8px;
-                background-color: ${domainToColor[command.domain()]};
+                background-color: ${domainToColor[command.domain()] ?? 'transparent'};
                 border-bottom: 1px solid #ddd;
                 justify-content: center;
               '>
                 ${humanReadableTimeIntervalShort(response.timestamp() - command.timestamp())}
               </vbox>
           `);
-          rowWrapper.append(renderMessage(response, domainToColor[command.domain()]));
+          logElement.append(renderMessage(response, domainToColor[command.domain()] ?? 'transparent'));
           allMessages.delete(response);
         } else {
-          rowWrapper.append(html`
+          logElement.append(html`
             <div style='
                 grid-column: recvmsg;
                 color: red;
@@ -185,7 +263,7 @@ class PWLog {
           `);
         }
       } else {
-        rowWrapper.append(renderMessage(msg, domainToColor[msg.domain() || '']));
+        logElement.append(renderMessage(msg, domainToColor[msg.domain()] ?? 'transparent'));
       }
     }
   }
@@ -200,8 +278,13 @@ class PWLog {
     const lines = stripAnsi(log).split('\n');
     const parsedLines = [];
     let lastParsed = undefined;
+    const sendMessages = new Map();
     for (const line of lines) {
       const parsed = LogMessage.parse(line);
+      if (parsed.type === msgTypes.SEND && parsed.json?.id && parsed.json?.method)
+        sendMessages.set(parsed.json.id, parsed.json.method);
+      else if (parsed.type === msgTypes.RECV && parsed.json?.id)
+        parsed.json.ackMethod = sendMessages.get(parsed.json.id);
       if (parsed.type === msgTypes.STDOUT && lastParsed?.type === msgTypes.STDOUT && !parsed.parseError) {
         lastParsed.raw += '\n' + parsed.raw;
       } else {
@@ -212,6 +295,7 @@ class PWLog {
     this._messages = [];
     let currentTimestamp = 0;
     let firstTimestamp = undefined;
+    const domains = new Set();
     for (const parsedLine of parsedLines) {
       let timestamp = undefined;
       if (parsedLine.msDelta !== undefined) {
@@ -223,11 +307,15 @@ class PWLog {
         timestamp = parsedLine.timestamp - firstTimestamp;
       }
 
-      this._messages.push(new LogMessage({
+      const logMessage = new LogMessage({
         ...parsedLine,
         timestamp,
-      }));
+      });
+      if (logMessage.domain())
+        domains.add(logMessage.domain());
+      this._messages.push(logMessage);
     }
+    this._allDomains.set([...domains]);
     this.render();
   }
 }
@@ -285,7 +373,7 @@ class LogMessage {
 
     let icon = undefined;
     if (this._type === msgTypes.SEND)
-      icon = html`<span class="msg-type-send log-row-icon">SEND ${CHAR_TRIANGLE_RIGHT}</span>`;
+      icon = html`<span class="msg-type-send log-row-icon">CMD ${CHAR_TRIANGLE_RIGHT}</span>`;
     else if (this._type === msgTypes.RECV && json?.id)
       icon = html`<span class="msg-type-recv log-row-icon">${CHAR_TRIANGLE_LEFT} ACK</span>`;
     else
@@ -303,11 +391,11 @@ class LogMessage {
       }
     } else if (json?.id) {
       if (Object.keys(json.result ?? {}).length) {
-        const jsonView = new JSONView(json.result ?? {}, html`<hbox>${icon}</hbox>`);
+        const jsonView = new JSONView(json.result ?? {}, html`<hbox>${icon}${json.ackMethod}(</hbox>`, ')');
         firstLineElement = jsonView.preview;
         secondLineElement = jsonView.expanded;
       } else {
-        firstLineElement = html`<hbox>${icon}{}</hbox>`;
+        firstLineElement = html`<hbox>${icon}${json.ackMethod}({})</hbox>`;
       }
     } else {
       firstLineElement = html`${this._rawLines[0] ?? ''}`;
@@ -324,7 +412,7 @@ class LogMessage {
 
   timestamp() { return this._timestamp; }
 
-  domain() { return this._json?.method?.split('.')[0]; }
+  domain() { return (this._json?.method ?? this._json?.ackMethod)?.split('.')[0]; }
   id() { return this._json?.id; }
   json() { return this._json; }
   isAck() { return this._json && !this._json.method; }
@@ -353,7 +441,7 @@ function renderJSONValue(value, maxValueSize = Infinity) {
 }
 
 function renderJSONKey(key) {
-  return html`<span style="color: #757575">${key}</span>`;
+  return html`<span style="">${key}</span>`;
 }
 
 function renderJSONPreview(json, maxValueSize = 30) {
@@ -366,23 +454,21 @@ function renderJSONPreview(json, maxValueSize = 30) {
     return element;
   }
 
-  const punct = (text, marginLeft = 0, marginRight = 0) => html`<span style='margin: 0 ${marginRight} 0 ${marginLeft};'>${text}</span>`;
-
   const isArray = Array.isArray(json);
   const entries = Object.entries(json || {});
 
-  element.append(punct(isArray ? '[' : '{', 0, entries.length ? '1ex' : 0));
+  element.append(isArray ? '[' : '{');
   // We'd like middle part to shrink, so it's a text_overflow container.
   const shrinkable = html`<span text_overflow></span>`;
   element.append(shrinkable);
   for (let i = 0; i < entries.length; ++i) {
     const [key, value] = entries[i];
     if (i > 0)
-      shrinkable.append(punct(', ', 0, '1ex'));
+      shrinkable.append(', ');
     // Do not render keys for arrays.
     if (!isArray) {
       shrinkable.append(renderJSONKey(key));
-      shrinkable.append(punct(': ', 0, '1ex'));
+      shrinkable.append(': ');
     }
     if (typeof value === 'object') {
       if (Array.isArray(value))
@@ -393,7 +479,7 @@ function renderJSONPreview(json, maxValueSize = 30) {
       shrinkable.append(renderJSONValue(value, maxValueSize));
     }
   }
-  element.append(punct(isArray ? ']' : '}', entries.length ? '1ex' : 0, 0));
+  element.append(isArray ? ']' : '}');
   return element;
 }
 

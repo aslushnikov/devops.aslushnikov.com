@@ -15,17 +15,13 @@ body {
   text-overflow: ellipsis;
 }
 
-[hoverable]:hover > * {
-  background-color: lightyellow;
-}
-
 .log-row-icon {
   padding: 1px 6px;
   margin-right: 6px;
   border-radius: 6px;
   font-family: var(--regular);
   font-weight: bold;
-  font-size: 60%;
+  font-size: 7px;
   flex: none;
 }
 

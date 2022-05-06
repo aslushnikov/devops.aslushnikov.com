@@ -123,11 +123,26 @@ class PWLog {
         recvMessages.set(msg.id(), msg);
     }
 
-    const renderMessage = (msg, column = msg.type() === msgTypes.SEND ? 'sendmsg' : 'recvmsg') => html`
+    const domainToColor = {
+      '': 'transparent',
+      'Page': '#fff9c4',
+      'Target': '#ede7f6',
+      'Network': '#e3f2fd',
+      'Runtime': '#fff3e0',
+      'Browser': '#eceff1',
+      'Input': '#f1f8e9',
+      'Log': '#e0e0e0',
+      'Emulation': '#fbe9e7',
+      'DOM': '#e1f5fe'
+    };
+
+    const renderMessage = (msg, bgColor = 'transparent') => html`
       <div text_overflow style='
-          grid-column: ${column};
+          grid-column: ${msg.type() === msgTypes.SEND ? 'sendmsg' : 'recvmsg'};
           white-space: nowrap;
           padding-left: 5px;
+          background-color: ${bgColor};
+          border-bottom: 1px solid #ddd;
         '>${msg.element}</div>
     `;
 
@@ -144,9 +159,9 @@ class PWLog {
       const event = msg.type() === msgTypes.RECV && !msg.id() ? msg : undefined;
 
       if (command) {
-        rowWrapper.append(renderMessage(command));
+        rowWrapper.append(renderMessage(command, domainToColor[command.domain()]));
         if (response) {
-          rowWrapper.append(renderMessage(response));
+          rowWrapper.append(renderMessage(response, domainToColor[command.domain()]));
           allMessages.delete(response);
         } else {
           rowWrapper.append(html`
@@ -157,7 +172,7 @@ class PWLog {
           `);
         }
       } else {
-        rowWrapper.append(renderMessage(msg));
+        rowWrapper.append(renderMessage(msg, domainToColor[msg.domain() || '']));
       }
     }
   }
@@ -296,6 +311,7 @@ class LogMessage {
 
   timestamp() { return this._timestamp; }
 
+  domain() { return this._json?.method?.split('.')[0]; }
   id() { return this._json?.id; }
   json() { return this._json; }
   isAck() { return this._json && !this._json.method; }

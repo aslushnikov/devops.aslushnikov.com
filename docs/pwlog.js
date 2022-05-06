@@ -7,9 +7,10 @@ import { Popover } from './widgets.js';
 const urlState = new URLState();
 const CHAR_ELLIPSIS = '…';
 const CHAR_LONG_DASH = '—';
-const CHAR_ARROW_RIGHT = '►';
-const CHAR_ARROW_LEFT = '◀';
-const CHAR_ARROW_BOTTOM = '▼';
+const CHAR_TRIANGLE_RIGHT = '►';
+const CHAR_ARROW_RIGHT = '⟼';
+const CHAR_TRIANGLE_LEFT = '◀';
+const CHAR_TRIANGLE_BOTTOM = '▼';
 const CHAR_WARN = '⚠';
 const CHAR_QUESTION = '�'
 const ICON_WARN = (width = 24, height = 24, fill = 'black') => svg`<svg fill=${fill} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${width}" height="${height}"><path fill-rule="evenodd" d="M1 12C1 5.925 5.925 1 12 1s11 4.925 11 11-4.925 11-11 11S1 18.075 1 12zm8.036-4.024a.75.75 0 00-1.06 1.06L10.939 12l-2.963 2.963a.75.75 0 101.06 1.06L12 13.06l2.963 2.964a.75.75 0 001.061-1.06L13.061 12l2.963-2.964a.75.75 0 10-1.06-1.06L12 10.939 9.036 7.976z"></path></svg>`;
@@ -101,9 +102,8 @@ class PWLog {
     const logElement = html`<section id=grid style='
         display: grid;
         grid-template-columns:
-            [sendicon] fit-content(200px)
             [sendmsg] 1fr
-            [recvicon] fit-content(200px)
+            [duration] fit-content(200px)
             [recvmsg] 1fr
           ;
       '></section>
@@ -161,6 +161,19 @@ class PWLog {
       if (command) {
         rowWrapper.append(renderMessage(command, domainToColor[command.domain()]));
         if (response) {
+          rowWrapper.append(html`
+            <vbox style='
+                grid-column: duration;
+                padding: 0 10px;
+                text-align: right;
+                font-size: 8px;
+                background-color: ${domainToColor[command.domain()]};
+                border-bottom: 1px solid #ddd;
+                justify-content: center;
+              '>
+                ${humanReadableTimeIntervalShort(response.timestamp() - command.timestamp())}
+              </vbox>
+          `);
           rowWrapper.append(renderMessage(response, domainToColor[command.domain()]));
           allMessages.delete(response);
         } else {
@@ -272,11 +285,11 @@ class LogMessage {
 
     let icon = undefined;
     if (this._type === msgTypes.SEND)
-      icon = html`<span class="msg-type-send log-row-icon">SEND ${CHAR_ARROW_RIGHT}</span>`;
+      icon = html`<span class="msg-type-send log-row-icon">SEND ${CHAR_TRIANGLE_RIGHT}</span>`;
     else if (this._type === msgTypes.RECV && json?.id)
-      icon = html`<span class="msg-type-recv log-row-icon">${CHAR_ARROW_LEFT} ACK</span>`;
+      icon = html`<span class="msg-type-recv log-row-icon">${CHAR_TRIANGLE_LEFT} ACK</span>`;
     else
-      icon = html`<span class="msg-type-event log-row-icon">${CHAR_ARROW_LEFT} EVENT</span>`;
+      icon = html`<span class="msg-type-event log-row-icon">${CHAR_TRIANGLE_LEFT} EVENT</span>`;
 
     let firstLineElement = undefined;
     let secondLineElement = undefined;
@@ -419,7 +432,7 @@ class JSONView {
         font-size: 80%;
         position: absolute;
         color: ${this.isExpandable() ? '#aaa' : 'transparent'};
-      '>${this._isExpanded ? CHAR_ARROW_BOTTOM : CHAR_ARROW_RIGHT}</span>
+      '>${this._isExpanded ? CHAR_TRIANGLE_BOTTOM : CHAR_TRIANGLE_RIGHT}</span>
     `;
   }
 

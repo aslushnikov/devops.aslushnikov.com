@@ -258,8 +258,10 @@ class LogMessage {
     let icon = undefined;
     if (this._type === msgTypes.SEND)
       icon = html`<span class="msg-type-send log-row-icon">SEND ${CHAR_ARROW_RIGHT}</span>`;
-    else if (this._type === msgTypes.RECV)
-      icon = html`<span class="msg-type-recv log-row-icon">${CHAR_ARROW_LEFT} RECV</span>`;
+    else if (this._type === msgTypes.RECV && json?.id)
+      icon = html`<span class="msg-type-recv log-row-icon">${CHAR_ARROW_LEFT} ACK</span>`;
+    else
+      icon = html`<span class="msg-type-event log-row-icon">${CHAR_ARROW_LEFT} EVENT</span>`;
 
     let firstLineElement = undefined;
     let secondLineElement = undefined;

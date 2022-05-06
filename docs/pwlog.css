@@ -44,11 +44,6 @@ body {
     color: white;
   }
 
-  .log-row-icon.msg-type-cmd {
-    background-color: #4caf50;
-    color: white;
-  }
-
   .log-row-icon.msg-type-event {
     background-color: #3f51b5;
     color: white;

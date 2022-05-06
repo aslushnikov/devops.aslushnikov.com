@@ -35,8 +35,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   urlState.startListening(Throttler.wrap(async () => {
     const state = urlState.state();
     pwlog.filter.set(state.filter || '');
-    pwlog.showStdout.set(JSON.parse(state.stdout ?? 'false'));
-    pwlog.showAck.set(JSON.parse(state.ack ?? 'false'));
   }));
 }, false);
 
@@ -45,8 +43,6 @@ class PWLog {
     this.render = Throttler.wrap(this._doRender.bind(this));
 
     this.log = observable(localStorage.getItem('log') || '');
-    this.showStdout = observable(true, () => this.render());
-    this.showAck = observable(false, () => this.render());
     this.filter = observable('', () => this.render());
 
     this._messages = [];
@@ -69,24 +65,6 @@ class PWLog {
             onclick=${() => this.log.set('')}
             onzrender=${node => this.log.observe(log => node.disabled = !log)}
           >Clear</button>
-          <hbox>
-            <input
-              type=checkbox
-              onzrender=${e => this.showAck.observe(value => e.checked = value)}
-              oninput=${e => urlState.amend({ ack: !!e.target.checked })}
-              id=show-ack
-            >
-            <label for=show-ack>Show ACKs</label>
-          </hbox>
-          <hbox style='margin-left: 1em;'>
-            <input
-              type=checkbox
-              onzrender=${e => this.showStdout.observe(value => e.checked = value)}
-              oninput=${e => urlState.amend({ stdout: !!e.target.checked })}
-              id=show-raw-messages
-            >
-            <label for=show-raw-messages>Show stdout</label>
-          </hbox>
           <hbox style='margin-left: 1em;'>
             <input
               type=text
@@ -122,61 +100,65 @@ class PWLog {
 
     const logElement = html`<section id=grid style='
         display: grid;
-        grid-column-gap: 5px;
         grid-template-columns:
-            [namespace] fit-content(200px)
-            [icon] fit-content(200px) [warn] fit-content(200px) [msdelta] fit-content(200px) [message] 1fr;
+            [sendicon] fit-content(200px)
+            [sendmsg] 1fr
+            [recvicon] fit-content(200px)
+            [recvmsg] 1fr
+          ;
       '></section>
     `;
     this._logContainer.append(logElement);
-    let lastTimestamp = this._messages[0]?.timestamp() ?? 0;
+
+    const sendMessages = new Map();
+    const recvMessages = new Map();
+    const allMessages = new Set();
     for (const msg of this._messages) {
-      if (msg.isAck() && !this.showAck.get())
+      allMessages.add(msg);
+      if (!msg.id())
         continue;
-      if (msg.type() === msgTypes.STDOUT && !this.showStdout.get())
-        continue;
+      if (msg.type() === msgTypes.SEND)
+        sendMessages.set(msg.id(), msg);
+      else if (msg.type() === msgTypes.RECV)
+        recvMessages.set(msg.id(), msg);
+    }
+
+    const renderMessage = (msg, column = msg.type() === msgTypes.SEND ? 'sendmsg' : 'recvmsg') => html`
+      <div text_overflow style='
+          grid-column: ${column};
+          white-space: nowrap;
+          padding-left: 5px;
+        '>${msg.element}</div>
+    `;
+
+    for (const msg of allMessages) {
       if (!msg.raw().toLowerCase().includes(this.filter.get().toLowerCase()))
         continue;
-      logElement.append(html`
-        <div style='
-            grid-column: namespace;
-            margin-left: 5px;
-          '
-        >${msg.renderNamespace()}</div>
-      `);
-      logElement.append(html`
-        <div style='
-            grid-column: icon;
-          '
-        >
-          ${msg.renderIcon(!this.showAck.get())}
-        </div>
-      `);
-      logElement.append(html`
-        <div style='grid-column: warn'>
-          ${msg.renderWarnElement()}
-        </div>
-      `);
+      if (msg.type() === msgTypes.STDOUT)
+        continue;
+      const rowWrapper = html`<div hoverable style="display: contents;"></div>`;
+      logElement.append(rowWrapper);
 
-      if (msg.timestamp() !== undefined) {
-        const delta = msg.timestamp() - lastTimestamp;
-        lastTimestamp = msg.timestamp();
-        logElement.append(html`
-          <div style='
-                grid-column: msdelta;
-                text-align: right;
-                justify-content: end;
-              '>+${humanReadableTimeIntervalShort(delta)}</div>
-        `);
+      const command = msg.type() === msgTypes.SEND ? msg : undefined;
+      const response = command ? recvMessages.get(msg.id()) : undefined;
+      const event = msg.type() === msgTypes.RECV && !msg.id() ? msg : undefined;
+
+      if (command) {
+        rowWrapper.append(renderMessage(command));
+        if (response) {
+          rowWrapper.append(renderMessage(response));
+          allMessages.delete(response);
+        } else {
+          rowWrapper.append(html`
+            <div style='
+                grid-column: recvmsg;
+                color: red;
+              '>NO REPONSE FOUND</div>
+          `);
+        }
+      } else {
+        rowWrapper.append(renderMessage(msg));
       }
-      logElement.append(html`
-        <div text_overflow style='
-            grid-column: message;
-            white-space: nowrap;
-            border-left: 1px solid #bdbdbd;
-            padding-left: 5px;
-          '>${msg.renderFirstLine()}${msg.renderSecondLine()}</div>
-      `);
     }
   }
 
@@ -188,17 +170,10 @@ class PWLog {
       return;
     }
     const lines = stripAnsi(log).split('\n');
-    const sendMessages = new Map();
-    const recvMessages = new Map();
     const parsedLines = [];
     let lastParsed = undefined;
     for (const line of lines) {
       const parsed = LogMessage.parse(line);
-      if (parsed.json && parsed.json.id && parsed.type === msgTypes.SEND)
-        sendMessages.set(parsed.json.id, parsed.json);
-      else if (parsed.json && parsed.json.id && parsed.type === msgTypes.RECV)
-        recvMessages.set(parsed.json.id, parsed.json);
-
       if (parsed.type === msgTypes.STDOUT && lastParsed?.type === msgTypes.STDOUT && !parsed.parseError) {
         lastParsed.raw += '\n' + parsed.raw;
       } else {
@@ -223,8 +198,6 @@ class PWLog {
       this._messages.push(new LogMessage({
         ...parsedLine,
         timestamp,
-        sendMessages,
-        recvMessages,
       }));
     }
     this.render();
@@ -273,7 +246,7 @@ class LogMessage {
     }
   }
 
-  constructor({ raw, type, namespace, json, parseError, timestamp, sendMessages = new Map(), recvMessages = new Map() }) {
+  constructor({ raw, type, namespace, json, parseError, timestamp }) {
     this._raw = raw;
     this._rawLines = raw.trim().split('\n');
     this._type = type;
@@ -281,90 +254,52 @@ class LogMessage {
     this._json = json;
     this._timestamp = timestamp;
     this._parseError = parseError;
-    const jsonData = json?.params ?? json?.result;
 
+    let icon = undefined;
+    if (this._type === msgTypes.SEND)
+      icon = html`<span class="msg-type-send log-row-icon">SEND ${CHAR_ARROW_RIGHT}</span>`;
+    else if (this._type === msgTypes.RECV)
+      icon = html`<span class="msg-type-recv log-row-icon">${CHAR_ARROW_LEFT} RECV</span>`;
+
+    let firstLineElement = undefined;
+    let secondLineElement = undefined;
     if (json?.method) {
-      this._jsonView = new JSONView(json.params ?? {}, json.method + '(', ')');
+      if (json.params) {
+        const jsonView = new JSONView(json.params, html`<hbox>${icon}${json.method}(</hbox>`, ')');
+        firstLineElement = jsonView.preview;
+        secondLineElement = jsonView.expanded;
+      } else {
+        firstLineElement = html`<hbox>${icon}${json.method}()</hbox>`;
+      }
     } else if (json?.id) {
-      const ackReference = type === msgTypes.RECV ? sendMessages.get(json.id)?.method : undefined;
-      const prefix = html`<span style='color: #7f7f7f'>&lt;ACK ${CHAR_LONG_DASH} ${ackReference || 'Unknown'}&gt;(</span>`;
-      this._jsonView = new JSONView(json.result, prefix, ')');
+      if (Object.keys(json.result ?? {}).length) {
+        const jsonView = new JSONView(json.result ?? {}, html`<hbox>${icon}</hbox>`);
+        firstLineElement = jsonView.preview;
+        secondLineElement = jsonView.expanded;
+      } else {
+        firstLineElement = html`<hbox>${icon}{}</hbox>`;
+      }
+    } else {
+      firstLineElement = html`${this._rawLines[0] ?? ''}`;
+      secondLineElement = html`<div style='white-space: pre;'>${this._rawLines.slice(1).join('\n')}</div>`;
     }
 
-    this._sendMessages = sendMessages;
-    this._recvMessages = recvMessages;
-
-    this._errorText = '';
-    if (this._parseError) {
-      this._errorText = `Parsing Error: ${this._parseError.message}`;
-    } else if (this._json?.id) {
-      if (this._type === msgTypes.RECV && !sendMessages.has(this._json.id))
-        this._errorText = `ERROR: this ack protocol message is missing a matching protocol command`;
-      else if (this._type === msgTypes.SEND && !recvMessages.has(this._json.id))
-        this._errorText = `ERROR: this protocol command is missing a matching protocol ack response`;
-    }
+    this.element = html`
+      <vbox>
+        ${firstLineElement}
+        ${secondLineElement}
+      </vbox>
+    `;
   }
 
   timestamp() { return this._timestamp; }
 
+  id() { return this._json?.id; }
   json() { return this._json; }
   isAck() { return this._json && !this._json.method; }
   parseError() { return this._parseError; }
   type() { return this._type; }
   raw() { return this._raw; }
-
-  renderIcon(showAsCommand) {
-    if (this._type === msgTypes.STDOUT)
-      return undefined;
-    const iconClass = {
-      [msgTypes.SEND]: showAsCommand ? 'msg-type-cmd' : 'msg-type-send',
-      [msgTypes.RECV]: showAsCommand ? 'msg-type-event' : 'msg-type-recv',
-    }[this._type];
-    const iconText = {
-      [msgTypes.SEND]: showAsCommand ? 'cmd' : `SEND ${CHAR_ARROW_RIGHT}`,
-      [msgTypes.RECV]: showAsCommand ? 'event' : `${CHAR_ARROW_LEFT} RECV`,
-    }[this._type];
-    return html`<span class="${iconClass} log-row-icon">${iconText}</span>`;
-  }
-
-  renderNamespace() {
-    return html`
-      <hbox style='
-          align-items: center;
-          justify-content: center;
-          background-color: #9e9e9e;
-          padding: 0px 4px;
-          border-radius: 5px;
-          font-size: 10px;
-          color: white;
-        '>${this._namespace}</hbox>
-    `;
-  }
-
-  renderWarnElement() {
-    if (!this._errorText)
-      return html``;
-    return html`
-      <hbox style="grid-area: warn;" onclick=${popover.onClickHandler(() => html`<div style='font: 1em/1.6 var(--regular);'>${this._errorText}</div>`)}>
-        ${ICON_EXCLAMATION(15, 15)}
-      </hbox>
-    `;
-  }
-
-  renderFirstLine() {
-    if (!this._json)
-      return html`${this._rawLines[0] ?? ''}`;
-
-    if (this._jsonView)
-      return this._jsonView.preview;
-    return html`<span>${this._json.method}()</span>`;
-  }
-
-  renderSecondLine() {
-    if (!this._json)
-      return html`<div style='white-space: pre;'>${this._rawLines.slice(1).join('\n')}</div>`;
-    return this._jsonView?.expanded;
-  }
 }
 
 function renderJSONValue(value, maxValueSize = Infinity) {
@@ -391,7 +326,10 @@ function renderJSONKey(key) {
 }
 
 function renderJSONPreview(json, maxValueSize = 30) {
-  const element = html`<hbox text_overflow></hbox>`;
+  const element = html`<span text_overflow style="
+      display: inline-flex;
+      align-items: center;
+    "></span>`;
   if (typeof json !== 'object') {
     element.append(renderJSONValue(json, maxValueSize));
     return element;
@@ -403,6 +341,7 @@ function renderJSONPreview(json, maxValueSize = 30) {
   const entries = Object.entries(json || {});
 
   element.append(punct(isArray ? '[' : '{', 0, entries.length ? '1ex' : 0));
+  // We'd like middle part to shrink, so it's a text_overflow container.
   const shrinkable = html`<span text_overflow></span>`;
   element.append(shrinkable);
   for (let i = 0; i < entries.length; ++i) {

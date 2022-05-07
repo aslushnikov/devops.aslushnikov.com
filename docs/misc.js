@@ -43,7 +43,7 @@ export function humanReadableTimeIntervalShort(diff) {
 }
 
 export function humanReadableDate(date) {
-  return date.toLocaleString('default', {month: 'short'}) + ', ' + date.getDate();
+  return date.toLocaleString('default', { month: 'short' }) + ' ' + date.getDate() + ', ' + date.getFullYear();
 }
 
 export function humanReadableSize(bytes) {
@@ -145,4 +145,13 @@ export function highlightANSIText(text) {
 const ansiRegex = new RegExp('[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))', 'g');
 export function stripAnsi(str) {
   return str.replace(ansiRegex, '');
+}
+
+Map.prototype.getOrCreate = function(key, initializeCallback) {
+  let value = this.get(key);
+  if (!value) {
+    value = initializeCallback();
+    this.set(key, value);
+  }
+  return value;
 }

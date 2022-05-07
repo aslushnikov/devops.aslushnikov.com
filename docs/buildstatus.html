@@ -121,16 +121,17 @@ class CDNStatusView {
       const HOST = 'https://playwright2.blob.core.windows.net';
       const buildURL = `${HOST}/builds/${browserName}/${buildNumber}/${build}`;
       const logURL = `${HOST}/builds/${browserName}/${buildNumber}/${build.replace(/\.zip$/, '.log.gz')}`;
-      Promise.all([
-        fetch(buildURL, { method: 'head', signal: abortSignal }),
-        fetch(logURL, { method: 'head', signal: abortSignal }),
-      ]).then(([buildResponse, logResponse]) => {
-        if (buildResponse.status === 200) {
-          const mb = Math.round(buildResponse.headers.get('content-length') / 1024 / 1024 * 100) / 100;
-          element.replaceWith(html`
-            <div class=build-succeeded><a href="${buildURL}">${build} - <b>${mb} MB</b></a></div>
-          `);
-        } else if (logResponse.status === 200) {
+      fetch(buildURL, { method: 'head', signal: abortSignal }).then((buildResponse) => {
+        if (buildResponse.status !== 200)
+          return fetch(logURL, { method: 'head', signal: abortSignal });
+        const mb = Math.round(buildResponse.headers.get('content-length') / 1024 / 1024 * 100) / 100;
+        element.replaceWith(html`
+          <div class=build-succeeded><a href="${buildURL}">${build} - <b>${mb} MB</b></a></div>
+        `);
+      }).then(logResponse => {
+        if (!logResponse)
+          return;
+        if (logResponse.status === 200) {
           element.replaceWith(html`
             <div class=build-failed><a href="${logURL}">${build} - <b>FAILED</b></a></div>
           `);

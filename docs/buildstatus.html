@@ -188,7 +188,7 @@ class CommitsList {
     // Sort commits per day (in local time zone).
     const dayToCommits = new Map();
     for (const commitView of this._commitViews) {
-      const commits = dayToCommits.getOrCreate(commitView.day(), () => new Set());
+      const commits = getOrCreate(dayToCommits, commitView.day(), () => new Set());
       commits.add(commitView);
     }
 
@@ -299,4 +299,14 @@ function renderCommit(ghCommit) {
   `;
 }
 
+function getOrCreate(map, key, initializeCallback) {
+  let value = map.get(key);
+  if (!value) {
+    value = initializeCallback();
+    map.set(key, value);
+  }
+  return value;
+}
+
 </script>
+

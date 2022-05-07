@@ -147,11 +147,3 @@ export function stripAnsi(str) {
   return str.replace(ansiRegex, '');
 }
 
-Map.prototype.getOrCreate = function(key, initializeCallback) {
-  let value = this.get(key);
-  if (!value) {
-    value = initializeCallback();
-    this.set(key, value);
-  }
-  return value;
-}

@@ -196,7 +196,7 @@ class BrowserView {
     const buildsStatus = new Map();
     this.element.append(html`
       <hbox style='padding: 0 10px;'>
-        <h2>${this._displayName}: <b>r${this._buildNumber}</b></h2>
+        <h2>${this._displayName}: <b>r${this._buildNumber}</b> (${humanReadableTimeInterval(new Date() - new Date(this._commit.commit.author.date))} ago)</h2>
         <span style='flex: auto;'></span>
         ${browserLogoURL(this._browserName) && browserLogo(this._browserName)}
       </hbox>
@@ -253,7 +253,7 @@ function renderCommit(ghCommit) {
             border-radius: 50%;
           "src="${author.avatar_url}">
         <div text_overflow>
-          <b>${author.login}</b> committed <b>${humanReadableTimeInterval(new Date() - new Date(commit.author.date))} ago</b>
+          <b>${author.login}</b> committed ${humanReadableTimeInterval(new Date() - new Date(commit.author.date))} ago
         </div>
       </hbox>
     </vbox>

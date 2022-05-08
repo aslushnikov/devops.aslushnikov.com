@@ -1,61 +1,26 @@
 <meta charset='utf-8'>
-<title>DevOps - Playwright</title>
+<title>Playwright DevOps</title>
 <link rel="icon" href="/favicon.svg">
-<link rel=stylesheet href=./all.css>
+<link rel=stylesheet href=./typography.css>
 
-<style>
-  html {
-    background-color: #eee;
-  }
-  .gallery {
-    padding: 20px;
-    margin: 0 auto;
-    max-width: 1300px;
-    columns: 2;
-  }
+<div style="
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  ">
+  <div>
+    <h1>Welcome to Playwright DevOps</h1>
+    <p>Here we have a bunch of resources that help Playwright team develop Playwright.</p>
+    <ul>
+      <li><a href="/buildstatus.html">CDN: builds status</a></li>
+      <li><a href="/flakiness2.html">Tests: Flakiness Dashboard</a></li>
+      <li><a href="/pwlog.html">Logs: pw:protocol visualizer</a></li>
+      <li><a href="https://vanilla.aslushnikov.com">Protocol: CDP viewer</a></li>
+      <li><a href="https://ffprotocol.aslushnikov.com">Protocol: Juggler viewer</a></li>
+      <li><a href="https://cs.chromium.org">Code Search: Chromium</a></li>
+      <li><a href="https://ffsearch.azurewebsites.net/">Code Search: Firefox (playwright build)</a></li>
+      <li><a href="https://wksearch.azurewebsites.net/">Code Search: WebKit (playwright build)</a></li>
+    </ul>
+  </div>
+</div>
 
-  .tile {
-    background-color: #fff;
-    padding: 4px;
-    margin-bottom: 10px;
-    border: 1px solid var(--border-color);
-    box-shadow: 2px 2px 5px 0px #ddd;
-    break-inside: avoid-column;
-  }
-</style>
-
-<script type=module>
-  import {html} from './zhtml.js';
-  import {fetchCDNStatus, renderCDNStatusPreview} from './cdn-status.js';
-  import {fetchTestStatus, renderTestStatusPreview} from './test-status.js';
-  import {fetchDockerStats, dockerSizeStats} from './docker-size.js';
-  import {fetchAutorollData, renderAutorollDataPreview} from './autoroll.js';
-  import {cronjobBadgesHeader} from './cronjobs.js';
-  import {renderUsefulLinks} from './useful-links.js';
-
-  window.addEventListener('DOMContentLoaded', async () => {
-    const [cdnData, testData, dockerData, firefoxAutorollData, webkitAutorollData, chromiumAutorollData] = await Promise.all([
-      fetchCDNStatus(),
-      fetchTestStatus(),
-      fetchDockerStats(),
-      fetchAutorollData('Firefox'),
-      fetchAutorollData('WebKit'),
-      fetchAutorollData('Chromium'),
-    ]);
-
-    document.body.append(html`
-      ${cronjobBadgesHeader()}
-      <div class="gallery">
-        <div class=tile>${renderTestStatusPreview(testData)}</div>
-        <div class=tile>${renderAutorollDataPreview({
-          firefox: firefoxAutorollData,
-          webkit: webkitAutorollData,
-          chromium: chromiumAutorollData,
-        })}</div>
-        <div class=tile>${dockerSizeStats(dockerData, true /* preview */)}</div>
-        <div class=tile>${renderCDNStatusPreview(cdnData)}</div>
-        <div class=tile>${renderUsefulLinks()}</div>
-      </div>
-    `);
-  }, false);
-</script>

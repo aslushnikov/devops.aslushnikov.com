@@ -41,42 +41,15 @@
 import { html } from './zhtml.js';
 import { humanReadableTimeInterval, humanReadableDate } from './misc.js';
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable, createEvent, emitEvent } from './utils.js';
-import { URLState, newURL, amendURL } from './urlstate.js';
 import { rateLimitedFetch } from './fetch-extras.js';
 
-const urlState = new URLState();
-
-async function getCommits(sha) {
-  if (!sha)
-    return JSON.parse(await rateLimitedFetch('https://api.github.com/repos/microsoft/playwright/commits?per_page=100'));
-  const commits1 = JSON.parse(await rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&sha=${sha}`));
-  const since = new Date(commits1[0].commit.committer.date);
-  const commits2 = JSON.parse(await rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&since=${new Date(+since+1000).toISOString()}`));
-  return [...commits2, ...commits1];
-}
-
-const commitsPromise = getCommits(urlState.state().sha);
-
 window.addEventListener('DOMContentLoaded', async () => {
-  const ghCommits = await commitsPromise;
-  const commitsList = new CommitsList(ghCommits);
   const statusView = new CDNStatusView();
-  commitsList.events.onSelected(ghCommit => statusView.setGHCommit(ghCommit));
   document.body.append(html`
-    <hbox style="height: 100%; overflow: hidden; align-items: flex-start;">
-      ${commitsList.element}
+    <hbox style="padding: 10px;">
       ${statusView.element}
     </hbox>
   `);
-
-  urlState.startListening(Throttler.wrap(async () => {
-    const state = urlState.state();
-    const sha = state.sha;
-    if (!commitsList.selectCommitBySHA(sha)) {
-      window.reload();
-      return;
-    }
-  }));
 });
 
 const BROWSERS = [
@@ -89,32 +62,37 @@ const BROWSERS = [
   'winldd',
 ];
 
-async function getBrowserInfo(browserName, sha) {
-  const [buildNumber, expectedBuilds] = await Promise.all([
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/BUILD_NUMBER`),
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/EXPECTED_BUILDS`),
+async function getBrowserInfo(browserName) {
+  const [buildNumber, expectedBuilds, ghCommits] = await Promise.all([
+    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/browser_patches/${browserName}/BUILD_NUMBER`),
+    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/browser_patches/${browserName}/EXPECTED_BUILDS`),
+    rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=5&path=browser_patches/${browserName}/BUILD_NUMBER`),
   ]);
 
   return {
     buildNumber: buildNumber.split('\n')[0].trim(),
     expectedBuilds: expectedBuilds.trim().split('\n').map(build => build.trim()),
+    commits: JSON.parse(ghCommits),
   };
 }
 
 class CDNStatusView {
   constructor() {
-    this.element = html`<vbox style="overflow: auto; height: 100%; flex: auto;"></vbox>`;
+    this.element = html`<vbox style="
+        overflow: auto;
+        max-height: 100%;
+        overflow: auto;
+        flex: auto;
+        display: grid;
+        grid-template-columns: 33% 33% 33%;
+        grid-gap: 10px;
+    "></vbox>`;
     this.render = Throttler.wrap(() => this._doRender());
-    this._ghCommit = null;
-  }
-
-  setGHCommit(ghCommit) {
-    this._ghCommit = ghCommit;
     this.render();
   }
 
-  async _renderBrowser(browserName, sha, abortSignal) {
-    const { buildNumber, expectedBuilds } = await getBrowserInfo(browserName, sha);
+  async _renderBrowser(browserName, abortSignal) {
+    const { buildNumber, expectedBuilds, commits } = await getBrowserInfo(browserName);
 
     const renderBrowserBuild = (build) => {
       const element = html`<div>${build} - getting status...</div>`;
@@ -146,23 +124,31 @@ class CDNStatusView {
     };
 
     return html`
-      <h2>${browserName} r${buildNumber}</h2>
-      ${expectedBuilds.map(renderBrowserBuild)}
+      <vbox>
+        <h2>${browserName} r${buildNumber}</h2>
+        <div style="
+          border: 1px solid #d0d7de;
+          border-radius: 6px;
+          padding: 8px 16px;
+          margin: 8px 0;
+        ">
+          ${renderCommit(commits[0])}
+        </div>
+        ${expectedBuilds.map(renderBrowserBuild)}
+      </vbox>
     `;
   }
 
   async _doRender(abortSignal) {
     this.element.textContent = '';
-    if (!this._ghCommit)
-      return;
     const browserRenders = await Promise.all([
-      this._renderBrowser('chromium', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('chromium-tip-of-tree', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('firefox', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('firefox-beta', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('webkit', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('ffmpeg', this._ghCommit.sha, abortSignal),
-      this._renderBrowser('winldd', this._ghCommit.sha, abortSignal),
+      this._renderBrowser('chromium', abortSignal),
+      this._renderBrowser('chromium-tip-of-tree', abortSignal),
+      this._renderBrowser('firefox', abortSignal),
+      this._renderBrowser('firefox-beta', abortSignal),
+      this._renderBrowser('webkit', abortSignal),
+      this._renderBrowser('ffmpeg', abortSignal),
+      this._renderBrowser('winldd', abortSignal),
     ]);
     this.element.append(html`${browserRenders}`);
   }
@@ -179,9 +165,6 @@ class CommitsList {
     this._commitViews = [];
     for (const ghCommit of ghCommits) {
       const commitView = new CommitView(ghCommit);
-      commitView.events.onClick(() => {
-        urlState.amend({ sha: commitView.sha() });
-      });
       this._commitViews.push(commitView);
     }
 
@@ -281,10 +264,7 @@ function renderCommit(ghCommit) {
     titleElement.append(html`<a style="color: var(--text-color);" href="${commitURL}">${title.substring(lastIndex)}</a>`);
 
   return html`
-    <vbox class=commit-view style="
-        padding: 8px 16px;
-        cursor: pointer;
-    ">
+    <vbox class=commit-view>
       ${titleElement}
       <hbox>
         <img width=20 height=20 style="
@@ -292,7 +272,7 @@ function renderCommit(ghCommit) {
             border-radius: 50%;
           "src="${author.avatar_url}">
         <div text_overflow>
-          <b>${author.login}</b> committed ${humanReadableTimeInterval(new Date() - new Date(commit.author.date))} ago
+          <b>${author.login}</b> committed <b>${humanReadableTimeInterval(new Date() - new Date(commit.author.date))} ago</b>
         </div>
       </hbox>
     </vbox>

@@ -7,7 +7,8 @@ export function humanReadableTimeInterval(diff) {
     [60, 'hour'],
     [24, 'day'],
     [7, 'week'],
-    [52, 'year'],
+    [4, 'month'],
+    [12, 'year'],
   ];
   let aggr = 1;
   let time = 'Just Now';

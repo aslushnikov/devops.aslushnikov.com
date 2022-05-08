@@ -75,6 +75,7 @@ const LOGO_URLS = {
   'msedge-beta': '/msedge-beta.svg',
   'msedge-dev': '/msedge-dev.svg',
   'chromium': '/chromium.svg',
+  'chromium-tip-of-tree': '/chromium.svg',
   'chrome': '/chrome.svg',
   'chrome-beta': '/chrome-beta.svg',
   'electron': '/electron.svg',

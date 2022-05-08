@@ -1,9 +1,11 @@
 <!DOCTYPE html>
+<meta charset='utf8'>
 <title>Build Status</title>
 <link rel="stylesheet" href="typography.css">
 <style>
   :root, body {
     height: 100%;
+    background-color: #eee;
   }
 
   .selected {
@@ -31,217 +33,172 @@
   a:hover {
     text-decoration: underline;
   }
-
-  .commit-view + .commit-view {
-    border-top: 1px solid #d0d7de;
-  }
 </style>
 <script type=module>
 
 import { html } from './zhtml.js';
-import { humanReadableTimeInterval, humanReadableDate } from './misc.js';
+import { browserLogo, browserLogoURL, humanReadableTimeInterval, humanReadableDate } from './misc.js';
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable, createEvent, emitEvent } from './utils.js';
 import { rateLimitedFetch } from './fetch-extras.js';
 
 window.addEventListener('DOMContentLoaded', async () => {
-  const statusView = new CDNStatusView();
+  const views = await Promise.all([
+    BrowserView.create('Chromium Beta', 'chromium'),
+    BrowserView.create('Chromium TOT', 'chromium-tip-of-tree'),
+    BrowserView.create('Firefox Stable', 'firefox'),
+    BrowserView.create('Firefox Beta', 'firefox-beta'),
+    BrowserView.create('WebKit', 'webkit'),
+    BrowserView.create('FFMPEG', 'ffmpeg'),
+    BrowserView.create('winldd', 'winldd'),
+  ]);
   document.body.append(html`
-    <hbox style="padding: 10px;">
-      ${statusView.element}
-    </hbox>
+    <vbox style="padding: 10px;">
+      <h1 style='text-align: center;'>🎭 Playwright CDN Status 🚀</h1>
+      <section id=grid style='display: grid; grid-template-columns: 1fr 1fr 1fr; grid-gap: 10px;'>
+        ${views.map(view => view.element)}
+      </section>
+    </vbox>
   `);
 });
 
-const BROWSERS = [
-  'chromium',
-  'chromium-tip-of-tree',
-  'firefox',
-  'firefox-beta',
-  'webkit',
-  'ffmpeg',
-  'winldd',
-];
-
-async function getBrowserInfo(browserName) {
+async function getBrowserInfo(browserName, sha = 'main') {
   const [buildNumber, expectedBuilds, ghCommits] = await Promise.all([
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/browser_patches/${browserName}/BUILD_NUMBER`),
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/browser_patches/${browserName}/EXPECTED_BUILDS`),
-    rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=5&path=browser_patches/${browserName}/BUILD_NUMBER`),
+    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/BUILD_NUMBER`),
+    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/EXPECTED_BUILDS`),
   ]);
 
   return {
     buildNumber: buildNumber.split('\n')[0].trim(),
     expectedBuilds: expectedBuilds.trim().split('\n').map(build => build.trim()),
-    commits: JSON.parse(ghCommits),
   };
 }
 
-class CDNStatusView {
-  constructor() {
-    this.element = html`<vbox style="
-        overflow: auto;
-        max-height: 100%;
-        overflow: auto;
-        flex: auto;
-        display: grid;
-        grid-template-columns: 33% 33% 33%;
-        grid-gap: 10px;
-    "></vbox>`;
-    this.render = Throttler.wrap(() => this._doRender());
+class BrowserView {
+  static async create(displayName, browserName) {
+    const [browserInfo, commits] = await Promise.all([
+      getBrowserInfo(browserName),
+      rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&path=browser_patches/${browserName}/BUILD_NUMBER`).then(JSON.parse.bind(JSON)),
+    ]);
+
+    return new BrowserView(displayName, browserName, browserInfo.buildNumber, browserInfo.expectedBuilds, commits);
+  }
+
+  constructor(displayName, browserName, buildNumber, expectedBuilds, commits) {
+    this._displayName = displayName;
+    this._browserName = browserName;
+    this._buildNumber = buildNumber;
+    this._expectedBuilds = expectedBuilds;
+    this._commits = commits;
+
+    this._commit = this._commits[0];
+
+    this.element = html`<vbox style='
+        min-width: 0;
+        border: 1px solid #d0d7de;
+        padding: 10px;
+        background-color: white;
+    '></vbox>`;
+    this.render = Throttler.wrap(this._doRender.bind(this));
     this.render();
   }
 
-  async _renderBrowser(browserName, abortSignal) {
-    const { buildNumber, expectedBuilds, commits } = await getBrowserInfo(browserName);
+  async _selectCommit(commit) {
+    this._commit = commit;
+    const browserInfo = await getBrowserInfo(this._browserName, commit.sha);
+    this._buildNumber = browserInfo.buildNumber;
+    this._expectedBuilds = browserInfo.expectedBuilds;
+    this.render();
+  }
 
-    const renderBrowserBuild = (build) => {
-      const element = html`<div>${build} - getting status...</div>`;
-      const HOST = 'https://playwright2.blob.core.windows.net';
-      const buildURL = `${HOST}/builds/${browserName}/${buildNumber}/${build}`;
-      const logURL = `${HOST}/builds/${browserName}/${buildNumber}/${build.replace(/\.zip$/, '.log.gz')}`;
-      fetch(buildURL, { method: 'head', signal: abortSignal }).then((buildResponse) => {
-        if (buildResponse.status !== 200)
-          return fetch(logURL, { method: 'head', signal: abortSignal });
-        const mb = Math.round(buildResponse.headers.get('content-length') / 1024 / 1024 * 100) / 100;
+  _renderBrowserBuild(build, abortSignal) {
+    const element = html`<div>${build} - getting status...</div>`;
+
+    const HOST = 'https://playwright2.blob.core.windows.net';
+    const buildURL = `${HOST}/builds/${this._browserName}/${this._buildNumber}/${build}`;
+    const logURL = `${HOST}/builds/${this._browserName}/${this._buildNumber}/${build.replace(/\.zip$/, '.log.gz')}`;
+    fetch(buildURL, { method: 'head', signal: abortSignal }).then((buildResponse) => {
+      if (buildResponse.status !== 200)
+        return fetch(logURL, { method: 'head', signal: abortSignal });
+      const mb = Math.round(buildResponse.headers.get('content-length') / 1024 / 1024 * 100) / 100;
+      element.replaceWith(html`
+        <div class=build-succeeded><a href="${buildURL}">${build} - <b>${mb} MB</b></a></div>
+      `);
+    }).then(logResponse => {
+      if (!logResponse)
+        return;
+      if (logResponse.status === 200) {
         element.replaceWith(html`
-          <div class=build-succeeded><a href="${buildURL}">${build} - <b>${mb} MB</b></a></div>
+          <div class=build-failed><a href="${logURL}">${build} - <b>FAILED</b></a></div>
         `);
-      }).then(logResponse => {
-        if (!logResponse)
-          return;
-        if (logResponse.status === 200) {
-          element.replaceWith(html`
-            <div class=build-failed><a href="${logURL}">${build} - <b>FAILED</b></a></div>
-          `);
-        } else {
-          element.replaceWith(html`
-            <div class=build-pending>${build} - <b>pending...</b></div>
-          `);
-        }
-      }).catch(e => {
-      });
-      return element;
-    };
-
-    return html`
-      <vbox>
-        <h2>${browserName} r${buildNumber}</h2>
-        <div style="
-          border: 1px solid #d0d7de;
-          border-radius: 6px;
-          padding: 8px 16px;
-          margin: 8px 0;
-        ">
-          ${renderCommit(commits[0])}
-        </div>
-        ${expectedBuilds.map(renderBrowserBuild)}
-      </vbox>
-    `;
-  }
-
-  async _doRender(abortSignal) {
-    this.element.textContent = '';
-    const browserRenders = await Promise.all([
-      this._renderBrowser('chromium', abortSignal),
-      this._renderBrowser('chromium-tip-of-tree', abortSignal),
-      this._renderBrowser('firefox', abortSignal),
-      this._renderBrowser('firefox-beta', abortSignal),
-      this._renderBrowser('webkit', abortSignal),
-      this._renderBrowser('ffmpeg', abortSignal),
-      this._renderBrowser('winldd', abortSignal),
-    ]);
-    this.element.append(html`${browserRenders}`);
-  }
-}
-
-class CommitsList {
-  constructor(ghCommits) {
-    this.events = {
-      onSelected: createEvent(),
-    };
-
-    this._selectedCommitView = null;
-    this._selectCommit = this._selectCommit.bind(this);
-    this._commitViews = [];
-    for (const ghCommit of ghCommits) {
-      const commitView = new CommitView(ghCommit);
-      this._commitViews.push(commitView);
-    }
-
-    // Sort commits per day (in local time zone).
-    const dayToCommits = new Map();
-    for (const commitView of this._commitViews) {
-      const commits = getOrCreate(dayToCommits, commitView.day(), () => new Set());
-      commits.add(commitView);
-    }
-
-    this.element = html`<section style="height: 100%; overflow: auto;"></section>`;
-
-    // Render list of commits.
-    for (const [day, commits] of dayToCommits) {
-      const container = html`<div style="
-          border-left: 2px solid rgb(216, 222, 228);
-          padding-left: 15px;
-          margin: 0 15px;
-      "></div>`;
-      this.element.append(container);
-
-      container.append(html`<h4 text_overflow style="margin: 0; padding: 0.6em 0;">Commits on ${day}</h4>`);
-
-      const commitsBox = html`<div style="
-          border: 1px solid #d0d7de;
-          border-radius: 6px;
-      "></div>`;
-      container.append(commitsBox);
-      for (const commit of commits)
-        commitsBox.append(commit.element);
-    }
-  }
-
-  selectCommitBySHA(sha) {
-    if (!sha)
-      sha = this._commitViews[0].sha();
-    for (const view of this._commitViews) {
-      if (view.sha() === sha) {
-        this._selectCommit(view);
-        view.element.scrollIntoViewIfNeeded();
-        return true;
+      } else {
+        element.replaceWith(html`
+          <div class=build-pending>${build} - <b>pending...</b></div>
+        `);
       }
-    }
-    return false;
+    }).catch(e => {
+    });
+    return element;
   }
 
-  _selectCommit(commitView) {
-    if (this._selectedCommitView === commitView)
-      return;
-    if (this._selectedCommitView)
-      this._selectedCommitView.element.classList.remove('selected');
-    this._selectedCommitView = commitView;
-    this._selectedCommitView.element.classList.add('selected');
-    emitEvent(this.events.onSelected, this._selectedCommitView.ghCommit());
+  _showCommitPicker() {
+    const dialog = html`
+      <dialog style='padding: 0;'>
+        <hbox style='padding: 0 10px; position: sticky; top: 0; background-color: white;'>
+          <h2>${this._displayName}</h2>
+          <span style='flex: auto;'></span>
+          ${this._commit !== this._commits[0] && html`
+            <button style='margin-right: 10px;' onclick=${() => {dialog.close(); this._selectCommit(this._commits[0]); }}>latest</button>
+          `}
+          <button onclick=${() => {dialog.close(); dialog.remove(); }}>close</button>
+        </hbox>
+        <vbox style='margin: 0 10px 10px 10px; border: 1px solid #d0d7de; border-radius: 6px;'>
+          ${this._commits.map(commit => html`
+            <hbox id=commit-sha-${commit.sha} style='
+              padding: 8px 16px;
+              border-bottom: 1px solid #d0d7de;
+              background-color: ${commit.sha === this._commit.sha ? '#fff9c4' : 'white'};
+            '>
+              ${renderCommit(commit)}
+              <button style='margin-left: 10px;' onclick=${() => { dialog.close(); this._selectCommit(commit); }}>select</button>
+            </hbox>
+          `)}
+        </vbox>
+      </dialog>
+    `;
+    document.body.append(dialog);
+    dialog.showModal();
+    dialog.$('#commit-sha-' + this._commit.sha)?.scrollIntoViewIfNeeded();
   }
-}
 
-class CommitView {
-  constructor(ghCommit) {
-    this._sha = ghCommit.sha;
-    this._day = humanReadableDate(new Date(ghCommit.commit.committer.date));
-    this._ghCommit = ghCommit;
-
-    this.events = {
-      onClick: createEvent(),
-    };
-
-    this.element = renderCommit(ghCommit);
-    this.element.addEventListener('click', event => {
-      consumeDOMEvent(event);
-      emitEvent(this.events.onClick, this);
-    }, false);
+  _doRender({ signal }) {
+    this.element.textContent = '';
+    this.element.append(html`
+      <hbox>
+        <h2>${this._displayName}: <b>r${this._buildNumber}</b></h2>
+        <span style='flex: auto;'></span>
+        ${browserLogoURL(this._browserName) && browserLogo(this._browserName)}
+      </hbox>
+      <hbox>
+        <div>${this._commit === this._commits[0] ? 'Latest Commit' : 'Commit'}</div>
+        <span style='flex: auto;'></span>
+        ${this._commit !== this._commits[0] ? html`<button onclick=${() => this._selectCommit(this._commits[0])}>reset to latest</button>` : undefined}
+      </hbox>
+      <hbox style="
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 8px 16px;
+        margin: 8px 0;
+        background-color: ${this._commit === this._commits[0] ? 'white' : '#fff9c4'};
+      ">
+        ${renderCommit(this._commit)}
+        <button onclick=${this._showCommitPicker.bind(this)} style="margin-left: 10px; flex: none; font-size: 10px; align-self: flex-start;">pick..</button>
+      </hbox>
+      <div>Builds:</div>
+      <ul>
+      ${this._expectedBuilds.map(build => html`<li>${this._renderBrowserBuild(build, signal)}`)}
+      </ul>
+    `);
   }
-
-  sha() { return this._sha; }
-  day() { return this._day; }
-  ghCommit() { return this._ghCommit; }
 }
 
 function renderCommit(ghCommit) {
@@ -264,7 +221,7 @@ function renderCommit(ghCommit) {
     titleElement.append(html`<a style="color: var(--text-color);" href="${commitURL}">${title.substring(lastIndex)}</a>`);
 
   return html`
-    <vbox class=commit-view>
+    <vbox class=commit-view style="flex: auto; min-width: 0;">
       ${titleElement}
       <hbox>
         <img width=20 height=20 style="
@@ -277,15 +234,6 @@ function renderCommit(ghCommit) {
       </hbox>
     </vbox>
   `;
-}
-
-function getOrCreate(map, key, initializeCallback) {
-  let value = map.get(key);
-  if (!value) {
-    value = initializeCallback();
-    map.set(key, value);
-  }
-  return value;
 }
 
 </script>

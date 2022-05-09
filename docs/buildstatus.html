@@ -68,7 +68,7 @@ async function getBrowserInfo(browserName, sha = 'main') {
   ]);
 
   return {
-    buildNumber: buildNumber.split('\n')[0].trim(),
+    buildNumber: +buildNumber.split('\n')[0].trim(),
     expectedBuilds: expectedBuilds.trim().split('\n').map(build => build.trim()),
   };
 }
@@ -86,11 +86,11 @@ class BrowserView {
   constructor(displayName, browserName, buildNumber, expectedBuilds, commits) {
     this._displayName = displayName;
     this._browserName = browserName;
-    this._buildNumber = buildNumber;
-    this._expectedBuilds = expectedBuilds;
-    this._commits = commits;
 
-    this._commit = this._commits[0];
+    this._buildNumber = '';
+    this._expectedBuilds = [];
+    this._commits = commits;
+    this._commit = null;
 
     this.element = html`<vbox style='
         min-width: 0;
@@ -98,14 +98,21 @@ class BrowserView {
         background-color: white;
     '></vbox>`;
     this.render = Throttler.wrap(this._doRender.bind(this));
-    this.render();
+
+    this._selectCommit(this._commits[0], buildNumber, expectedBuilds);
   }
 
-  async _selectCommit(commit) {
-    this._commit = commit;
+  async _selectCommitAndLoad(commit) {
     const browserInfo = await getBrowserInfo(this._browserName, commit.sha);
-    this._buildNumber = browserInfo.buildNumber;
-    this._expectedBuilds = browserInfo.expectedBuilds;
+    this._selectCommit(commit, browserInfo.buildNumber, browserInfo.expectedBuilds);
+  }
+
+  async _selectCommit(commit, buildNumber, expectedBuilds) {
+    this._commit = commit;
+    this._buildNumber = buildNumber;
+    // explicitly set build number so that we can 
+    this._commit.buildNumber = buildNumber;
+    this._expectedBuilds = expectedBuilds;
     this.render();
   }
 
@@ -148,7 +155,6 @@ class BrowserView {
 
   _updateMainElementStatus(buildStatus) {
     const values = new Set([...buildStatus.values()]);
-    console.log(this._buildNumber, buildStatus, values);
     if (values.has('build-failed')) {
       this.element.style.setProperty('outline', '4px solid red');
     } else if (values.has('<none>')) {
@@ -161,13 +167,23 @@ class BrowserView {
   }
 
   _showCommitPicker() {
+    // Dirty hack: this will be used in commits.map later.
+    let lastCommitBuildNumber = 0;
+    let getCommitBuildNumber = (commit) => {
+      if (commit.buildNumber) {
+        lastCommitBuildNumber = commit.buildNumber;
+        return lastCommitBuildNumber;
+      }
+      return --lastCommitBuildNumber;
+    }
+
     const dialog = html`
       <dialog style='padding: 0;'>
         <hbox style='padding: 0 10px; position: sticky; top: 0; background-color: white;'>
           <h2>${this._displayName}</h2>
           <span style='flex: auto;'></span>
           ${this._commit !== this._commits[0] && html`
-            <button style='margin-right: 10px;' onclick=${() => {dialog.close(); this._selectCommit(this._commits[0]); }}>latest</button>
+            <button style='margin-right: 10px;' onclick=${() => {dialog.close(); this._selectCommitAndLoad(this._commits[0]); }}>latest</button>
           `}
           <button onclick=${() => {dialog.close(); dialog.remove(); }}>close</button>
         </hbox>
@@ -179,7 +195,10 @@ class BrowserView {
               background-color: ${commit.sha === this._commit.sha ? '#fff9c4' : 'white'};
             '>
               ${renderCommit(commit)}
-              <button style='margin-left: 10px;' onclick=${() => { dialog.close(); this._selectCommit(commit); }}>select</button>
+              <div style='margin: 0 10px;'>
+                r${getCommitBuildNumber(commit)}
+              </div>
+              <button style='margin-left: 10px;' onclick=${() => { dialog.close(); this._selectCommitAndLoad(commit); }}>select</button>
             </hbox>
           `)}
         </vbox>
@@ -203,7 +222,7 @@ class BrowserView {
       <hbox style='padding: 0 10px;'>
         <div>${this._commit === this._commits[0] ? 'Latest Commit' : 'Commit'}</div>
         <span style='flex: auto;'></span>
-        ${this._commit !== this._commits[0] ? html`<button onclick=${() => this._selectCommit(this._commits[0])}>reset to latest</button>` : undefined}
+        ${this._commit !== this._commits[0] ? html`<button onclick=${() => this._selectCommitAndLoad(this._commits[0])}>reset to latest</button>` : undefined}
       </hbox>
       <hbox style="
         border: 1px solid #d0d7de;

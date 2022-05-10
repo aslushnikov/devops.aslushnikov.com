@@ -2,11 +2,9 @@ const STORE_NAME = 'key-value';
 
 export class IDBStore {
   constructor(dbName) {
-    this._databasePromise = safariFix().then(() => {
-      const request = indexedDB.open('idb-store-' + dbName);
-      request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
-      return idbPromise(request);
-    });
+    const request = indexedDB.open('idb-store-' + dbName);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
+    this._databasePromise = idbPromise(request);
   }
 
   async _transactionStore(mode) {

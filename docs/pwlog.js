@@ -3,6 +3,9 @@ import { stripAnsi, humanReadableTimeIntervalShort } from './misc.js';
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable } from './utils.js';
 import { URLState, newURL, amendURL } from './urlstate.js';
 import { Popover } from './widgets.js';
+import { IDBStore } from './idbStore.js';
+
+const idbStore = new IDBStore('pwlog');
 
 const urlState = new URLState();
 const CHAR_ELLIPSIS = '…';
@@ -53,6 +56,10 @@ function colorsPie(colors) {
 
 window.addEventListener('DOMContentLoaded', async () => {
   const pwlog = new PWLog();
+
+  idbStore.get('log').then(log => pwlog.log.set(log));
+  pwlog.log.observe(log => idbStore.set('log', log));
+  
   document.body.append(html`
     ${pwlog.element}
   `);
@@ -75,7 +82,7 @@ class PWLog {
   constructor() {
     this.render = Throttler.wrap(this._doRender.bind(this));
 
-    this.log = observable(localStorage.getItem('log') || '');
+    this.log = observable('');
     this.filter = observable('', () => this.render());
     // This comes from user toggling buttons.
     this.excludeDomains = observable(new Set(), () => this.render());
@@ -269,7 +276,6 @@ class PWLog {
   }
 
   _setLog(log) {
-    localStorage.setItem('log', log);
     if (!log) {
       this._messages = [];
       this.render();

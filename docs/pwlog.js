@@ -3,7 +3,7 @@ import { stripAnsi, humanReadableTimeIntervalShort } from './misc.js';
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable } from './utils.js';
 import { URLState, newURL, amendURL } from './urlstate.js';
 import { Popover } from './widgets.js';
-import { IDBStore } from './idbStore.js';
+import { IDBStore } from './idbstore.js';
 
 const idbStore = new IDBStore('pwlog');
 

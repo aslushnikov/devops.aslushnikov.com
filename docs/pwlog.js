@@ -102,15 +102,15 @@ class PWLog {
             background-color: #f5f5f5;
             border-bottom: 1px solid #333;
         '>
-          <h4 style='
-                margin: 0 1em 0 0;
-                color: var(--link-color);
-              '
-          >PWLog</h4>
           <button
             onclick=${() => this.log.set('')}
             onzrender=${node => this.log.observe(log => node.disabled = !log)}
           >Clear</button>
+          <h4 style='
+                margin: 0 0 0 1em;
+                color: var(--link-color);
+              '
+          >PWLog</h4>
           <hbox style='margin-left: 1em;'>
             <input
               type=text

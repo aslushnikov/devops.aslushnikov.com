@@ -3,6 +3,14 @@
 <link rel="icon" href="/favicon.svg">
 <link rel=stylesheet href=./typography.css>
 
+<style>
+img[icon] {
+  margin-right: 1ex;
+  width: 16px;
+  height: 16px;
+}
+</style>
+
 <div style="
     display: flex;
     align-items: center;
@@ -10,17 +18,17 @@
   ">
   <div>
     <h1>Welcome to Playwright DevOps</h1>
-    <p>Here we have a bunch of resources that help Playwright team develop Playwright.</p>
-    <ul>
-      <li><a href="/buildstatus.html">CDN: builds status</a></li>
-      <li><a href="/flakiness2.html">Tests: Flakiness Dashboard</a></li>
-      <li><a href="/pwlog.html">Logs: pw:protocol visualizer</a></li>
-      <li><a href="https://vanilla.aslushnikov.com">Protocol: CDP viewer</a></li>
-      <li><a href="https://ffprotocol.aslushnikov.com">Protocol: Juggler viewer</a></li>
-      <li><a href="https://cs.chromium.org">Code Search: Chromium</a></li>
-      <li><a href="https://ffsearch.azurewebsites.net/">Code Search: Firefox (playwright build)</a></li>
-      <li><a href="https://wksearch.azurewebsites.net/">Code Search: WebKit (playwright build)</a></li>
-    </ul>
+    <p>Tools for Playwright Team</p>
+    <vbox>
+      <hbox><img icon src='/buildstatus.svg'><a href="/buildstatus.html">CDN: builds status</a></hbox>
+      <hbox><img icon src='/flakiness.svg'><a href="/flakiness2.html">Tests: Flakiness Dashboard</a></li></hbox>
+      <hbox><img icon src='/pwlog.svg'><a href="/pwlog.html">Logs: pw:protocol visualizer</a></li></hbox>
+      <hbox><img icon src='/remote.svg'><a href="https://vanilla.aslushnikov.com">Protocol: CDP viewer</a></hbox>
+      <hbox><img icon src='/remote.svg'><a href="https://ffprotocol.aslushnikov.com">Protocol: Juggler viewer</a></hbox>
+      <hbox><img icon src='/cs.svg'><a href="https://cs.chromium.org">Code Search: Chromium</a></hbox>
+      <hbox><img icon src='/cs.svg'><a href="https://ffsearch.azurewebsites.net/">Code Search: Firefox (playwright build)</a></hbox>
+      <hbox><img icon src='/cs.svg'><a href="https://wksearch.azurewebsites.net/">Code Search: WebKit (playwright build)</a></hbox>
+    </vbox>
   </div>
 </div>
 

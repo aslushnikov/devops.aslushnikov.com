@@ -42,6 +42,19 @@ import { browserLogo, browserLogoURL, humanReadableTimeInterval, humanReadableDa
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable, createEvent, emitEvent } from './utils.js';
 import { rateLimitedFetch } from './fetch-extras.js';
 
+const ONE_DAY = 1000 * 60 * 60 * 24;
+const ONE_WEEK = ONE_DAY * 7;
+const TWO_WEEKS = ONE_WEEK * 2;
+const ONE_MONTH = ONE_WEEK * 4;
+
+const BUILD_AGES = {
+  'chromium-tip-of-tree': { warn: ONE_WEEK, panic: TWO_WEEKS },
+  'chromium': { warn: ONE_WEEK, panic: TWO_WEEKS },
+  'firefox': { warn: TWO_WEEKS, panic: ONE_MONTH },
+  'firefox-beta': { warn: TWO_WEEKS, panic: ONE_MONTH },
+  'webkit': { warn: ONE_WEEK, panic: TWO_WEEKS },
+};
+
 window.addEventListener('DOMContentLoaded', async () => {
   const views = await Promise.all([
     BrowserView.create('Chromium Beta', 'chromium'),
@@ -52,10 +65,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     BrowserView.create('FFMPEG', 'ffmpeg'),
     BrowserView.create('winldd', 'winldd'),
   ]);
+  const browsersJSONView = await BrowsersJSONView.create(views);
   document.body.append(html`
     <vbox style="padding: 10px;">
       <h1 style='text-align: center;'>🎭 Playwright CDN Status 🚀</h1>
       <section id=grid style='display: grid; grid-template-columns: 1fr 1fr 1fr; grid-gap: 10px;'>
+        ${browsersJSONView.element}
         ${views.map(view => view.element)}
       </section>
     </vbox>
@@ -92,6 +107,8 @@ class BrowserView {
     this._expectedBuilds = [];
     this._commits = commits;
     this._commit = null;
+    this._speculativeBuildNumberToCommit = new Map();
+    this._speculativeCommitToBuildNumber = new Map();
 
     this.element = html`<vbox style='
         min-width: 0;
@@ -108,12 +125,36 @@ class BrowserView {
     this._selectCommit(commit, browserInfo.buildNumber, browserInfo.expectedBuilds);
   }
 
+  browserName() { return this._browserName; }
+  displayName() { return this._displayName; }
+
+  // We assume that every commit to BUILD_NUMBER file bumps the revision.
+  // This is mostly true, but wasn't the case for old chromium builds.
+  speculativeBuildNumberToCommit(buildNumber) {
+    return this._speculativeBuildNumberToCommit.get(buildNumber);
+  }
+
   async _selectCommit(commit, buildNumber, expectedBuilds) {
     this._commit = commit;
     this._buildNumber = buildNumber;
     // explicitly set build number so that we can 
     this._commit.buildNumber = buildNumber;
     this._expectedBuilds = expectedBuilds;
+
+    // Assign a commit <-> buildNumber mapping.
+    // This is SPECULATIVE since we assume that each commit to BUILD_NUMBER file bumps
+    // revision. This is mostly true, but was not the case for old builds.
+    this._speculativeBuildNumberToCommit.clear();
+    this._speculativeCommitToBuildNumber.clear();
+    let lastCommitBuildNumber = 0;
+    for (const commit of this._commits) {
+      if (commit.buildNumber)
+        lastCommitBuildNumber = commit.buildNumber;
+      else
+        --lastCommitBuildNumber;
+      this._speculativeBuildNumberToCommit.set(lastCommitBuildNumber, commit);
+      this._speculativeCommitToBuildNumber.set(commit, lastCommitBuildNumber);
+    }
     this.render();
   }
 
@@ -168,16 +209,6 @@ class BrowserView {
   }
 
   _showCommitPicker() {
-    // Dirty hack: this will be used in commits.map later.
-    let lastCommitBuildNumber = 0;
-    let getCommitBuildNumber = (commit) => {
-      if (commit.buildNumber) {
-        lastCommitBuildNumber = commit.buildNumber;
-        return lastCommitBuildNumber;
-      }
-      return --lastCommitBuildNumber;
-    }
-
     const dialog = html`
       <dialog style='padding: 0;'>
         <hbox style='padding: 0 10px; position: sticky; top: 0; background-color: white;'>
@@ -197,7 +228,7 @@ class BrowserView {
             '>
               ${renderCommit(commit)}
               <div style='margin: 0 10px;'>
-                r${getCommitBuildNumber(commit)}
+                r${this._speculativeCommitToBuildNumber.get(commit)}
               </div>
               <button style='margin-left: 10px;' onclick=${() => { dialog.close(); this._selectCommitAndLoad(commit); }}>select</button>
             </hbox>
@@ -241,6 +272,71 @@ class BrowserView {
       ${this._expectedBuilds.map(build => html`<li>${this._renderBrowserBuild(build, signal, buildsStatus)}`)}
       </ul>
       </vbox>
+    `);
+  }
+}
+
+class BrowsersJSONView {
+  static async create(browserViews) {
+    const [browsersJSON, commits] = await Promise.all([
+      rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON)),
+      // rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&path=packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON)),
+    ]);
+    return new BrowsersJSONView(browsersJSON, browserViews);
+  }
+
+  constructor(browsersJSON, browserViews) {
+    this._browserNameToView = new Map(browserViews.map(view => [view.browserName(), view]));
+    this._browsersJSON = browsersJSON;
+    this.element = html`<vbox style='
+        min-width: 0;
+        border: 1px solid #d0d7de;
+        background-color: white;
+        padding: 0 10px;
+    '></vbox>`;
+
+    this.render = Throttler.wrap(this._doRender.bind(this));
+    this.render();
+  }
+
+  _renderBrowser(name, revision, version) {
+    const browserView = this._browserNameToView.get(name);
+    const ghCommit = browserView.speculativeBuildNumberToCommit(+revision);
+    const buildAge = new Date() - new Date(ghCommit.commit.author.date);
+    const warnTimes = BUILD_AGES[name];
+    let decoration = 'build-succeeded';
+    if (warnTimes && warnTimes.panic <= buildAge)
+      decoration = 'build-failed';
+    else if (warnTimes && warnTimes.warn <= buildAge)
+      decoration = 'build-pending';
+
+    return html`
+      <div>
+        <b>${browserView.displayName()}</b> ${version}
+      </div>
+      <div>
+        build <b>r${revision}</b> from <span class=${decoration}>${humanReadableTimeInterval(buildAge)} ago</span>
+      </div>
+    `;
+  }
+
+  _doRender() {
+    this.element.textContent = '';
+    console.log(this._browsersJSON);
+    const browsersToRender = this._browsersJSON.browsers.filter(browser => this._browserNameToView.has(browser.name));
+    this.element.append(html`
+      <h2>Playwright browsers on <code>main</code> branch</h2>
+      <section style='
+      '>
+        <div>The information is parsed from <a href='https://github.com/microsoft/playwright/tree/main/packages/playwright-core/browsers.json'>browsers.json</a>:</div>
+        <ul>
+          ${browsersToRender.map(browser => html`
+            <li>
+              ${this._renderBrowser(browser.name, browser.revision, browser.browserVersion)}
+            </li>
+          `)}
+        </ul>
+      </section>
     `);
   }
 }

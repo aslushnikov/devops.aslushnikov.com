@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<meta charset="utf8" />
+<title>Commit Status</title>
+<link rel="stylesheet" href="typography.css" />
+<style>
+  :root {
+    --theme-gap-size: 2px;
+    --theme-square-size: 16px;
+    --theme-left-side-bar-size: 400px;
+  }
+
+  .nowrap {
+    white-space: nowrap;
+  }
+
+  .left-ellision {
+    direction: rtl;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .vertical {
+    transform: rotate(180deg);
+    white-space: nowrap;
+    writing-mode: vertical-lr;
+    text-align: start;
+  }
+
+  .category__flaky {
+    background-color: rgb(206, 147, 216);
+  }
+
+  .category__good {
+    background-color: rgb(165, 214, 167);
+  }
+
+  .category__bad {
+    background-color: rgb(239, 154, 154);
+  }
+
+  .category__- {
+    background-color: #efefef;
+  }
+
+  header {
+    z-index: 2;
+    background-color: #efefef;
+    position: sticky;
+    top: 0;
+  }
+</style>
+<script type="module">
+  import { html } from "./zhtml.js";
+
+  const CATEGORY_PRECEDENCE = ["bad", "flaky", "good"];
+
+  const categoryClass = (category) => (category ? `category__${category}` : "");
+
+  const getTestName = (test) => {
+    const browserName = test.parameters.browserName || "N/A";
+    const browserVersion = test.parameters.browserVersion || "";
+    const platform = test.parameters.platform;
+    const prefix =
+      browserName && browserVersion
+        ? browserName + " " + browserVersion
+        : browserName;
+    return [
+      prefix,
+      platform,
+      ...Object.entries(test.parameters)
+        .filter(
+          ([key, value]) =>
+            !!value &&
+            key !== "platform" &&
+            key !== "browserName" &&
+            key !== "browserVersion"
+        )
+        .map(([key, value]) => {
+          if (typeof value === "string") return value;
+          if (typeof value === "boolean") return key;
+          return `${key}=${value}`;
+        }),
+    ].join(" / ");
+  };
+
+  const getTestCategory = (test) => {
+    const hasGoodRun = test.runs[test.expectedStatus] > 0;
+    const hasBadRun =
+      (test.expectedStatus !== "failed" && test.runs.failed > 0) ||
+      (test.expectedStatus !== "timedOut" && test.runs.timedOut > 0);
+    if (hasGoodRun && hasBadRun) return "flaky";
+    if (hasBadRun) return "bad";
+    return "good";
+  };
+
+  const nextCategory = (prev, current) => {
+    if (prev === "bad" || current === "bad") return "bad";
+    if (prev === "flaky" || current === "flaky") return "flaky";
+    if (current !== "good") throw new Error("unreachable");
+    return "good";
+  };
+
+  const aggregate = (json, commit) => {
+    const specs = [];
+    const tests = [];
+    const configurations = new Set();
+
+    for (const entry of json) {
+      for (const spec of entry.specs) {
+        const specId = entry.file + "---" + spec.title;
+        const specObject = {
+          specId,
+          file: entry.file,
+          title: spec.title,
+          line: spec.line,
+          column: spec.column,
+          configurationToTest: {},
+        };
+        specs.push(specObject);
+        for (const test of spec.tests || []) {
+          if (test.parameters.channel) {
+            test.parameters.browserName = test.parameters.channel;
+            delete test.parameters.channel;
+          }
+          // By default, all tests are run under "default" mode unless marked differently.
+          if (!test.parameters.mode) test.parameters.mode = "default";
+
+          // Cleanup a bunch of values that we don't use.
+          delete test.parameters["timestamp"];
+          delete test.parameters["ci.link"];
+          delete test.parameters["revision.id"];
+          delete test.parameters["revision.author"];
+          delete test.parameters["revision.email"];
+          delete test.parameters["revision.subject"];
+          delete test.parameters["revision.timestamp"];
+          delete test.parameters["revision.link"];
+          const testObject = {
+            specId,
+            // spec: specObject,
+            name: getTestName(test),
+            browserName: test.parameters.browserName || "N/A",
+            platform: test.parameters.platform,
+            parameters: test.parameters,
+            annotations: test.annotations || [],
+            runs: {
+              passed: test.passed || 0,
+              skipped: test.skipped || 0,
+              timedOut: test.timedOut || 0,
+              failed: test.failed ? test.failed.length : 0,
+            },
+            errors: (test.failed || []).map((error) => ({
+              // Sometimes we get an error object like this:
+              // { "value: "Worker process exited unexpectedly" }
+              stack: error.stack || error.value,
+              // errorId: humanId(createStackSignature(error.stack || error.message || error.value)),
+            })),
+            hasErrors: test.failed?.length > 0,
+            maxTime: test.maxTime, // max time with test passing
+            expectedStatus: test.expectedStatus || "passed",
+          };
+          testObject.category = getTestCategory(testObject);
+          tests.push(testObject);
+          if (specObject.configurationToTest[testObject.name])
+            throw new Error(
+              `Duplicate test for ${testObject.name}\nNEW:\n\n${JSON.stringify(
+                { testObject },
+                null,
+                " "
+              )}\nOLD:\n\n${JSON.stringify(
+                specObject.configurationToTest[testObject.name],
+                null,
+                " "
+              )}`
+            );
+          specObject.configurationToTest[testObject.name] = testObject;
+        }
+
+        specObject.category = "good";
+        for (const [, { category: testCategory }] of Object.entries(
+          specObject.configurationToTest
+        ))
+          specObject.category = nextCategory(specObject.category, testCategory);
+      }
+    }
+
+    for (const test of tests) configurations.add(test.name);
+
+    if (specs.length !== new Set(specs.map((s) => s.file + s.title)).size)
+      throw new Error("unreachable: one spec per file+title violated");
+    if (
+      specs.length !==
+      new Set(specs.map((s) => [s.file, s.title, s.line, s.column].join(":")))
+        .size
+    )
+      throw new Error("unreachable: ambiguous spec name");
+
+    const toConfig = (name) => {
+      const category = specs
+        .map((s) => s.configurationToTest[name] || null)
+        .filter(Boolean)
+        .map((s) => s.category)
+        .reduce(nextCategory, "good");
+      return { name, category };
+    };
+
+    const configs = [...configurations].map(toConfig);
+    configs.sort((a, b) => {
+      const [aCategory, bCategory] = [
+        CATEGORY_PRECEDENCE.indexOf(a.category),
+        CATEGORY_PRECEDENCE.indexOf(b.category),
+      ];
+      if (aCategory !== bCategory) return aCategory < bCategory ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    specs.sort((a, b) => {
+      const [aCategory, bCategory] = [
+        CATEGORY_PRECEDENCE.indexOf(a.category),
+        CATEGORY_PRECEDENCE.indexOf(b.category),
+      ];
+      if (aCategory !== bCategory) return aCategory < bCategory ? -1 : 1;
+      return a.specId.localeCompare(b.specId);
+    });
+
+    const matrix = [
+      ["spec", ...configs],
+      ...specs.map((s) => [
+        s,
+        ...configs
+          .map((c) => c.name)
+          .map((c) => s.configurationToTest[c] || null),
+      ]),
+    ];
+
+    return matrix;
+  };
+
+  const commitPicker = (onPicked) => {
+    const input = html`<input type="text" required />`;
+    return html`
+      <dialog
+        onzrender=${(e) =>
+          e.addEventListener("close", () => onPicked(input.value))}
+        open
+      >
+        <form method="dialog">
+          <label>commit: ${input} </label>
+        </form>
+      </dialog>
+    `;
+  };
+
+  window.addEventListener("DOMContentLoaded", async () => {
+    const root = html`<div></div>`;
+    document.body.appendChild(html`
+      <vbox style="padding: 10px;">
+        <h1 style="text-align: center;">🎭 Playwright Commit Status 🚀</h1>
+        ${root}
+      </vbox>
+    `);
+
+    const render = (commit) => {
+      const status = html`<div></div>`;
+      root.replaceChildren(html`
+        <p>commit: ${commit}</p>
+        ${status}
+      `);
+
+      (async () => {
+        status.innerText = "fetching…";
+        const url = `https://folioflakinessdashboard.blob.core.windows.net/dashboards/compressed_v1/${encodeURIComponent(
+          commit
+        )}.json`;
+        const json = await fetch(url)
+          .then((r) => {
+            if (r.status !== 200)
+              throw new Error(`[${url}]: Expected 200, but got ${r.status}`);
+            return r;
+          })
+          .then((r) => r.json());
+        console.log(json);
+        const [configs, ...specRows] = aggregate(json);
+
+        const header = configs
+          .slice(1)
+          .map(
+            (bot) =>
+              html`<div
+                class="vertical ${categoryClass(bot.category)}"
+                style="width: var(--theme-square-size)"
+              >
+                ${bot.name}
+              </div>`
+          );
+
+        root.replaceChildren(html`
+          <header
+            style="
+              display: grid;
+              grid-gap: var(--theme-gap-size);
+              grid-template-columns: var(--theme-left-side-bar-size) repeat(${configs.length - 1}, var(--theme-square-size));
+            "
+          >
+            <div
+              style="width: var(--theme-left-side-bar-size); position: sticky; left: 0; top: 0; z-index: 5;"
+            ></div>
+            ${header}
+          </header>
+
+          <main style="display: flex; margin-top: var(--theme-gap-size);">
+            <div
+              style="width: var(--theme-left-side-bar-size); position: sticky; left: 0; margin-left: var(--theme-gap-size)"
+            >
+              ${specRows.map((row) => {
+                const [spec] = row;
+                return html`<div
+                  style="margin: var(--theme-gap-size); margin-top: 0;"
+                  class="left-ellision ${categoryClass(spec.category)}"
+                >
+                  ${spec.file} - ${spec.title}
+                </div>`;
+              })}
+            </div>
+            <section
+              style="display: grid; grid-gap: var(--theme-gap-size); grid-template-columns: repeat(${configs.length - 1}, var(--theme-square-size));"
+            >
+              ${specRows.flatMap((row, i) => {
+                const [, ...tests] = row;
+                return tests.map(
+                  (t) =>
+                    html`<div
+                      style="text-align: center; vertical-align: middle;"
+                      class="${categoryClass(t?.category)}"
+                    >
+                      ${t?.category[0].toUpperCase() || "-"}
+                    </div>`
+                );
+              })}
+            </section>
+          </main>
+        `);
+      })().catch((e) => (status.innerText = `ERROR: ${e}`));
+    };
+
+    const url = new URL(window.location);
+    let commit = url.searchParams.get("commit");
+    if (!commit) {
+      root.replaceChildren(
+        commitPicker((c) => {
+          url.searchParams.set("commit", c);
+          window.history.pushState({}, "", url);
+          render(c);
+        })
+      );
+    } else {
+      render(commit);
+    }
+  });
+</script>

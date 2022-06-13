@@ -6,7 +6,7 @@
   "scripts": {
     "serve": "static docs/ -p 1234",
     "dev:commit-status": "parcel src/commitstatus/index.html",
-    "build:commit-status": "parcel build --no-source-maps --dist-dir --no-autoinstall --detailed-report --dist-dir docs/commitstatus2 src/commitstatus/index.html"
+    "build:commit-status": "parcel build --no-source-maps --dist-dir --detailed-report --dist-dir docs/commitstatus2 src/commitstatus/index.html"
   },
   "keywords": [],
   "author": "",

@@ -8,11 +8,11 @@ import {
 } from "./datastore";
 import groupBy from "lodash/groupBy";
 import { useEffect, useMemo, useState } from "react";
-import { DragAndDropGrouper, Group } from "./ColumnOrderAndGrouper";
+import { DragAndDropGrouper } from "./ColumnOrderAndGrouper";
 import { CommitPicker } from "./CommitPicker";
 
 const CATEGORY_PRECEDENCE: Readonly<Category[]> = ["bad", "flaky", "good"];
-const DEFAULT_REMOVED = ["id", "botName"];
+const DEFAULT_REMOVED = ["id", "botName", "total"];
 const DEFAULT_GROUPED = [
   "category",
   "file",
@@ -27,6 +27,7 @@ const DEFAULT_GROUPED = [
   "nodejsVersion",
   "commit",
 ];
+const DEFAULT_UNGROUPED = [];
 type Row = Schema<TestSchema>;
 const rowKeyGetter = (row: Row) => row.id;
 
@@ -60,6 +61,7 @@ function getComparator(sortColumn: keyof Row): Comparator {
       return (a, b) => {
         return a[sortColumn].localeCompare(b[sortColumn]);
       };
+    case "total":
     case "id":
       return (a, b) => {
         return a[sortColumn] - b[sortColumn];
@@ -80,9 +82,15 @@ const groupFormatter = ({
   const category = childRows.reduce((acc, cur) => {
     return nextCategory(acc, cur.category as Category);
   }, "good" as Category);
+
+  const total = childRows.reduce((acc, cur) => {
+    return acc + cur.total;
+  }, 0);
   return (
     <>
-      <div className={categoryClass(category)}>{groupKey as string}</div>
+      <div className={categoryClass(category)}>
+        {groupKey as string} ({total})
+      </div>
     </>
   );
 };
@@ -92,11 +100,11 @@ export const SpecGrid: React.FC<{
 }> = ({ onLoadingChange }) => {
   const { isLoading, error, fetchCommit, db, commits } = useRemoteDataHook();
   const [grouped, setGrouped] = useState<string[]>(DEFAULT_GROUPED);
-  const [ungrouped, setUngrouped] = useState<string[]>([]);
+  const [ungrouped, setUngrouped] = useState<string[]>(DEFAULT_UNGROUPED);
   const [removed, setRemoved] = useState<string[]>(DEFAULT_REMOVED);
   const [includeGood, setIncludeGood] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
-    [...DEFAULT_GROUPED, ...DEFAULT_REMOVED].map((v) => ({
+    [...DEFAULT_GROUPED, ...DEFAULT_UNGROUPED, ...DEFAULT_REMOVED].map((v) => ({
       columnKey: v,
       direction: "ASC",
     }))

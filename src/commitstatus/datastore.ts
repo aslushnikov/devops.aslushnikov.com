@@ -136,6 +136,7 @@ export type TestSchema = {
   trace: "boolean";
   video: "boolean";
   commit: "string";
+  total: "number";
 };
 
 const aggregate = (
@@ -209,6 +210,7 @@ const aggregate = (
           trace: test.parameters.trace,
           video: test.parameters.video,
           commit: commit,
+          total: 1,
         });
       }
     }
@@ -244,6 +246,7 @@ export const useRemoteDataHook = () => {
       trace: "boolean",
       video: "boolean",
       commit: "string",
+      total: "number",
     })
   );
 

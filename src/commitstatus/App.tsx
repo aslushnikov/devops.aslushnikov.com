@@ -7,11 +7,11 @@ export const App: React.FC = () => {
   return (
     <>
       <main>
-        <BrandHeader
+        {/* <BrandHeader
           title="Playwright"
           subtitle="Test Status"
           shimmer={isLoading}
-        />
+        /> */}
         <SpecGrid onLoadingChange={setIsLoading} />
       </main>
     </>

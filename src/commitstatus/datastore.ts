@@ -301,5 +301,21 @@ export const useRemoteDataHook = () => {
     window.history.pushState({}, "", o);
   }, [commits]);
 
-  return { commits, isLoading, error, fetchCommit, db };
+  const autoLoadGitHub = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        "https://api.github.com/repos/microsoft/playwright/commits/main"
+      );
+      if (res.status !== 200)
+        throw new Error(`Expected 200 from GH API, but got ${res.status}`);
+      const { sha } = await res.json();
+      fetchCommit(sha);
+    } catch (e) {
+      setError(e.toString());
+      setIsLoading(false);
+    }
+  };
+
+  return { commits, isLoading, error, fetchCommit, db, autoLoadGitHub };
 };

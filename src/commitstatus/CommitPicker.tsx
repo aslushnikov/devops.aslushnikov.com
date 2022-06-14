@@ -16,7 +16,7 @@ export const CommitPicker: React.FC<{
       }}
     >
       <label>
-        Load Commit
+        Enter an Arbitrary Commit
         <input
           placeholder={placeholder}
           disabled={disabled}

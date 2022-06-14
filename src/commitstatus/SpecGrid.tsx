@@ -12,11 +12,9 @@ import { DragAndDropGrouper } from "./ColumnOrderAndGrouper";
 import { CommitPicker } from "./CommitPicker";
 
 const CATEGORY_PRECEDENCE: Readonly<Category[]> = ["bad", "flaky", "good"];
-const DEFAULT_REMOVED = ["id", "botName", "total"];
-const DEFAULT_GROUPED = [
-  "category",
-  "file",
-  "title",
+const DEFAULT_REMOVED = [
+  "id",
+  "total",
   "browserName",
   "platform",
   "headful",
@@ -27,7 +25,8 @@ const DEFAULT_GROUPED = [
   "nodejsVersion",
   "commit",
 ];
-const DEFAULT_UNGROUPED = [];
+const DEFAULT_GROUPED = [];
+const DEFAULT_UNGROUPED = ["category", "file", "title", "botName"];
 type Row = Schema<TestSchema>;
 const rowKeyGetter = (row: Row) => row.id;
 
@@ -98,7 +97,8 @@ const groupFormatter = ({
 export const SpecGrid: React.FC<{
   onLoadingChange: (loading: boolean) => void;
 }> = ({ onLoadingChange }) => {
-  const { isLoading, error, fetchCommit, db, commits } = useRemoteDataHook();
+  const { isLoading, error, fetchCommit, db, commits, autoLoadGitHub } =
+    useRemoteDataHook();
   const [grouped, setGrouped] = useState<string[]>(DEFAULT_GROUPED);
   const [ungrouped, setUngrouped] = useState<string[]>(DEFAULT_UNGROUPED);
   const [removed, setRemoved] = useState<string[]>(DEFAULT_REMOVED);
@@ -147,7 +147,8 @@ export const SpecGrid: React.FC<{
         (db.schema() as any)[v] === "boolean"
           ? ({ row }) => <>{(row as any)[v].toString()}</>
           : undefined,
-      width: v === "file" || v === "title" ? 400 : undefined,
+      width:
+        v === "file" || v === "title" ? 400 : v === "category" ? 50 : undefined,
       cellClass:
         v === "category"
           ? (row: Row) => categoryClass(row.category as any)
@@ -159,7 +160,26 @@ export const SpecGrid: React.FC<{
   return (
     <>
       <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-        <div style={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
+        <div
+          style={{
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div>
+            <button
+              disabled={isLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                autoLoadGitHub();
+              }}
+            >
+              Load Latest Commit From GitHub
+            </button>
+          </div>
+          <div>- OR -</div>
           <div>
             <CommitPicker
               placeholder={isLoading ? "loading…" : "commit"}

@@ -50,10 +50,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   urlState.startListening(CriticalSection.wrap(async () => {
     const state = urlState.state();
 
-    const showFlaky = StringToBool(state.show_flaky || 'true');
+    const showFlaky = StringToBool(state.show_flaky || 'false');
     dashboard.setShowFlaky(showFlaky);
 
-    const commits = parseInt(state.commits || '20', 10);
+    const commits = parseInt(state.commits || '10', 10);
     dashboard.setLastCommits(commits);
     dashboard.setBrowserFilter(state.browser === 'any' ? undefined : state.browser);
     dashboard.setPlatformFilter(state.platform === 'any' ? undefined : state.platform);

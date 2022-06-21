@@ -4,5 +4,3 @@
 *.swp
 *.pyc
 .vscode
-.parcel-cache/
-dist/

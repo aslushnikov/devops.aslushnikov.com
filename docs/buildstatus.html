@@ -35,8 +35,7 @@
     text-decoration: underline;
   }
 </style>
-<script type=module>
-
+<script type="module">
 import { html } from './zhtml.js';
 import { browserLogo, browserLogoURL, humanReadableTimeInterval, humanReadableDate } from './misc.js';
 import { Throttler, consumeDOMEvent, preventTextSelectionOnDBLClick, observable, createEvent, emitEvent } from './utils.js';
@@ -54,6 +53,8 @@ const BUILD_AGES = {
   'firefox-beta': { warn: TWO_WEEKS, panic: ONE_MONTH },
   'webkit': { warn: ONE_WEEK, panic: TWO_WEEKS },
 };
+
+const BROWSER_WITH_UPSTREAM_COMMITS = ['webkit', 'firefox', 'firefox-beta', 'chromium', 'chromium-tip-of-tree'];
 
 window.addEventListener('DOMContentLoaded', async () => {
   const views = await Promise.all([
@@ -77,8 +78,39 @@ window.addEventListener('DOMContentLoaded', async () => {
   `);
 });
 
+async function getBrowserJsonMetaInformation(browserName, branch = 'main') {
+  const rawUpstreamConfig = await rateLimitedFetch(
+   `https://raw.githubusercontent.com/microsoft/playwright/${branch}/browser_patches/${browserName}/UPSTREAM_CONFIG.sh`
+  );
+  if (!rawUpstreamConfig) {
+    return null;
+  }
+  const upstreamConfig = Object.fromEntries(rawUpstreamConfig.split('\n').map(line => {
+    const match = /(\w+)="(.+)"/.exec(line);
+    return match ? [match[1], match[2]] : null;
+  }).filter(Boolean));
+  const { REMOTE_URL, BRANCH_COMMIT, BASE_REVISION } = upstreamConfig
+  if (!REMOTE_URL && !BRANCH_COMMIT) {
+    return null;
+  }
+  const commit = BRANCH_COMMIT || BASE_REVISION;
+  const normalizedRemoteURL = REMOTE_URL ? REMOTE_URL.replace('.git', '') : 'https://github.com/chromium/chromium';
+  const commitLink = `${normalizedRemoteURL}/commit/${commit}`;
+  const [owner, repo] = new URL(normalizedRemoteURL).pathname.slice(1).split('/');
+  const lastUpstreamCommitResponse = await rateLimitedFetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${commit}`,
+    7 * 24 * 60 * 60 * 1000, /* 7 days */
+  );
+  const lastUpstreamCommit = new Date(JSON.parse(lastUpstreamCommitResponse).commit.author.date);
+  return {
+    commit,
+    commitLink,
+    lastUpstreamCommit,
+  };
+}
+
 async function getBrowserInfo(browserName, sha = 'main') {
-  const [buildNumber, expectedBuilds, ghCommits] = await Promise.all([
+  const [buildNumber, expectedBuilds, ] = await Promise.all([
     rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/BUILD_NUMBER`),
     rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/EXPECTED_BUILDS`),
   ]);
@@ -278,16 +310,15 @@ class BrowserView {
 
 class BrowsersJSONView {
   static async create(browserViews) {
-    const [browsersJSON, commits] = await Promise.all([
-      rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON)),
-      // rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&path=packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON)),
-    ]);
-    return new BrowsersJSONView(browsersJSON, browserViews);
+    const browsersJSON = await rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON));
+    const browser2MetaInformation = Object.fromEntries(await Promise.all(BROWSER_WITH_UPSTREAM_COMMITS.map(async browserName => [browserName, await getBrowserJsonMetaInformation(browserName)])));
+    return new BrowsersJSONView(browsersJSON, browser2MetaInformation, browserViews);
   }
 
-  constructor(browsersJSON, browserViews) {
+  constructor(browsersJSON, browser2MetaInformation, browserViews) {
     this._browserNameToView = new Map(browserViews.map(view => [view.browserName(), view]));
     this._browsersJSON = browsersJSON;
+    this.browser2MetaInformation = browser2MetaInformation;
     this.element = html`<vbox style='
         min-width: 0;
         border: 1px solid #d0d7de;
@@ -315,14 +346,18 @@ class BrowsersJSONView {
         <b>${browserView.displayName()}</b> ${version}
       </div>
       <div>
-        build <b>r${revision}</b> from <span class=${decoration}>${humanReadableTimeInterval(buildAge)} ago</span>
+        ${this.browser2MetaInformation[name] ? html`
+          revision <a href="${this.browser2MetaInformation[name].commitLink}" target="_blank">${this.browser2MetaInformation[name].commit.substring(0, 7)}</a> 
+          from <span class=${decoration}>${humanReadableTimeInterval(new Date() - new Date(this.browser2MetaInformation[name].lastUpstreamCommit))} ago </span>
+        ` : html`
+          build <b>r${revision}</b> from <span class=${decoration}>${humanReadableTimeInterval(buildAge)} ago</span>
+        `}
       </div>
     `;
   }
 
   _doRender() {
     this.element.textContent = '';
-    console.log(this._browsersJSON);
     const browsersToRender = this._browsersJSON.browsers.filter(browser => this._browserNameToView.has(browser.name));
     this.element.append(html`
       <h2>Playwright browsers on <code>main</code> branch</h2>

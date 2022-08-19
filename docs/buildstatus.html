@@ -5,16 +5,11 @@
 <link rel="stylesheet" href="typography.css">
 <style>
   :root, body {
-    height: 100%;
-    background-color: #eee;
+    background-color: var(--background-color);
   }
 
   .selected {
     background-color: #fff9c4;
-  }
-
-  .build-succeeded {
-    /* background-color: #f1f8e9 !important; */
   }
 
   .build-failed {
@@ -34,6 +29,27 @@
   a:hover {
     text-decoration: underline;
   }
+
+  @media (prefers-color-scheme: dark) {
+    a {
+      color: #45ba4b;
+    }
+    body {
+      --text-color: white;
+      --background-color: #1b1b1d;
+      --link-color: #0366d6;
+    }
+    :root {
+      color-scheme: dark;
+    }
+    vbox vbox {
+      background-color: #1e272e !important;
+    }
+    #grid hbox {
+      background-color: #1e272e !important;
+    }
+  }
+
 </style>
 <script type="module">
 import { html } from './zhtml.js';

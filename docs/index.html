@@ -4,11 +4,26 @@
 <link rel=stylesheet href=./typography.css>
 
 <style>
-img[icon] {
-  margin-right: 1ex;
-  width: 16px;
-  height: 16px;
-}
+  img[icon] {
+    margin-right: 1ex;
+    width: 16px;
+    height: 16px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    a {
+      color: #45ba4b;
+    }
+    body {
+      --text-color: white;
+      background-color: #1b1b1d;
+      --link-color: #0366d6;
+    }
+    :root {
+      color-scheme: dark;
+    }
+  }
+
 </style>
 
 <div style="

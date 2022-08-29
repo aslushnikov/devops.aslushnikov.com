@@ -46,7 +46,7 @@ class RateLimitedFetcher {
   }
 
   async get(url, options) {
-    const maxAget = 15 * 60 * 1000; /* 15 minutes */
+    const maxAge = 15 * 60 * 1000; /* 15 minutes */
     options = { ...options, method: 'get' };
     const CACHE_KEY = JSON.stringify({...options, url});
     return await this._criticalSection.run(CACHE_KEY, async () => {

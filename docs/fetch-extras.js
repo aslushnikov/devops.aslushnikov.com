@@ -45,13 +45,15 @@ class RateLimitedFetcher {
     }
   }
 
-  async get(url, maxAge = 15 * 60 * 1000 /* 15 minutes */) {
-    const CACHE_KEY = JSON.stringify({method: 'get', url});
+  async get(url, options) {
+    const maxAget = 15 * 60 * 1000; /* 15 minutes */
+    options = { ...options, method: 'get' };
+    const CACHE_KEY = JSON.stringify({...options, url});
     return await this._criticalSection.run(CACHE_KEY, async () => {
       const data = await this._cache.get(CACHE_KEY);
       if (data && Date.now() - data.timestamp < data.maxAge)
         return data.text;
-      const response = await fetch(url);
+      const response = await fetch(url, options);
       if (!response.ok) {
         // Save result as `null` and cache it for the next 10 minutes.
         // Otherwise we might keep flooding GH API and might eventually run out of quota.
@@ -67,10 +69,10 @@ class RateLimitedFetcher {
 
 let rlfetcherPromise = null;
 
-export function rateLimitedFetch(url, maxAge) {
+export function rateLimitedFetch(url, options) {
   if (!rlfetcherPromise)
     rlfetcherPromise = RateLimitedFetcher.create();
-  return rlfetcherPromise.then(fetcher => fetcher.get(url, maxAge));
+  return rlfetcherPromise.then(fetcher => fetcher.get(url, options));
 }
 
 // This is based on https://javascript.info/fetch-progress

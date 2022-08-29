@@ -56,6 +56,8 @@ const BUILD_AGES = {
 
 const BROWSER_WITH_UPSTREAM_COMMITS = ['webkit', 'firefox', 'firefox-beta', 'chromium', 'chromium-tip-of-tree'];
 
+const GH_TOKEN = JSON.parse(localStorage.getItem('GH_TOKEN') || 'null');
+
 window.addEventListener('DOMContentLoaded', async () => {
   const views = await Promise.all([
     BrowserView.create('Chromium Beta', 'chromium'),
@@ -65,7 +67,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     BrowserView.create('WebKit', 'webkit'),
     BrowserView.create('FFMPEG', 'ffmpeg'),
     BrowserView.create('winldd', 'winldd'),
-  ]);
+  ]).catch(e => {
+    // Assume we're not logged in!
+    return null;
+  });
+  if (!views) {
+    await logInFlow();
+    return;
+  }
   const browsersJSONView = await BrowsersJSONView.create(views);
   document.body.append(html`
     <vbox style="padding: 10px;">
@@ -77,6 +86,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     </vbox>
   `);
 });
+
+async function logInFlow() {
+  document.body.append(html`
+    <vbox style='justify-content: center; align-items: center; height: 100%;'>
+        <h1>Please, log in!</h1>
+    </vbox>
+  `);
+}
 
 async function getBrowserJsonMetaInformation(browserName, branch = 'main') {
   const rawUpstreamConfig = await rateLimitedFetch(

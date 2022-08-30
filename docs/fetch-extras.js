@@ -45,8 +45,7 @@ class RateLimitedFetcher {
     }
   }
 
-  async get(url, options) {
-    const maxAge = 15 * 60 * 1000; /* 15 minutes */
+  async get(url, options, maxAge = 15 * 60 * 1000 /* 15 minutes */) {
     options = { ...options, method: 'get' };
     const CACHE_KEY = JSON.stringify({...options, url});
     return await this._criticalSection.run(CACHE_KEY, async () => {
@@ -69,10 +68,10 @@ class RateLimitedFetcher {
 
 let rlfetcherPromise = null;
 
-export function rateLimitedFetch(url, options) {
+export function rateLimitedFetch(url, options, maxAge) {
   if (!rlfetcherPromise)
     rlfetcherPromise = RateLimitedFetcher.create();
-  return rlfetcherPromise.then(fetcher => fetcher.get(url, options));
+  return rlfetcherPromise.then(fetcher => fetcher.get(url, options, maxAge));
 }
 
 // This is based on https://javascript.info/fetch-progress

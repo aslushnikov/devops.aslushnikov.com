@@ -56,7 +56,13 @@ const BUILD_AGES = {
 
 const BROWSER_WITH_UPSTREAM_COMMITS = ['webkit', 'firefox', 'firefox-beta', 'chromium', 'chromium-tip-of-tree'];
 
-const GH_TOKEN = JSON.parse(localStorage.getItem('GH_TOKEN') || 'null');
+const GH_TOKEN = localStorage.getItem('GH_TOKEN');
+const GH_FETCH_OPTIONS = GH_TOKEN ? {
+  headers: {
+    'Authorization': `bearer ${GH_TOKEN}`,
+    'Accept': 'application/vnd.github.v3.raw',
+  },
+} : undefined;
 
 window.addEventListener('DOMContentLoaded', async () => {
   const views = await Promise.all([
@@ -72,7 +78,38 @@ window.addEventListener('DOMContentLoaded', async () => {
     return null;
   });
   if (!views) {
-    await logInFlow();
+    localStorage.removeItem('GH_TOKEN');
+    document.body.append(html`
+      <vbox style='justify-content: center; align-items: center; height: 100%;'>
+          <h1>Authorization Required</h1>
+          <vbox style='max-width: 600px; font-size: 16px;'>
+            <p>This website requires a <i><u>P</u>ersonal <u>A</u>ccess <u>T</u>oken</i> (PAT) to access resources. This token is stored locally and is only used
+            to issue requests to GitHub API.</p>
+            <p>To create a new token:
+            <ol>
+              <li>Navigate to <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a></li>
+              <li>Click "Generate new Token" and generate a new token
+                <ul>
+                  <li>Select the <code>repo</code> permissions</li>
+                  <li>Make sure to set some reasonable expiration time</li>
+                </ul>
+              </li>
+              <li>Copy the token to clipboard.</li>
+              <li>Hit "Configure SSO" to enable SSO for the PAT</li>
+              <li>Click this button and enter the PAT:
+            </ol>
+            </p>
+
+            <p>Once ready, hit the button below:</p>
+          </vbox>
+
+          <button onclick=${() => {
+            const token = prompt('Enter PAT:');
+            localStorage.setItem('GH_TOKEN', token);
+            window.location.reload();
+          }}><h2>Enter PAT</h2></button>
+      </vbox>
+    `);
     return;
   }
   const browsersJSONView = await BrowsersJSONView.create(views);
@@ -87,17 +124,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   `);
 });
 
-async function logInFlow() {
-  document.body.append(html`
-    <vbox style='justify-content: center; align-items: center; height: 100%;'>
-        <h1>Please, log in!</h1>
-    </vbox>
-  `);
-}
-
 async function getBrowserJsonMetaInformation(browserName, branch = 'main') {
   const rawUpstreamConfig = await rateLimitedFetch(
-   `https://raw.githubusercontent.com/microsoft/playwright/${branch}/browser_patches/${browserName}/UPSTREAM_CONFIG.sh`
+    `https://api.github.com/repos/microsoft/playwright-browsers/contents/browser_patches/${browserName}/UPSTREAM_CONFIG.sh?ref=${branch}`,
+    // `https://raw.githubusercontent.com/microsoft/playwright-browsers/${branch}/browser_patches/${browserName}/UPSTREAM_CONFIG.sh`,
+    GH_FETCH_OPTIONS,
   );
   if (!rawUpstreamConfig) {
     return null;
@@ -128,8 +159,8 @@ async function getBrowserJsonMetaInformation(browserName, branch = 'main') {
 
 async function getBrowserInfo(browserName, sha = 'main') {
   const [buildNumber, expectedBuilds, ] = await Promise.all([
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/BUILD_NUMBER`),
-    rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/${sha}/browser_patches/${browserName}/EXPECTED_BUILDS`),
+    rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright-browsers/contents/browser_patches/${browserName}/BUILD_NUMBER?ref=${sha}`, GH_FETCH_OPTIONS),
+    rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright-browsers/contents/browser_patches/${browserName}/EXPECTED_BUILDS?ref=${sha}`, GH_FETCH_OPTIONS),
   ]);
 
   return {
@@ -142,7 +173,7 @@ class BrowserView {
   static async create(displayName, browserName) {
     const [browserInfo, commits] = await Promise.all([
       getBrowserInfo(browserName),
-      rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/commits?per_page=100&path=browser_patches/${browserName}/BUILD_NUMBER`).then(JSON.parse.bind(JSON)),
+      rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright-browsers/commits?per_page=100&path=browser_patches/${browserName}/BUILD_NUMBER`, GH_FETCH_OPTIONS).then(JSON.parse.bind(JSON)),
     ]);
 
     return new BrowserView(displayName, browserName, browserInfo.buildNumber, browserInfo.expectedBuilds, commits);
@@ -327,7 +358,7 @@ class BrowserView {
 
 class BrowsersJSONView {
   static async create(browserViews) {
-    const browsersJSON = await rateLimitedFetch(`https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright-core/browsers.json`).then(JSON.parse.bind(JSON));
+    const browsersJSON = await rateLimitedFetch(`https://api.github.com/repos/microsoft/playwright/contents/packages/playwright-core/browsers.json?ref=main`, GH_FETCH_OPTIONS).then(JSON.parse.bind(JSON));
     const browser2MetaInformation = Object.fromEntries(await Promise.all(BROWSER_WITH_UPSTREAM_COMMITS.map(async browserName => [browserName, await getBrowserJsonMetaInformation(browserName)])));
     return new BrowsersJSONView(browsersJSON, browser2MetaInformation, browserViews);
   }

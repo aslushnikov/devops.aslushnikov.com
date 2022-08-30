@@ -2,6 +2,69 @@
 <title>Playwright DevOps</title>
 <link rel="icon" href="/favicon.svg">
 <link rel=stylesheet href=./typography.css>
+<script type="text/javascript" src="https://alcdn.msauth.net/browser/2.28.1/js/msal-browser.min.js"></script>
+
+<script>
+
+(async function() {
+  const msalConfig = {
+      auth: {
+          clientId: '5e9c2128-caaa-46c5-938c-569974bc2d45',
+          authority: "https://devopsaslushnikovcom.b2clogin.com/devopsaslushnikovcom.onmicrosoft.com/B2C_1_signup-or-signin",
+          knownAuthorities: ["devopsaslushnikovcom.b2clogin.com"], // array of domains that are known to be trusted
+          redirectUri: 'http://localhost:1234',
+      },
+  };
+  const msalInstance = new msal.PublicClientApplication(msalConfig);
+  const accounts = msalInstance.getAllAccounts();
+  console.log('accounts', accounts);
+
+  if (!accounts.length) {
+    const response = await msalInstance.loginPopup({
+      scopes: [ 'https://api.github.com/repo' ],
+    })
+    console.log(response);
+    return;
+  }
+
+  const request = { account: msalInstance.getAllAccounts()[0], scopes: ['repo', 'user'] };
+  const response = await msalInstance.acquireTokenSilent(request).then(tokenResponse => {
+    debugger;
+  }).catch(async (error) => {
+    if (error instanceof msal.InteractionRequiredAuthError) {
+      // fallback to interaction when silent call fails
+      return msalInstance.acquireTokenPopup(request);
+    }
+    console.error(error);
+    debugger;
+  }).catch(error => {
+    console.error(error);
+    debugger;
+      // handleError(error);
+  });
+
+  console.log(response);
+})();
+
+
+
+/*
+msalInstance.acquireTokenSilent().then(tokenResponse => {
+    // Do something with the tokenResponse
+    debugger;
+}).catch(async (error) => {
+  debugger;
+    if (error instanceof msal.InteractionRequiredAuthError) {
+        // fallback to interaction when silent call fails
+        return msalInstance.acquireTokenPopup(request);
+    }
+}).catch(error => {
+    console.error(error);
+    //handleError(error);
+});
+*/
+
+</script>
 
 <style>
 img[icon] {
